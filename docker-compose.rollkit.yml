@@ -1,12 +1,20 @@
 services:
-  beacond:
-    image: ghcr.io/rollkit/beacon-kit:v0.1.3
-    container_name: beacond
+  rollkit-evm-single:
+    image: ghcr.io/rollkit/rollkit-evm-single:v0.1.3
+    container_name: rollkit-evm-single
     volumes:
-      - ./testing/files:/beacon-kit/testing/files
-      - ./.tmp:/beacon-kit/.tmp
       - /var/run/docker.sock:/var/run/docker.sock
-    entrypoint: /beacon-kit/testing/files/entrypoint.sh
+    entrypoint: /usr/bin/entrypoint.sh
+    environment:
+      - EVM_ENGINE_URL=http://reth:8551
+      - EVM_ETH_URL=http://reth:8545
+      - EVM_JWT_SECRET=f747494bb0fb338a0d71f5f9fe5b5034c17cc988c229b59fd71e005ee692e9bf
+      - EVM_GENESIS_HASH=0x06bab65f0fa3c9b1ba0da34e319d7a5cd948cd10ba33080b88f17d281880e344
+      - EVM_BLOCK_TIME=1s
+      - EVM_SIGNER_PASSPHRASE=secret
+      - DA_ADDRESS=http://celestia-network-bridge:26658
+      - DA_AUTH_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiLCJhZG1pbiJdfQ.qxoN_a-k7aZZE77VSpfgyvI_0eNvJ_OgBsT35zxUQnQ
+      - DA_NAMESPACE=00000000000000000000000000000000000000b7b24d9321578eb83626
     depends_on:
       celestia-network-validator:
         condition: service_healthy
@@ -16,28 +24,36 @@ services:
         condition: service_started
     networks:
       - rollkit-network
-
   reth:
     image: ghcr.io/paradigmxyz/reth:v1.3.11 # Use the official Reth image
     container_name: reth
     ports:
+      - "9001:9001" # Metrics port
       - "30303:30303" # P2P port
       - "8545:8545" # HTTP port
       - "8551:8551" # Auth RPC port
     volumes:
       - ./testing/files:/testapp_files # Mount the directory for test app files
       - ./.tmp:/.tmp # Mount a temporary directory for data
-    command: |
-      node
-      --chain /testapp_files/eth-genesis.json
-      --http
-      --http.addr 0.0.0.0
-      --http.api eth,net,debug
-      --authrpc.addr 0.0.0.0
-      --authrpc.jwtsecret /testapp_files/jwt.hex
-      --datadir /.tmp/eth-home
-      --ipcpath /.tmp/eth-home/eth-engine.ipc
-      --rpc.eth-proof-window 120000
+      - ./testing/files/logs:/root/logs # Mount the logs directory
+    entrypoint: /bin/sh -c
+    command:
+      - |
+          reth node \
+          --chain /testapp_files/eth-genesis.json \
+          --metrics 0.0.0.0:9001 \
+          --log.file.directory /root/logs \
+          --authrpc.addr 0.0.0.0 \
+          --authrpc.port 8551 \
+          --http \
+          --http.addr 0.0.0.0 \
+          --http.port 8545 \
+          --http.api "eth,net,web3,txpool" \
+          --authrpc.jwtsecret /testapp_files/jwt.hex \
+          --datadir /.tmp/eth-home \
+          --ipcpath /.tmp/eth-home/eth-engine.ipc \
+          --disable-discovery \
+          --rpc.eth-proof-window 120000
     networks:
       - rollkit-network
 
@@ -148,7 +164,7 @@ services:
     ports:
       - "50052:50052"
     depends_on:
-      beacond:
+      rollkit-evm-single:
         condition: service_started
       indexer:
         condition: service_healthy
@@ -171,7 +187,7 @@ services:
       - HTTP_TIMEOUT_SECONDS=30
       - RECONNECT_DELAY_SECONDS=5
     depends_on:
-      beacond:
+      rollkit-evm-single:
         condition: service_started
     networks:
       - rollkit-network
