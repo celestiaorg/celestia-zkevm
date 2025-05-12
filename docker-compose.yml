@@ -1,15 +1,15 @@
 services:
   celestia-init:
-    image: ghcr.io/celestiaorg/celestia-app-standalone:02ff9af
+    image: ghcr.io/celestiaorg/celestia-app-standalone:feature-zk-execution-ism
     container_name: celestia-init
     entrypoint: /scripts/init.sh
     volumes:
       - ./scripts/init-celestia.sh:/scripts/init.sh:ro
-      - celestia-app:/home/celestia/.celestia-appd
+      - celestia-app:/home/celestia/.celestia-app
     restart: "no"
 
   celestia-validator:
-    image: ghcr.io/celestiaorg/celestia-app-standalone:02ff9af
+    image: ghcr.io/celestiaorg/celestia-app-standalone:feature-zk-execution-ism
     container_name: celestia-validator
     ports:
       - "26656:26656"
@@ -18,13 +18,13 @@ services:
     healthcheck:
       test: [
         "CMD-SHELL",
-        "bh=$(curl -sf http://localhost:26657/status | jq -r '.result.sync_info.latest_block_height'); if [ \"$$bh\" -ge 1 ]; then exit 0; else exit 1; fi"
+        "bh=$(curl -sf http://localhost:26657/status | jq -r '.result.sync_info.latest_block_height'); if [ \"$$bh\" -gt 1 ]; then exit 0; else exit 1; fi"
       ]
       interval: 30s
       timeout: 5s
       start_period: 10s
     volumes:
-      - celestia-app:/home/celestia/.celestia-appd
+      - celestia-app:/home/celestia/.celestia-app
     command: >
       start --force-no-bbr
     depends_on:
@@ -33,8 +33,26 @@ services:
     networks:
       - celestia-zkevm-net
 
+  celestia-bridge:
+    image: ghcr.io/celestiaorg/celestia-node:v0.23.0-rc0
+    container_name: celestia-bridge
+    volumes:
+      - ./scripts/init-celestia-bridge.sh:/scripts/init.sh:ro
+      - celestia-bridge:/home/celestia
+    entrypoint: /scripts/init.sh
+    command: celestia bridge start --log.level.module share/discovery:fatal
+    ports:
+      - "26658:26658"
+      - "2121:2121"
+    depends_on:
+      celestia-validator:
+        condition: service_healthy
+    networks:
+      - celestia-zkevm-net
+
 volumes:
   celestia-app:
+  celestia-bridge:
 
 networks:
   celestia-zkevm-net:
