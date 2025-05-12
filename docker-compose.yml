@@ -1,4 +1,13 @@
 services:
+  celestia-init:
+    image: ghcr.io/celestiaorg/celestia-app-standalone:02ff9af
+    container_name: celestia-init
+    entrypoint: /scripts/init.sh
+    volumes:
+      - ./scripts/init-celestia.sh:/scripts/init.sh:ro
+      - celestia-app:/home/celestia/.celestia-appd
+    restart: "no"
+
   celestia-validator:
     image: ghcr.io/celestiaorg/celestia-app-standalone:02ff9af
     container_name: celestia-validator
@@ -9,26 +18,23 @@ services:
     healthcheck:
       test: [
         "CMD-SHELL",
-        "BLOCK_HEIGHT=$(curl -sf http://localhost:26657/status | jq -r '.result.sync_info.latest_block_height'); \
-        if [ \"$$BLOCK_HEIGHT\" -gt 1 ]; then \
-          exit 0; \
-        else \
-          echo \"Block height too low: $$BLOCK_HEIGHT\"; \
-          exit 1; \
-        fi"
+        "bh=$(curl -sf http://localhost:26657/status | jq -r '.result.sync_info.latest_block_height'); if [ \"$$bh\" -ge 1 ]; then exit 0; else exit 1; fi"
       ]
       interval: 30s
       timeout: 5s
-      retries: 3
       start_period: 10s
     volumes:
-      - ./testnet/celestia-validator:/setup
-      - ./.tmp/celestia-validator:/home/celestia/.celestia-appd
-    # override the default entrypoint to cp -R default chain state
-    entrypoint: >
-      sh -c "cp -R /setup/* /home/celestia/.celestia-appd && celestia-appd start --force-no-bbr"
+      - celestia-app:/home/celestia/.celestia-appd
+    command: >
+      start --force-no-bbr
+    depends_on:
+      celestia-init:
+        condition: service_completed_successfully
     networks:
       - celestia-zkevm-net
+
+volumes:
+  celestia-app:
 
 networks:
   celestia-zkevm-net:
