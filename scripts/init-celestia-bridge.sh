@@ -4,6 +4,7 @@ set -euo pipefail
 
 CHAIN_ID="celestia-zkevm-testnet"
 CONSENSUS_RPC="http://celestia-validator:26657/status"
+MNEMONIC="father remove minimum call daughter fly runway sponsor two exile bean sting address person hidden view want black strong text fashion ethics nephew reform"
 
 if [ -f /home/celestia/.env ]; then
     echo "Skipping initialisation..."
@@ -23,11 +24,15 @@ else
     export CELESTIA_CUSTOM="$CHAIN_ID:$GEN_BLOCK_HASH"
     echo "export CELESTIA_CUSTOM=$CELESTIA_CUSTOM" > /home/celestia/.env
 
+    echo "Recovering bridge node operator account from seed phase..."
+    echo $MNEMONIC | cel-key add node --recover --node.type bridge
+
     echo "Initializing bridge node..."
     celestia bridge init \
         --core.ip celestia-validator \
         --rpc.addr 0.0.0.0 \
-        --rpc.port 26658
+        --rpc.port 26658 \
+        --keyring.keyname node
 fi
 
 echo "Starting bridge node..."
