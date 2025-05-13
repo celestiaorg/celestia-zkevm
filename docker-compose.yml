@@ -40,10 +40,17 @@ services:
       - ./scripts/init-celestia-bridge.sh:/scripts/init.sh:ro
       - celestia-bridge:/home/celestia
     entrypoint: /scripts/init.sh
-    command: celestia bridge start --log.level.module share/discovery:fatal
+    command: celestia bridge start --log.level.module share/discovery:fatal --keyring.keyname node --rpc.skip-auth
     ports:
       - "26658:26658"
       - "2121:2121"
+    healthcheck:
+      test: >
+        curl -sf -X POST http://localhost:26658
+        -H "Content-Type: application/json"
+        -d '{"id":1,"jsonrpc":"2.0","method":"node.Ready","params":[]}' | grep true
+      interval: 10s
+      start_period: 10s
     depends_on:
       celestia-validator:
         condition: service_healthy
