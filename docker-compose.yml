@@ -40,7 +40,7 @@ services:
       - ./scripts/init-celestia-bridge.sh:/scripts/init.sh:ro
       - celestia-bridge:/home/celestia
     entrypoint: /scripts/init.sh
-    command: celestia bridge start --log.level.module share/discovery:fatal --keyring.keyname node
+    command: celestia bridge start --log.level.module share/discovery:fatal
     ports:
       - "26658:26658"
       - "2121:2121"
