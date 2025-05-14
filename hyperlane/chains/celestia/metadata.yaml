@@ -22,7 +22,7 @@ nativeToken:
   denom: utia
   name: Tia
   symbol: TIA
-protocol: cosmos
+protocol: cosmosnative
 restUrls:
   - http: http://localhost:1317
 rpcUrls:
