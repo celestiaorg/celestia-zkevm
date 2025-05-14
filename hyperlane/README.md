@@ -47,3 +47,49 @@ hyperlane core init --advanced --registry ./hyperlane
 ```
 hyperlane core deploy --chain rethlocal --registry ./hyperlane
 ```
+
+5. Create synthetic token on Reth.
+
+```
+hyperlane warp deploy --config ./configs/warp-config.yaml --registry ./hyperlane/
+```
+
+### Deploy Hyperlane fixtures on Celestia
+
+1. Create a `NoopISM`
+
+```
+celestia-appd tx hyperlane ism create-noop --from default --fees 400utia
+```
+
+2. Create a `Mailbox`
+
+The ID provided is the ISM ID.
+
+```
+celestia-appd tx hyperlane mailbox create 0x726f757465725f69736d00000000000000000000000000000000000000000000 69420 --from default --fees 400utia
+```
+
+3. Create `Hooks`. For testing we will first create `NoopHooks`.
+
+```
+celestia-appd tx hyperlane hooks noop create --from default --fees 400utia
+```
+
+4. Set the hooks on the mailbox
+
+```
+celestia-appd tx hyperlane mailbox set $mailbox_id --required-hook $noopHooksID --default-hook $noopHooksID --from default --fees 400utia
+```
+
+5. Create a `utia` collateral token.
+
+```
+celestia-appd tx warp create-collateral-token [mailbox-id] utia --from default  --fees 400utia
+```
+
+6. Set the default ISM on the collateral token.
+
+```
+celestia-appd tx warp set-token 0x726f757465725f61707000000000000000000000000000010000000000000000 --ism-id $ismID --from default --fees 400utia
+```
