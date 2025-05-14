@@ -13,6 +13,9 @@ chainId: celestia
 displayName: Celestia
 domainId: 69420
 gasCurrencyCoinGeckoId: celestia
+gasPrice:
+  denom: utia
+  amount: "0.002"
 grpcUrls:
   - http: http://localhost:9090
 isTestnet: true
