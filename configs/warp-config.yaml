@@ -3,7 +3,7 @@ rethlocal:
   # token: "0x123" # Collateral/vault address. Required for collateral types
   owner: "0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d" # Optional owner address for synthetic token
   mailbox: "0xb1c938F5BA4B3593377F399e12175e8db0C787Ff" # mailbox address route
-  # interchainSecurityModule: "0xa05915fD6E32A1AA7E67d800164CaCB12487142d" TODO: retry this
+  interchainSecurityModule: "0xa05915fD6E32A1AA7E67d800164CaCB12487142d"
   # interchainGasPaymaster: "0x123" # Optional interchainGasPaymaster address
   # isNft: true # If the token is an NFT (ERC721), set to true
   # You can optionally set the token metadata

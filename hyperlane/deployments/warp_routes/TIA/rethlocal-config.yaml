@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/hyperlane-xyz/hyperlane-registry/v15.2.0/deployments/warp_routes/schema.json
 tokens:
-  - addressOrDenom: "0x032e1B988eB5Ac8F0C8617E09de92a664cABf37D"
+  - addressOrDenom: "0x8ccBa74d0010B76F3E9507bb3A86cC394F96815d"
     chainName: rethlocal
     decimals: 6
     name: SynTIA
