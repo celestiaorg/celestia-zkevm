@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -44,6 +45,13 @@ type Broadcaster struct {
 
 	address sdk.AccAddress
 	privKey *secp256k1.PrivKey
+}
+
+type HyperlaneConfig struct {
+	IsmID     util.HexAddress `json:"ism_id"`
+	MailboxID util.HexAddress `json:"mailbox_id"`
+	HooksID   util.HexAddress `json:"hooks_id"`
+	TokenID   util.HexAddress `json:"collateral_token_id"`
 }
 
 func NewBroadcaster(enc encoding.Config, grpcConn *grpc.ClientConn) *Broadcaster {
@@ -151,62 +159,6 @@ func (b *Broadcaster) waitForTxResponse(ctx context.Context, hash string) (*sdk.
 
 }
 
-func main() {
-	ctx := context.Background()
-	enc := encoding.MakeConfig(app.ModuleEncodingRegisters...)
-
-	grpcConn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("failed to connect to gRPC: %v", err)
-	}
-	defer grpcConn.Close()
-
-	broadcaster := NewBroadcaster(enc, grpcConn)
-	msgCreateNoopISM := ismtypes.MsgCreateNoopIsm{
-		Creator: broadcaster.address.String(),
-	}
-
-	res := broadcaster.BroadcastTx(ctx, &msgCreateNoopISM)
-	ismID := parseISMFromEvents(res.Events)
-
-	msgCreateNoopHooks := hooktypes.MsgCreateNoopHook{
-		Owner: broadcaster.address.String(),
-	}
-
-	res = broadcaster.BroadcastTx(ctx, &msgCreateNoopHooks)
-	hookID := parseHookIDFromEvents(res.Events)
-
-	msgCreateMailBox := coretypes.MsgCreateMailbox{
-		Owner:        broadcaster.address.String(),
-		DefaultIsm:   ismID,
-		LocalDomain:  69420,
-		DefaultHook:  &hookID,
-		RequiredHook: &hookID,
-	}
-
-	res = broadcaster.BroadcastTx(ctx, &msgCreateMailBox)
-	mailboxID := parseMailboxIDFromEvents(res.Events)
-
-	msgCreateCollateralToken := warptypes.MsgCreateCollateralToken{
-		Owner:         broadcaster.address.String(),
-		OriginMailbox: mailboxID,
-		OriginDenom:   denom,
-	}
-
-	res = broadcaster.BroadcastTx(ctx, &msgCreateCollateralToken)
-	tokenID := parseCollateralTokenIDFromEvents(res.Events)
-
-	// set ism id on new collateral token (for some reason this can't be done on creation)
-	msgSetToken := warptypes.MsgSetToken{
-		Owner:    broadcaster.address.String(),
-		TokenId:  tokenID,
-		IsmId:    &ismID,
-		NewOwner: broadcaster.address.String(),
-	}
-
-	res = broadcaster.BroadcastTx(ctx, &msgSetToken)
-}
-
 func parseISMFromEvents(events []abci.Event) util.HexAddress {
 	var ismID util.HexAddress
 	for _, evt := range events {
@@ -226,7 +178,7 @@ func parseISMFromEvents(events []abci.Event) util.HexAddress {
 	return ismID
 }
 
-func parseHookIDFromEvents(events []abci.Event) util.HexAddress {
+func parseHooksIDFromEvents(events []abci.Event) util.HexAddress {
 	var hookID util.HexAddress
 	for _, evt := range events {
 		if evt.GetType() == proto.MessageName(&hooktypes.EventCreateNoopHook{}) {
@@ -281,4 +233,74 @@ func parseCollateralTokenIDFromEvents(events []abci.Event) util.HexAddress {
 	}
 
 	return tokenID
+}
+
+func main() {
+	ctx := context.Background()
+	enc := encoding.MakeConfig(app.ModuleEncodingRegisters...)
+
+	grpcConn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("failed to connect to gRPC: %v", err)
+	}
+	defer grpcConn.Close()
+
+	broadcaster := NewBroadcaster(enc, grpcConn)
+	msgCreateNoopISM := ismtypes.MsgCreateNoopIsm{
+		Creator: broadcaster.address.String(),
+	}
+
+	res := broadcaster.BroadcastTx(ctx, &msgCreateNoopISM)
+	ismID := parseISMFromEvents(res.Events)
+
+	msgCreateNoopHooks := hooktypes.MsgCreateNoopHook{
+		Owner: broadcaster.address.String(),
+	}
+
+	res = broadcaster.BroadcastTx(ctx, &msgCreateNoopHooks)
+	hooksID := parseHooksIDFromEvents(res.Events)
+
+	msgCreateMailBox := coretypes.MsgCreateMailbox{
+		Owner:        broadcaster.address.String(),
+		DefaultIsm:   ismID,
+		LocalDomain:  69420,
+		DefaultHook:  &hooksID,
+		RequiredHook: &hooksID,
+	}
+
+	res = broadcaster.BroadcastTx(ctx, &msgCreateMailBox)
+	mailboxID := parseMailboxIDFromEvents(res.Events)
+
+	msgCreateCollateralToken := warptypes.MsgCreateCollateralToken{
+		Owner:         broadcaster.address.String(),
+		OriginMailbox: mailboxID,
+		OriginDenom:   denom,
+	}
+
+	res = broadcaster.BroadcastTx(ctx, &msgCreateCollateralToken)
+	tokenID := parseCollateralTokenIDFromEvents(res.Events)
+
+	// set ism id on new collateral token (for some reason this can't be done on creation)
+	msgSetToken := warptypes.MsgSetToken{
+		Owner:    broadcaster.address.String(),
+		TokenId:  tokenID,
+		IsmId:    &ismID,
+		NewOwner: broadcaster.address.String(),
+	}
+
+	res = broadcaster.BroadcastTx(ctx, &msgSetToken)
+
+	hypConfig := &HyperlaneConfig{
+		IsmID:     ismID,
+		HooksID:   hooksID,
+		MailboxID: mailboxID,
+		TokenID:   tokenID,
+	}
+
+	out, err := json.MarshalIndent(hypConfig, "", "  ")
+	if err != nil {
+		log.Fatalf("failed to marshal config: %v", err)
+	}
+
+	log.Printf("successfully deployed Hyperlane: %s", string(out))
 }
