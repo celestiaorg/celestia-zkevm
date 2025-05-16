@@ -83,7 +83,7 @@ celestia-appd tx hyperlane hooks noop create --from default --fees 400utia
 4. Set the hooks on the mailbox
 
 ```
-celestia-appd tx hyperlane mailbox set $mailbox_id --required-hook $noopHooksID --default-hook $noopHooksID --from default --fees 400utia
+celestia-appd tx hyperlane mailbox set $MAILBOX --required-hook $HOOKS --default-hook $HOOKS --from default --fees 400utia
 ```
 
 5. Create a `utia` collateral token.
@@ -129,3 +129,6 @@ cast call 0x8ccBa74d0010B76F3E9507bb3A86cC394F96815d \
 
 0x726f757465725f61707000000000000000000000000000010000000000000000
 ```
+
+
+celestia-appd tx warp transfer 0x726f757465725f61707000000000000000000000000000010000000000000000 1234 0x000000000000000000000000d7958B336f0019081Ad2279B2B7B7c3f744Bce0a "1000" --from default --fees 400utia --max-hyperlane-fee 100utia

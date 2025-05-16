@@ -16,6 +16,8 @@ if [ ! -f "$GENESIS_FILE" ]; then
     
     # Expose core rpc to network
     sed -i 's#laddr = "tcp://127.0.0.1:26657"#laddr = "tcp://0.0.0.0:26657"#' config/config.toml
+    # Enable tx indexing
+    sed -i 's#indexer = "null"#indexer = "kv"#' config/config.toml
     
     celestia-appd keys add default
     celestia-appd keys add validator
