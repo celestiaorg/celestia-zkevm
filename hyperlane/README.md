@@ -51,7 +51,7 @@ hyperlane core deploy --chain rethlocal --registry ./hyperlane --yes
 5. Create synthetic token on Reth.
 
 ```
-hyperlane warp deploy --config ./configs/warp-config.yaml --registry ./hyperlane/
+hyperlane warp deploy --config ./configs/warp-config.yaml --registry ./hyperlane --yes
 ```
 
 ### Deploy Hyperlane core ISM and Mailbox on Celestia
@@ -132,7 +132,33 @@ cast call 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
 0x726f757465725f61707000000000000000000000000000010000000000000000
 ```
 
+### Warp Transfer
+
 TODO: Try to get the relayer working and successfully transfer utia to evm
+As of right now I believe this is working... will clean this up.
+
+Clone the `hyperlane-monorepo` and navigate to `rust/main` and follow the instructions to build the `relayer` binary on the README.md.
+Use the following the config `relayer-config.json` in this directory. Configure it using the `CONFIG_FILES` env variable.
+
+For example, drop the `relayer` binary into a directory called `bin` in this repo and the mv the config to `bin/config/config.json`.
+Then:
+
+```
+export CONFIG_FILES=./config/config.json
+
+cd bin
+
+./relayer
+```
+
+Exec into celestia-validator container for access to `default` acc on the keyring.
+Not strictly required but doing this for now.
+
+```
+docker exec -it celestia-validator /bin/bash
+```
+
+Run the `warp transfer` command. 
 
 ```
 celestia-appd tx warp transfer 0x726f757465725f61707000000000000000000000000000010000000000000000 1234 0x000000000000000000000000d7958B336f0019081Ad2279B2B7B7c3f744Bce0a "1000" --from default --fees 400utia --max-hyperlane-fee 100utia

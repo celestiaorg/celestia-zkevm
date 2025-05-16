@@ -19,6 +19,8 @@ if [ ! -f "$GENESIS_FILE" ]; then
     sed -i 's#laddr = "tcp://127.0.0.1:26657"#laddr = "tcp://0.0.0.0:26657"#' config/config.toml
     # Enable tx indexing
     sed -i 's#indexer = "null"#indexer = "kv"#' config/config.toml
+    # Keep abci responses (required by hyperlane relayer for /block_results rpc queries)
+    sed -i 's#discard_abci_responses = true#discard_abci_responses = false#' config/config.toml
     
     celestia-appd keys add default
     celestia-appd keys add validator
