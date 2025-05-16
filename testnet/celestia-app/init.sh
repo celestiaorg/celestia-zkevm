@@ -1,7 +1,8 @@
 #!/bin/sh
 
 GENESIS_FILE="/home/celestia/.celestia-app/config/genesis.json"
-MNEMONIC="father remove minimum call daughter fly runway sponsor two exile bean sting address person hidden view want black strong text fashion ethics nephew reform"
+MNEMONIC_HYP="sphere exhibit essay fancy okay tuna leaf culture elbow drum trip exchange scorpion excuse parent sun make spot chunk mouse tenant shoe hurt scale"
+MNEMONIC_NODE="father remove minimum call daughter fly runway sponsor two exile bean sting address person hidden view want black strong text fashion ethics nephew reform"
 
 if [ ! -f "$GENESIS_FILE" ]; then
     echo "Initializing Celestia App state..."
@@ -22,10 +23,13 @@ if [ ! -f "$GENESIS_FILE" ]; then
     celestia-appd keys add default
     celestia-appd keys add validator
 
+    # Use a deterministic address for hyperlane operator account (deployment, etc)
+    echo $MNEMONIC_HYP | celestia-appd keys add hyp --recover
     # Use a deterministic address for celestia-node operator account recovery
-    echo $MNEMONIC | celestia-appd keys add node --recover
+    echo $MNEMONIC_NODE | celestia-appd keys add node --recover
 
     celestia-appd genesis add-genesis-account "$(celestia-appd keys show default -a)" 1000000000000utia
+    celestia-appd genesis add-genesis-account "$(celestia-appd keys show hyp -a)" 1000000000000utia
     celestia-appd genesis add-genesis-account "$(celestia-appd keys show node -a)" 1000000000000utia
     celestia-appd genesis add-genesis-account "$(celestia-appd keys show validator -a)" 1000000000000utia
     celestia-appd genesis gentx validator 100000000utia --fees 500utia
