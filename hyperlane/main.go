@@ -302,5 +302,5 @@ func main() {
 		log.Fatalf("failed to marshal config: %v", err)
 	}
 
-	log.Printf("successfully deployed Hyperlane: %s", string(out))
+	log.Printf("successfully deployed Hyperlane: \n%s", string(out))
 }

@@ -45,7 +45,7 @@ hyperlane core init --advanced --registry ./hyperlane
 4. Deploy the core contracts on Reth.
 
 ```
-hyperlane core deploy --chain rethlocal --registry ./hyperlane
+hyperlane core deploy --chain rethlocal --registry ./hyperlane --yes
 ```
 
 5. Create synthetic token on Reth.
@@ -107,7 +107,7 @@ NOTE: Here we left-pad the 20byte EVM address to conform to the `HexAddress` spe
 It is unclear whether or not this is the correct approach. See: https://github.com/bcp-innovations/hyperlane-cosmos/issues/121
 
 ```
-celestia-appd tx warp enroll-remote-router 0x726f757465725f61707000000000000000000000000000010000000000000000 1234 0x0000000000000000000000008ccBa74d0010B76F3E9507bb3A86cC394F96815d 0 --from default --fees 400utia
+celestia-appd tx warp enroll-remote-router 0x726f757465725f61707000000000000000000000000000010000000000000000 1234 0x000000000000000000000000a7578551baE89a96C3365b93493AD2D4EBcbAe97 0 --from default --fees 400utia
 ```
 
 2. Enroll the collateral token ID from the celestia-app cosmosnative module as the remote router on the synthetic token contract (EVM).
@@ -115,7 +115,7 @@ Normally this should be possible to configure in a `warp-config.yaml` using the 
 Instead, we attempt to do this manually by invoking the EVM contract directly.
 
 ```
-cast send 0x8ccBa74d0010B76F3E9507bb3A86cC394F96815d \
+cast send 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
   "enrollRemoteRouter(uint32,bytes32)" \
   69420 0x726f757465725f61707000000000000000000000000000010000000000000000 \
   --private-key $HYP_KEY \
@@ -125,12 +125,24 @@ cast send 0x8ccBa74d0010B76F3E9507bb3A86cC394F96815d \
 Validate the above tx succeeded by running the following query.
 
 ```
-cast call 0x8ccBa74d0010B76F3E9507bb3A86cC394F96815d \
+cast call 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
   "routers(uint32)(bytes32)" 69420 \
   --rpc-url http://localhost:8545
 
 0x726f757465725f61707000000000000000000000000000010000000000000000
 ```
 
+TODO: Try to get the relayer working and successfully transfer utia to evm
 
+```
 celestia-appd tx warp transfer 0x726f757465725f61707000000000000000000000000000010000000000000000 1234 0x000000000000000000000000d7958B336f0019081Ad2279B2B7B7c3f744Bce0a "1000" --from default --fees 400utia --max-hyperlane-fee 100utia
+```
+
+Querying ERC20 balanceOf method of synthetic token contract:
+
+```
+cast call 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
+  "balanceOf(address)(uint256)" \
+  0xd7958B336f0019081Ad2279B2B7B7c3f744Bce0a \
+  --rpc-url http://localhost:8545
+```
