@@ -56,7 +56,7 @@ hyperlane warp deploy --config ./configs/warp-config.yaml --registry ./hyperlane
 
 ### Deploy Hyperlane core ISM and Mailbox on Celestia
 
-To automate this run `go run main.go` from this directory.
+> To automate this run `go run main.go` from this directory. Below are the manual steps.
 
 NOTE: Here we run the `celestia-appd` txs from inside the docker compose service container.
 This is mainly for access to the keyring without having to recover keys on the host machine. 
