@@ -18,7 +18,7 @@ npm install -g @hyperlane-xyz/cli
 docker compose up
 ```
 
-### Deploy EVM Contracts
+### Deploy EVM core and warp route contracts
 
 1. Configure an env variable `HYP_KEY` for tx signing.
 Use the following privkey as the associated account is already funded in the docker-compose reth service genesis file.
@@ -44,23 +44,32 @@ hyperlane core init --advanced --registry ./hyperlane
 
 4. Deploy the core contracts on Reth.
 
+NOTE: Uses `./configs/core-config.yaml` by default.
+
 ```
 hyperlane core deploy --chain rethlocal --registry ./hyperlane --yes
 ```
 
 5. Create synthetic token on Reth.
 
+NOTE: Here we must specific the `--config` flag to the warp router deployment config.
+
 ```
 hyperlane warp deploy --config ./configs/warp-config.yaml --registry ./hyperlane --yes
 ```
 
-### Deploy Hyperlane core ISM and Mailbox on Celestia
+### Deploy Cosmosnative core and warp route on Celestia
 
-> To automate this run `go run main.go` from this directory. Below are the manual steps.
+> As there is no cosmosnative support in the hyperlane CLI, a Go program has been added to automate this.
 
-NOTE: Here we run the `celestia-appd` txs from inside the docker compose service container.
-This is mainly for access to the keyring without having to recover keys on the host machine. 
-This is not strictly required, and will aim to automate this later.
+```
+go install ./cmd/hyp
+
+hyp deploy 127.0.0.1:9090
+```
+
+Below is a list of the manual steps which are performed by the Go program used above.
+Skip to the next section to configure the remote routers for both the EVM and cosmosnative deployments.
 
 1. Create a `NoopISM`
 
@@ -102,11 +111,16 @@ celestia-appd tx warp set-token 0x726f757465725f61707000000000000000000000000000
 
 ### Enroll remote routers for both collateral and synthetic tokens
 
+Now that we've deployed the Hyperlane core and warp route infrastructure for a collateral token on Celestia and a synthetic token on Reth, 
+we must establish a link between the two tokens and mailboxes.
+
 1. Enroll the synethetic token contract on Reth as the remote router contract on the celestia-app cosmosnative module.
 NOTE: Here we left-pad the 20byte EVM address to conform to the `HexAddress` spec of cosmosnative.
 It is unclear whether or not this is the correct approach. See: https://github.com/bcp-innovations/hyperlane-cosmos/issues/121
 
 ```
+celestia-appd tx warp enroll-remote-router [token-id] [remote-domain] [receiver-contract] [gas]
+
 celestia-appd tx warp enroll-remote-router 0x726f757465725f61707000000000000000000000000000010000000000000000 1234 0x000000000000000000000000a7578551baE89a96C3365b93493AD2D4EBcbAe97 0 --from default --fees 400utia
 ```
 
@@ -132,13 +146,10 @@ cast call 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
 0x726f757465725f61707000000000000000000000000000010000000000000000
 ```
 
-### Warp Transfer
+### Warp token transfer with Hyperlane relayer
 
-TODO: Try to get the relayer working and successfully transfer utia to evm
-As of right now I believe this is working... will clean this up.
-
-Clone the `hyperlane-monorepo` and navigate to `rust/main` and follow the instructions to build the `relayer` binary on the README.md.
-Use the following the config `relayer-config.json` in this directory. Configure it using the `CONFIG_FILES` env variable.
+Clone the [hyperlane-monorepo](https://github.com/hyperlane-xyz/hyperlane-monorepo) and navigate to `rust/main` and follow the instructions to build the `relayer` binary on the README.md.
+There is a relayer config ready to use available in this directory: `relayer-config.json`. Configure it using the `CONFIG_FILES` env variable.
 
 For example, drop the `relayer` binary into a directory called `bin` in this repo and the mv the config to `bin/config/config.json`.
 Then:
@@ -151,8 +162,7 @@ cd bin
 ./relayer
 ```
 
-Exec into celestia-validator container for access to `default` acc on the keyring.
-Not strictly required but doing this for now.
+Exec into the `celestia-validator` container for access to `default` acc on the keyring.
 
 ```
 docker exec -it celestia-validator /bin/bash
