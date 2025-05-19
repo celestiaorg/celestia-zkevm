@@ -1,0 +1,26 @@
+defaultHook:
+  address: "0xFCb1d485ef46344029D9E8A7925925e146B3430E"
+  type: merkleTreeHook
+defaultIsm:
+  address: "0xa05915fD6E32A1AA7E67d800164CaCB12487142d"
+  type: testIsm
+interchainAccountRouter:
+  address: "0x4dc4E8bf5D0390C95Af9AFEb1e9c9927c4dB83e7"
+  mailbox: "0xb1c938F5BA4B3593377F399e12175e8db0C787Ff"
+  owner: "0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d"
+  proxyAdmin:
+    address: "0x67cff9B0F9F25c00C71bd8300c3f38553088e234"
+    owner: "0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d"
+  remoteIcaRouters: {}
+owner: "0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d"
+proxyAdmin:
+  address: "0x7e7aD18Adc99b94d4c728fDf13D4dE97B926A0D8"
+  owner: "0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d"
+requiredHook:
+  address: "0x1D957dA7A6988f5a9d2D2454637B4B7fea0Aeea5"
+  beneficiary: "0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d"
+  maxProtocolFee: "10000000000000000000000000000"
+  owner: "0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d"
+  protocolFee: "0"
+  type: protocolFee
+

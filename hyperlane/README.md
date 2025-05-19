@@ -30,7 +30,7 @@ export HYP_KEY=0x82bfcfadbf1712f6550d8d2c00a39f05b33ec78939d0167be2a737d691f33a6
 2. Inspect the local hyperlane registry.
 
 ```
-hyperlane registry list --registry ./hyperlane
+hyperlane registry list --registry ./registry
 ```
 
 3. Initialise a core deployment config using a TestISM (NoopISM).
@@ -39,7 +39,7 @@ This step requires the `--advanced` flag. Follow the instructions by the prompt.
 NOTE: This step can be skipped as we will add `configs` to version control.
 
 ```
-hyperlane core init --advanced --registry ./hyperlane
+hyperlane core init --advanced --registry ./registry
 ```
 
 4. Deploy the core contracts on Reth.
@@ -47,7 +47,7 @@ hyperlane core init --advanced --registry ./hyperlane
 NOTE: Uses `./configs/core-config.yaml` by default.
 
 ```
-hyperlane core deploy --chain rethlocal --registry ./hyperlane --yes
+hyperlane core deploy --chain rethlocal --registry ./registry --yes
 ```
 
 5. Create synthetic token on Reth.
@@ -55,7 +55,7 @@ hyperlane core deploy --chain rethlocal --registry ./hyperlane --yes
 NOTE: Here we must specific the `--config` flag to the warp router deployment config.
 
 ```
-hyperlane warp deploy --config ./configs/warp-config.yaml --registry ./hyperlane --yes
+hyperlane warp deploy --config ./configs/warp-config.yaml --registry ./registry --yes
 ```
 
 ### Deploy Cosmosnative core and warp route on Celestia
@@ -116,12 +116,19 @@ we must establish a link between the two tokens and mailboxes.
 
 1. Enroll the synethetic token contract on Reth as the remote router contract on the celestia-app cosmosnative module.
 NOTE: Here we left-pad the 20byte EVM address to conform to the `HexAddress` spec of cosmosnative.
-It is unclear whether or not this is the correct approach. See: https://github.com/bcp-innovations/hyperlane-cosmos/issues/121
+
+NOTE: The following can be run from inside the `celestia-validator` service container, or from your host machine if you have access to a key for a funded account.
 
 ```
 celestia-appd tx warp enroll-remote-router [token-id] [remote-domain] [receiver-contract] [gas]
 
-celestia-appd tx warp enroll-remote-router 0x726f757465725f61707000000000000000000000000000010000000000000000 1234 0x000000000000000000000000a7578551baE89a96C3365b93493AD2D4EBcbAe97 0 --from default --fees 400utia
+celestia-appd tx warp enroll-remote-router 0x726f757465725f61707000000000000000000000000000010000000000000000 1234 0x000000000000000000000000a7578551baE89a96C3365b93493AD2D4EBcbAe97 0 --from hyp --fees 400utia
+```
+
+Validate the above tx succeeded by running the following query:
+
+```
+celestia-appd q warp remote-routers 0x726f757465725f61707000000000000000000000000000010000000000000000
 ```
 
 2. Enroll the collateral token ID from the celestia-app cosmosnative module as the remote router on the synthetic token contract (EVM).
