@@ -26,8 +26,9 @@ type HyperlaneConfig struct {
 func NewRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "hyp",
-		Short: "A CLI for deploying hyperlane cosmosnative structures",
-		Long:  `This CLI provides deployment functionality for hyperlane comosnative modules.`,
+		Short: "A CLI for deploying hyperlane cosmosnative infrastructure",
+		Long: `This CLI provides deployment functionality for hyperlane comosnative modules. 
+		It deploys basic core components and warp route collateral token for testing purposes.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},
@@ -40,7 +41,7 @@ func NewRootCmd() *cobra.Command {
 func getDeployCmd() *cobra.Command {
 	deployCmd := &cobra.Command{
 		Use:   "deploy [grpc-addr]",
-		Short: "Deploy to a remote service",
+		Short: "Deploy cosmosnative hyperlane components to a remote service via gRPC",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			ctx := cmd.Context()
