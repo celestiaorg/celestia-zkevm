@@ -1,4 +1,5 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/hyperlane-xyz/hyperlane-registry/v15.2.0/chains/schema.json
+# NOTE: The following chain spec is unused by the official Hyperlane CLI until cosmosnative support is added
 bech32Prefix: celestia
 blockExplorers:
   - apiUrl: https://apis.mintscan.io/v1/celestia
