@@ -52,7 +52,7 @@ hyperlane core deploy --chain rethlocal --registry ./registry --yes
 
 5. Create synthetic token on Reth.
 
-NOTE: Here we must specific the `--config` flag to the warp router deployment config.
+NOTE: Here we must specify the `--config` flag to the warp router deployment config.
 
 ```
 hyperlane warp deploy --config ./configs/warp-config.yaml --registry ./registry --yes
@@ -158,7 +158,7 @@ cast call 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
 Clone the [hyperlane-monorepo](https://github.com/hyperlane-xyz/hyperlane-monorepo) and navigate to `rust/main` and follow the instructions to build the `relayer` binary on the README.md.
 There is a relayer config ready to use available in this directory: `relayer-config.json`. Configure it using the `CONFIG_FILES` env variable.
 
-For example, drop the `relayer` binary into a directory called `bin` in this repo and the mv the config to `bin/config/config.json`.
+For example, drop the `relayer` binary into a directory called `bin` in this repo and then move the config to `bin/config/config.json`.
 Then:
 
 ```
