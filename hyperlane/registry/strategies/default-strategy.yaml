@@ -1,7 +1,7 @@
+# NOTE: The following deployment strategy file is unused by the official Hyperlane CLI until cosmosnative support is added
 celestia:
   submitter:
     chain: celestia
     privateKey: 00ae97487709f19987c2d62caab232d2bb5e489fc319480970782096bf1eda6a
     type: jsonRpc
     userAddress: celestia13vedhr3w833pdwlr9ctnqjc5ezne8sfz7n63vj
-

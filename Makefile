@@ -83,7 +83,7 @@ demo:
 
 ## start: Start all Docker containers for the demo.
 start:
-	@docker compose -f docker-compose.rollkit.yml up --detach
+	@docker compose up --detach
 .PHONY: start
 
 ## setup: Set up the IBC light clients.
@@ -112,13 +112,10 @@ query-balance:
 	@go run ./testing/demo/pkg/transfer/ query-balance
 .PHONY: query-balance
 
-## stop: Stop all Docker containers and remove the tmp directory.
+## stop: Stop all Docker containers and remove volumes.
 stop:
 	@echo "--> Stopping all Docker containers"
-	@docker compose -f docker-compose.rollkit.yml down
-	@docker compose -f docker-compose.rollkit.yml rm
-	@echo "--> Removing the tmp directory"
-	@rm -rf .tmp
+	@docker compose down -v
 .PHONY: stop
 
 ## build: Build the simapp and indexer binaries into the ./build directory.
