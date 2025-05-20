@@ -1,8 +1,0 @@
-[package]
-version = "0.1.0"
-name = "blevm-common"
-edition = { workspace = true }
-
-[dependencies]
-serde = { workspace = true }
-bincode = { workspace = true }
