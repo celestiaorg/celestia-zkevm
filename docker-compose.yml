@@ -60,7 +60,10 @@ services:
   rollkit-evm-single:
     image: ghcr.io/rollkit/rollkit-evm-single:v0.1.3
     container_name: rollkit-evm-single
-    entrypoint: /usr/bin/entrypoint.sh
+    volumes:
+      - ./testnet/rollkit-evm-single/init.sh:/scripts/init.sh:ro
+      - rollkit:/root/.evm-single
+    entrypoint: /scripts/init.sh
     environment:
       - EVM_ENGINE_URL=http://reth:8551
       - EVM_ETH_URL=http://reth:8545
@@ -110,10 +113,12 @@ services:
     networks:
       - celestia-zkevm-net
 
+
 volumes:
   celestia-app:
   celestia-bridge:
   reth:
+  rollkit:
 
 networks:
   celestia-zkevm-net:
