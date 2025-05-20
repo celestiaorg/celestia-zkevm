@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/hyperlane-xyz/hyperlane-registry/v15.2.0/chains/schema.json
+bech32Prefix: celestia
+blockExplorers:
+  - apiUrl: https://apis.mintscan.io/v1/celestia
+    family: other
+    name: MintScan
+    url: https://www.mintscan.io/celestia
+blocks:
+  confirmations: 1
+  estimateBlockTime: 6
+  reorgPeriod: 1
+chainId: celestia
+displayName: Celestia
+domainId: 69420
+gasCurrencyCoinGeckoId: celestia
+gasPrice:
+  denom: utia
+  amount: "0.002"
+grpcUrls:
+  - http: http://localhost:9090
+isTestnet: true
+name: celestia
+nativeToken:
+  decimals: 6
+  denom: utia
+  name: Tia
+  symbol: TIA
+protocol: cosmosnative
+restUrls:
+  - http: http://localhost:1317
+rpcUrls:
+  - http: http://localhost:26657
+slip44: 118
+technicalStack: other
