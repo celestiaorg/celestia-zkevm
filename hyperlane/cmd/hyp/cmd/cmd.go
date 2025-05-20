@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"log"
+	"os"
 
 	"github.com/bcp-innovations/hyperlane-cosmos/util"
 	ismtypes "github.com/bcp-innovations/hyperlane-cosmos/x/core/01_interchain_security/types"
@@ -109,6 +110,12 @@ func getDeployCmd() *cobra.Command {
 			out, err := json.MarshalIndent(hypConfig, "", "  ")
 			if err != nil {
 				log.Fatalf("failed to marshal config: %v", err)
+			}
+
+			outputPath := "hyperlane-cosmosnative.json"
+			err = os.WriteFile(outputPath, out, 0644)
+			if err != nil {
+				log.Fatalf("failed to write JSON file: %v", err)
 			}
 
 			cmd.Printf("successfully deployed Hyperlane: \n%s", string(out))
