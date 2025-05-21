@@ -30,7 +30,4 @@ COPY hyperlane/configs /home/hyperlane/configs
 COPY hyperlane/registry /home/hyperlane/registry
 COPY hyperlane/scripts /home/hyperlane/scripts
 
-# Verify tools
-RUN cast --version && forge --version
-
 ENTRYPOINT [ "scripts/docker-entrypoint.sh" ]
