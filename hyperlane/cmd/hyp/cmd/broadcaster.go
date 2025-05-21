@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"time"
@@ -10,11 +11,11 @@ import (
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
+	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
-	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"google.golang.org/grpc"
 )
@@ -34,7 +35,8 @@ type Broadcaster struct {
 	txService   txtypes.ServiceClient
 
 	address sdk.AccAddress
-	privKey *secp256k1.PrivKey
+
+	kr keyring.Keyring
 }
 
 func NewBroadcaster(enc encoding.Config, grpcConn *grpc.ClientConn) *Broadcaster {
@@ -48,12 +50,17 @@ func NewBroadcaster(enc encoding.Config, grpcConn *grpc.ClientConn) *Broadcaster
 	pk := secp256k1.PrivKey{Key: privKey}
 	signerAddr := sdk.AccAddress(pk.PubKey().Address())
 
+	kr := keyring.NewInMemory(enc.Codec)
+	if err := kr.ImportPrivKeyHex(signerAddr.String(), hex.EncodeToString(pk.Bytes()), pk.Type()); err != nil {
+		log.Fatalf("key import failed")
+	}
+
 	return &Broadcaster{
 		enc:         enc,
 		authService: authtypes.NewQueryClient(grpcConn),
 		txService:   txtypes.NewServiceClient(grpcConn),
-		privKey:     &pk,
 		address:     signerAddr,
+		kr:          kr,
 	}
 }
 
@@ -76,21 +83,16 @@ func (b *Broadcaster) BroadcastTx(ctx context.Context, msgs ...sdk.Msg) *sdk.TxR
 	txBuilder.SetGasLimit(gasLimit)
 	txBuilder.SetFeeAmount(sdk.NewCoins(sdk.NewInt64Coin(denom, feeAmount)))
 
-	signerData := authsigning.SignerData{
-		Address:       b.address.String(),
-		ChainID:       chainID,
-		AccountNumber: acc.AccountNumber,
-		Sequence:      acc.Sequence,
-		PubKey:        b.privKey.PubKey(),
-	}
+	factory := tx.Factory{}.
+		WithKeybase(b.kr).
+		WithSignMode(signing.SignMode_SIGN_MODE_DIRECT).
+		WithTxConfig(b.enc.TxConfig).
+		WithChainID(chainID).
+		WithAccountNumber(acc.AccountNumber).
+		WithSequence(acc.Sequence)
 
-	sigv2, err := tx.SignWithPrivKey(ctx, signing.SignMode_SIGN_MODE_LEGACY_AMINO_JSON, signerData, txBuilder, b.privKey, b.enc.TxConfig, acc.Sequence)
-	if err != nil {
-		log.Fatalf("sign tx failed: %v", err)
-	}
-
-	if err := txBuilder.SetSignatures(sigv2); err != nil {
-		log.Fatalf("set signatures failed: %v", err)
+	if err := tx.Sign(ctx, factory, b.address.String(), txBuilder, false); err != nil {
+		log.Fatalf("failed to sign tx: %v", err)
 	}
 
 	txBytes, err := b.enc.TxConfig.TxEncoder()(txBuilder.GetTx())

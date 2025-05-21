@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"strconv"
 
 	"cosmossdk.io/math"
 	"github.com/bcp-innovations/hyperlane-cosmos/util"
@@ -150,16 +151,16 @@ func getEnrollRouterCmd() *cobra.Command {
 				log.Fatalf("failed to parse token id: %v", err)
 			}
 
-			// domain, err := strconv.ParseUint(args[2], 10, 32)
-			// if err != nil {
-			// 	log.Fatalf("failed to parse remote domain: %v", err)
-			// }
+			domain, err := strconv.ParseUint(args[2], 10, 32)
+			if err != nil {
+				log.Fatalf("failed to parse remote domain: %v", err)
+			}
 
 			msgEnrollRemoteRouter := warptypes.MsgEnrollRemoteRouter{
 				Owner:   broadcaster.address.String(),
 				TokenId: tokenID,
 				RemoteRouter: &warptypes.RemoteRouter{
-					ReceiverDomain:   1234,
+					ReceiverDomain:   uint32(domain),
 					ReceiverContract: args[3],
 					Gas:              math.ZeroInt(),
 				},
