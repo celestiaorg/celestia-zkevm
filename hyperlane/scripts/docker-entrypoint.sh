@@ -18,6 +18,22 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 
   echo "Deploying Hyperlane on cosmosnative..."
   hyp deploy celestia-validator:9090
+
+  echo "Configuring remote router for warp route on EVM..."
+  cast send 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
+    "enrollRemoteRouter(uint32,bytes32)" \
+    69420 0x726f757465725f61707000000000000000000000000000010000000000000000 \
+    --private-key $HYP_KEY \
+    --rpc-url http://reth:8545
+
+  router_addr=$(cast call 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
+    "routers(uint32)(bytes32)" 69420 \
+    --rpc-url http://reth:8545)
+
+  echo "Successfully registered remote router address for domain 69420: $router_addr"
+
+  echo "Configuring remote router for warp route on cosmosnative..."
+  hyp enroll-remote-router celestia-validator:9090 0x726f757465725f61707000000000000000000000000000010000000000000000 1234 0x000000000000000000000000a7578551baE89a96C3365b93493AD2D4EBcbAe97
 else
   echo "Skipping deployment: $CONFIG_FILE already exists."
 fi
