@@ -86,6 +86,12 @@ start:
 	@docker compose up --detach
 .PHONY: start
 
+## relay-local: Start a local instance of the hyperlane relayer (NOTE: This is temporary and should be removed in favour of Docker).
+relay-local:
+	@echo "--> Starting hyperlane relayer"
+	@cd local && CONFIG_FILES=./config/config.json ./relayer
+.PHONY: relay-local
+
 ## setup: Set up the IBC light clients.
 setup:
 	@echo "--> Creating genesis.json for Tendermint light client"
