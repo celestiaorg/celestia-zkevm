@@ -19,7 +19,7 @@
             "protocol": "ethereum",
             "rpcUrls": [
                 {
-                    "http": "http://127.0.0.1:8545"
+                    "http": "http://reth:8545"
                 }
             ],
             "signer": {
@@ -60,7 +60,7 @@
                 "amount": "0.002"
             },
             "index": {
-                "from": 1150,
+                "from": 1,
                 "chunk": 10
             },
             "isTestnet": true,
@@ -74,12 +74,12 @@
             "protocol": "cosmosnative",
             "restUrls": [
                 {
-                    "http": "http://127.0.0.1:1317"
+                    "http": "http://celestia-validator:1317"
                 }
             ],
             "rpcUrls": [
                 {
-                    "http": "http://127.0.0.1:26657"
+                    "http": "http://celestia-validator:26657"
                 }
             ],
             "signer": {
@@ -96,7 +96,7 @@
             "validatorAnnounce": "0x68797065726c616e650000000000000000000000000000000000000000000000",
             "grpcUrls": [
                 {
-                    "http": "http://127.0.0.1:9090"
+                    "http": "http://celestia-validator:9090"
                 }
             ]
         }
