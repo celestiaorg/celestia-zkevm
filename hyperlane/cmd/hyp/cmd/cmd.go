@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"strconv"
 
+	"cosmossdk.io/math"
 	"github.com/bcp-innovations/hyperlane-cosmos/util"
 	ismtypes "github.com/bcp-innovations/hyperlane-cosmos/x/core/01_interchain_security/types"
 	hooktypes "github.com/bcp-innovations/hyperlane-cosmos/x/core/02_post_dispatch/types"
@@ -36,6 +38,7 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	rootCmd.AddCommand(getDeployCmd())
+	rootCmd.AddCommand(getEnrollRouterCmd())
 	return rootCmd
 }
 
@@ -119,6 +122,54 @@ func getDeployCmd() *cobra.Command {
 			}
 
 			cmd.Printf("successfully deployed Hyperlane: \n%s", string(out))
+		},
+	}
+	return deployCmd
+}
+
+func getEnrollRouterCmd() *cobra.Command {
+	deployCmd := &cobra.Command{
+		Use:   "enroll-remote-router [grpc-addr] [token-id] [remote-domain] [remote-contract]",
+		Short: "Enroll the remote router contract address for a cosmosnative hyperlane warp route",
+		Args:  cobra.ExactArgs(4),
+		Run: func(cmd *cobra.Command, args []string) {
+			ctx := cmd.Context()
+			enc := encoding.MakeConfig(app.ModuleEncodingRegisters...)
+
+			grpcAddr := args[0]
+
+			grpcConn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+			if err != nil {
+				log.Fatalf("failed to connect to gRPC: %v", err)
+			}
+			defer grpcConn.Close()
+
+			broadcaster := NewBroadcaster(enc, grpcConn)
+
+			tokenID, err := util.DecodeHexAddress(args[1])
+			if err != nil {
+				log.Fatalf("failed to parse token id: %v", err)
+			}
+
+			domain, err := strconv.ParseUint(args[2], 10, 32)
+			if err != nil {
+				log.Fatalf("failed to parse remote domain: %v", err)
+			}
+
+			msgEnrollRemoteRouter := warptypes.MsgEnrollRemoteRouter{
+				Owner:   broadcaster.address.String(),
+				TokenId: tokenID,
+				RemoteRouter: &warptypes.RemoteRouter{
+					ReceiverDomain:   uint32(domain),
+					ReceiverContract: args[3],
+					Gas:              math.ZeroInt(),
+				},
+			}
+
+			res := broadcaster.BroadcastTx(ctx, &msgEnrollRemoteRouter)
+			recvContract := parseReceiverContractFromEvents(res.Events)
+
+			cmd.Printf("successfully registered remote router on Hyperlane cosmosnative: \n%s", recvContract)
 		},
 	}
 	return deployCmd

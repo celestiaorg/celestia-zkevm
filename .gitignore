@@ -4,3 +4,5 @@ build
 /target
 *.bin
 bin
+
+**/hyperlane_db

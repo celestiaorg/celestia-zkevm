@@ -88,3 +88,22 @@ func parseCollateralTokenIDFromEvents(events []abci.Event) util.HexAddress {
 
 	return tokenID
 }
+
+func parseReceiverContractFromEvents(events []abci.Event) string {
+	var recvContract string
+	for _, evt := range events {
+		if evt.GetType() == proto.MessageName(&warptypes.EventEnrollRemoteRouter{}) {
+			event, err := sdk.ParseTypedEvent(evt)
+			if err != nil {
+				log.Fatalf("failed to parse typed event: %v", err)
+			}
+
+			if enrollEvent, ok := event.(*warptypes.EventEnrollRemoteRouter); ok {
+				log.Printf("successfully enrolled remote router: %s\n", enrollEvent)
+				recvContract = enrollEvent.ReceiverContract
+			}
+		}
+	}
+
+	return recvContract
+}

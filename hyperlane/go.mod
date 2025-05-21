@@ -12,6 +12,7 @@ replace (
 )
 
 require (
+	cosmossdk.io/math v1.5.3
 	github.com/bcp-innovations/hyperlane-cosmos v1.0.0
 	github.com/celestiaorg/celestia-app/v4 v4.0.0-arabica
 	github.com/cometbft/cometbft v0.38.17
@@ -37,7 +38,6 @@ require (
 	cosmossdk.io/depinject v1.1.0 // indirect
 	cosmossdk.io/errors v1.0.2 // indirect
 	cosmossdk.io/log v1.5.1 // indirect
-	cosmossdk.io/math v1.5.3 // indirect
 	cosmossdk.io/store v1.1.2 // indirect
 	cosmossdk.io/x/circuit v0.1.1 // indirect
 	cosmossdk.io/x/evidence v0.1.1 // indirect
