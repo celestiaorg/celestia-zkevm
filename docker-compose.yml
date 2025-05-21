@@ -125,6 +125,20 @@ services:
     networks:
       - celestia-zkevm-net
 
+  relayer:
+    image: gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.4.0
+    container_name: relayer
+    environment:
+      - CONFIG_FILES=/app/config/config.json
+    volumes:
+      - ./hyperlane/relayer-config.json:/app/config/config.json
+    command: "/app/relayer"
+    depends_on:
+      hyperlane-init:
+        condition: service_completed_successfully
+    networks:
+      - celestia-zkevm-net
+
 volumes:
   celestia-app:
   celestia-bridge:
