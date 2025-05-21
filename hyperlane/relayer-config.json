@@ -60,7 +60,7 @@
                 "amount": "0.002"
             },
             "index": {
-                "from": 1,
+                "from": 1150,
                 "chunk": 10
             },
             "isTestnet": true,
