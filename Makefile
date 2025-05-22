@@ -62,7 +62,7 @@ transfer-back:
 
 ## query-balance: Query the balance of the receiver in the EVM roll-up.
 query-balance:
-	@echo "--> Querying the balance of the receivier on the EVM roll-up"
+	@echo "--> Querying the balance of the receiver on the EVM roll-up"
 	@cast call 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
   		"balanceOf(address)(uint256)" \
   		0xd7958B336f0019081Ad2279B2B7B7c3f744Bce0a \
