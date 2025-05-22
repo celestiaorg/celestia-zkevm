@@ -94,10 +94,15 @@ setup:
 	@go run ./testing/demo/pkg/setup/
 .PHONY: setup
 
-## transfer: Transfer tokens from simapp to the EVM roll-up.
+## transfer: Transfer tokens from celestia-app to the EVM roll-up.
 transfer:
-	@echo "--> Transferring tokens from simapp to the EVM roll-up"
-	@go run ./testing/demo/pkg/transfer/ transfer
+	@echo "--> Transferring tokens from celestia-app to the EVM roll-up"
+	@docker run --rm \
+  		--network celestia-zkevm-hl-testnet_celestia-zkevm-net \
+  		--volume celestia-zkevm-hl-testnet_celestia-app:/home/celestia/.celestia-app \
+  		ghcr.io/celestiaorg/celestia-app-standalone:feature-zk-execution-ism \
+  		tx warp transfer 0x726f757465725f61707000000000000000000000000000010000000000000000 1234 0x000000000000000000000000d7958B336f0019081Ad2279B2B7B7c3f744Bce0a "1000" \
+  		--from default --fees 400utia --max-hyperlane-fee 100utia --node http://celestia-validator:26657 --yes
 .PHONY: transfer
 
 ## transfer-back: Transfer tokens back from the EVM roll-up to simapp.
@@ -109,7 +114,10 @@ transfer-back:
 ## query-balance: Query the balance of the receiver in the EVM roll-up.
 query-balance:
 	@echo "--> Querying the balance of the receivier on the EVM roll-up"
-	@go run ./testing/demo/pkg/transfer/ query-balance
+	@cast call 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
+  		"balanceOf(address)(uint256)" \
+  		0xd7958B336f0019081Ad2279B2B7B7c3f744Bce0a \
+  		--rpc-url http://localhost:8545
 .PHONY: query-balance
 
 ## stop: Stop all Docker containers and remove volumes.
