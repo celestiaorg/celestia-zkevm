@@ -127,6 +127,7 @@ services:
 
   relayer:
     image: gcr.io/abacus-labs-dev/hyperlane-agent:main
+    platform: linux/amd64
     container_name: relayer
     environment:
       - CONFIG_FILES=/app/config/config.json
