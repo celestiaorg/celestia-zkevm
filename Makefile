@@ -32,6 +32,7 @@ check-dependencies:
 
 ## start: Start all Docker containers for the demo.
 start:
+	@echo "--> Starting all Docker containers"
 	@docker compose up --detach
 .PHONY: start
 
