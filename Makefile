@@ -49,15 +49,18 @@ transfer:
   		--network celestia-zkevm-hl-testnet_celestia-zkevm-net \
   		--volume celestia-zkevm-hl-testnet_celestia-app:/home/celestia/.celestia-app \
   		ghcr.io/celestiaorg/celestia-app-standalone:feature-zk-execution-ism \
-  		tx warp transfer 0x726f757465725f61707000000000000000000000000000010000000000000000 1234 0x000000000000000000000000d7958B336f0019081Ad2279B2B7B7c3f744Bce0a "1000" \
+  		tx warp transfer 0x726f757465725f61707000000000000000000000000000010000000000000000 1234 0x000000000000000000000000aF9053bB6c4346381C77C2FeD279B17ABAfCDf4d "1000" \
   		--from default --fees 400utia --max-hyperlane-fee 100utia --node http://celestia-validator:26657 --yes
 .PHONY: transfer
 
 ## transfer-back: Transfer tokens back from the EVM roll-up to celestia-app.
-# TODO: https://github.com/celestiaorg/celestia-zkevm-hl-testnet/issues/34
 transfer-back:
 	@echo "--> Transferring tokens back from the EVM roll-up to celestia-app"
-	@go run ./testing/demo/pkg/transfer/ transfer-back
+	@cast send 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
+  		"transferRemote(uint32, bytes32, uint256)(bytes32)" \
+  		69420 000000000000000000000000F2858934D6333AD75AB387CE8598D39A783B7846 1000 \
+		--private-key 0x82bfcfadbf1712f6550d8d2c00a39f05b33ec78939d0167be2a737d691f33a6a \
+  		--rpc-url http://localhost:8545
 .PHONY: transfer-back
 
 ## query-balance: Query the balance of the receiver in the EVM roll-up.
@@ -65,6 +68,6 @@ query-balance:
 	@echo "--> Querying the balance of the receivier on the EVM roll-up"
 	@cast call 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
   		"balanceOf(address)(uint256)" \
-  		0xd7958B336f0019081Ad2279B2B7B7c3f744Bce0a \
+  		0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d \
   		--rpc-url http://localhost:8545
 .PHONY: query-balance
