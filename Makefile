@@ -58,7 +58,7 @@ transfer-back:
 	@echo "--> Transferring tokens back from the EVM roll-up to celestia-app"
 	@cast send 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
   		"transferRemote(uint32, bytes32, uint256)(bytes32)" \
-  		69420 000000000000000000000000F2858934D6333AD75AB387CE8598D39A783B7846 1000 \
+  		69420 0000000000000000000000006A809B36CAF0D46A935EE76835065EC5A8B3CEA7 1000 \
 		--private-key 0x82bfcfadbf1712f6550d8d2c00a39f05b33ec78939d0167be2a737d691f33a6a \
   		--rpc-url http://localhost:8545
 .PHONY: transfer-back

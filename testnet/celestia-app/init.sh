@@ -1,6 +1,7 @@
 #!/bin/sh
 
 GENESIS_FILE="/home/celestia/.celestia-app/config/genesis.json"
+MNEMONIC_DEFAULT="pond please denial auto candy muffin elegant amused hole cinnamon glory desk purity proud elevator rubber gadget embody life custom disorder nuclear ship lock"
 MNEMONIC_HYP="sphere exhibit essay fancy okay tuna leaf culture elbow drum trip exchange scorpion excuse parent sun make spot chunk mouse tenant shoe hurt scale"
 MNEMONIC_NODE="father remove minimum call daughter fly runway sponsor two exile bean sting address person hidden view want black strong text fashion ethics nephew reform"
 
@@ -22,10 +23,11 @@ if [ ! -f "$GENESIS_FILE" ]; then
     # Keep abci responses (required by hyperlane relayer for /block_results rpc queries)
     sed -i 's#discard_abci_responses = true#discard_abci_responses = false#' config/config.toml
     
-    celestia-appd keys add default
     celestia-appd keys add validator
 
-    # Use a deterministic address for hyperlane operator account (deployment, etc)
+    # Use a deterministic address for the default sender account (used for transfers, etc)
+    echo $MNEMONIC_DEFAULT | celestia-appd keys add default --recover
+    # Use a deterministic address for hyperlane operator account (deployment, relayer)
     echo $MNEMONIC_HYP | celestia-appd keys add hyp --recover
     # Use a deterministic address for celestia-node operator account recovery
     echo $MNEMONIC_NODE | celestia-appd keys add node --recover
