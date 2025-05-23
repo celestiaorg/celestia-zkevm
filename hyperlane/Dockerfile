@@ -6,7 +6,8 @@ COPY hyperlane/go.* /home/hyperlane/
 COPY hyperlane/cmd /home/hyperlane/cmd
 
 # Build your Go CLI for cosmosnative deployment
-RUN go build -o hyp ./cmd/hyp
+ARG TARGETARCH
+RUN GOARCH=$TARGETARCH GOOS=linux go build -o hyp ./cmd/hyp
 
 FROM node:24-slim
 
