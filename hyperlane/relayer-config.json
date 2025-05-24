@@ -84,7 +84,7 @@
             ],
             "signer": {
                 "type": "cosmosKey",
-                "key": "0x748bcf364b62ac9b74c2bc13e2d429c5b85a3b3ddd8089b873369c1e38fcb10e",
+                "key": "0x6e30efb1d3ebd30d1ba08c8d5fc9b190e08394009dc1dd787a69e60c33288a8c",
                 "prefix": "celestia"
             },
             "slip44": 118,
