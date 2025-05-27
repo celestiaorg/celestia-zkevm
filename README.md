@@ -68,6 +68,18 @@ NETWORK_PRIVATE_KEY="PRIVATE_KEY" to the SP1 prover network private key from Cel
     make query-balance
     ```
 
+7. Transfer funds back from the ERC20 contract to celestia.
+
+    ```shell
+    make transfer-back
+    ```
+
+8. Stop and teardown docker compose services.
+
+    ```shell
+    make stop
+    ```
+
 ## Architecture
 
 See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for more information.
