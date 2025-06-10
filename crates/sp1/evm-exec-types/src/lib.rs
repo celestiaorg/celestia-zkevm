@@ -15,22 +15,22 @@ pub struct EvmBlockExecOutput {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EvmRangeExecOutput {
-    // newest_header_hash is the last block's hash on the EVM roll-up.
-    // TODO: this may be removable.
-    pub newest_header_hash: [u8; 32],
-    // oldest_header_hash is the earliest block's hash on the EVM roll-up.
-    // TODO: this may be removable.
-    pub oldest_header_hash: [u8; 32],
+    // TODO: remove in favour of celestia_header_hash (latest)
     // celestia_header_hashes is the range of Celestia blocks that include all
     // of the blob data the EVM roll-up has posted from oldest_header_hash to
     // newest_header_hash.
     pub celestia_header_hashes: Vec<[u8; 32]>, // provided by Celestia state machine (eventually x/header)
-    // newest_state_root is the computed state root of the EVM roll-up after
-    // processing blocks from oldest_header_hash to newest_header_hash.
-    pub newest_state_root: [u8; 32],
-    // newest_height is the most recent block number of the EVM roll-up.
-    // TODO: this may be removable.
-    pub newest_height: u64,
+    // celestia_header_hash is the hash of the celestia header at which new_height is available.
+    pub celestia_header_hash: [u8; 32],
+    // trusted_height is the trusted height of the EVM application.
+    pub trusted_height: u64,
+    // trusted_state_root is the state commitment root of the EVM application at trusted_height.
+    pub trusted_state_root: [u8; 32],
+    // new_height is the EVM application block number after N state transitions.
+    pub new_height: u64,
+    // new_state_root is the computed state root of the EVM application after
+    // executing N blocks from trusted_height to new_height.
+    pub new_state_root: [u8; 32],
 }
 
 /// A buffer of serializable/deserializable objects.

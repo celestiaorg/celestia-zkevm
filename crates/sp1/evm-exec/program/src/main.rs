@@ -45,7 +45,7 @@ pub fn main() {
     println!("cycle-tracker-start: assert trusted state root");
 
     assert_eq!(
-        client_executor_input.current_block.state_root.as_slice(),
+        client_executor_input.parent_state.state_root().as_slice(),
         trusted_state_root,
         "Current block state root does not match trusted root"
     );

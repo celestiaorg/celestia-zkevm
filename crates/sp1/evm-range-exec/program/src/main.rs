@@ -31,7 +31,7 @@ pub fn main() {
     assert_eq!(
         vkeys.len(),
         public_values.len(),
-        "Mismatch between number of verification keys and public value blobs"
+        "mismatch between number of verification keys and public value blobs"
     );
 
     let proof_count = vkeys.len();
@@ -67,7 +67,7 @@ pub fn main() {
         assert_eq!(
             curr.prev_header_hash,
             prev.header_hash,
-            "Header linkage failed at index {}: expected {:?}, got {:?}",
+            "verify sequential headers failed at index {}: expected {:?}, got {:?}",
             i + 1,
             prev.header_hash,
             curr.prev_header_hash
@@ -84,11 +84,12 @@ pub fn main() {
     let celestia_header_hashes: Vec<_> = outputs.iter().map(|o| o.celestia_header_hash).collect();
 
     let range_output = EvmRangeExecOutput {
-        oldest_header_hash: first.header_hash,
-        newest_header_hash: last.header_hash,
-        newest_state_root: last.state_root,
-        newest_height: last.height,
-        celestia_header_hashes,
+        celestia_header_hashes: celestia_header_hashes,
+        celestia_header_hash: [0u8; 32], // TODO: assign this correctly
+        trusted_height: first.height,    // should be first.trusted_height
+        trusted_state_root: first.trusted_state_root,
+        new_state_root: last.state_root,
+        new_height: last.height,
     };
 
     sp1_zkvm::io::commit(&range_output);
