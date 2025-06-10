@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 sp1-zkvm = "5.0.0"
-evm-exec-types = { path = "../evm-exec-types" }
+evm-exec-types = { path = "../../evm-exec-types" }
 
 alloy-sol-types = { workspace = true }
 bincode = { workspace = true }

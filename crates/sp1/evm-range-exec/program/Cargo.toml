@@ -1,11 +1,11 @@
 [package]
 version = "0.1.0"
-name = "evm-range-exec"
+name = "evm-range-exec-program"
 edition = "2021"
 
 [dependencies]
 sp1-zkvm = { version = "5.0.0", features = ["verify"] }
-evm-exec-types = { path = "../evm-exec-types" }
+evm-exec-types = { path = "../../evm-exec-types" }
 
 hex-literal = "0.4.1"
 alloy-sol-types = { workspace = true }
