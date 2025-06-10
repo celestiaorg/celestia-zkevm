@@ -1,0 +1,8 @@
+[package]
+version = "0.1.0"
+name = "evm-exec-types"
+edition = "2021"
+
+[dependencies]
+serde = "1"
+bincode = { workspace = true }
