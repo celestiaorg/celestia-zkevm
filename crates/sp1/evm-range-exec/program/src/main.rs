@@ -67,7 +67,7 @@ pub fn main() {
         assert_eq!(
             curr.prev_header_hash,
             prev.header_hash,
-            "verify sequential headers failed at index {}: expected {:?}, got {:?}",
+            "verify sequential EVM headers failed at index {}: expected {:?}, got {:?}",
             i + 1,
             prev.header_hash,
             curr.prev_header_hash
@@ -80,7 +80,7 @@ pub fn main() {
         assert_eq!(
             curr.prev_celestia_header_hash,
             prev.celestia_header_hash,
-            "verify sequential headers failed at index {}: expected {:?}, got {:?}",
+            "verify sequential Celestia headers failed at index {}: expected {:?}, got {:?}",
             i + 1,
             prev.celestia_header_hash,
             curr.prev_celestia_header_hash
