@@ -1,16 +1,29 @@
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+// TODO: Remove this type when happy to do so!
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BlEvmBlockExecOutput {
+    pub blob_commitment: [u8; 32], // confirm needed?
+    pub header_hash: [u8; 32],
+    pub prev_header_hash: [u8; 32],
+    pub height: u64,
+    pub gas_used: u64,         // confirm needed?
+    pub beneficiary: [u8; 20], // confirm needed?
+    pub state_root: [u8; 32],
+    pub celestia_header_hash: [u8; 32],
+    pub trusted_state_root: [u8; 32],
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EvmBlockExecOutput {
     pub blob_commitment: [u8; 32],
     pub header_hash: [u8; 32],
     pub prev_header_hash: [u8; 32],
-    pub height: u64,
-    pub gas_used: u64,
-    pub beneficiary: [u8; 20],
-    pub state_root: [u8; 32],
     pub celestia_header_hash: [u8; 32],
-    pub trusted_state_root: [u8; 32],
+    pub new_height: u64,
+    pub new_state_root: [u8; 32],
+    pub prev_height: u64,
+    pub prev_state_root: [u8; 32],
 }
 
 #[derive(Serialize, Deserialize, Debug)]

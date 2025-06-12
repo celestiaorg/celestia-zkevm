@@ -86,10 +86,10 @@ pub fn main() {
     let range_output = EvmRangeExecOutput {
         celestia_header_hashes: celestia_header_hashes,
         celestia_header_hash: [0u8; 32], // TODO: assign this correctly
-        trusted_height: first.height,    // should be first.trusted_height
-        trusted_state_root: first.trusted_state_root,
-        new_state_root: last.state_root,
-        new_height: last.height,
+        trusted_height: first.prev_height,
+        trusted_state_root: first.prev_state_root,
+        new_state_root: last.new_state_root,
+        new_height: last.new_height,
     };
 
     sp1_zkvm::io::commit(&range_output);
