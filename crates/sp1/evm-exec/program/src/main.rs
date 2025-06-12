@@ -3,7 +3,7 @@
 //! 1. Accepts an EVM block and associated Celestia proofs
 //! 2. Verifies that the EVM block was included in the Celestia block
 //! 3. Executes the EVM block
-//! 4. Commits the resulting EVM block metadata and hash as public outputs
+//! 4. Commits the resulting EVM and Celestia block metadata as public outputs
 
 #![no_main]
 

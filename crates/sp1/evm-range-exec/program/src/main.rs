@@ -6,13 +6,13 @@
 //!
 //! It performs:
 //! 1. Proof verification for each input
-//! 2. Header linkage verification (i.e., block continuity)
+//! 2. Sequential header verification (i.e., block continuity)
 //! 3. Aggregation of metadata into a `EvmRangeExecOutput`
 //!
 //! It commits:
-//! - The oldest and newest EVM block header hashes
-//! - The final block height and state root
-//! - All Celestia header hashes from the sequence
+//! - The trusted block height and state root
+//! - The new block height and state root
+//! - The latest Celestia header hash from the sequence
 
 #![no_main]
 sp1_zkvm::entrypoint!(main);
