@@ -32,6 +32,7 @@ pub fn main() {
         bincode::deserialize(&sp1_zkvm::io::read_vec())
             .expect("failed to deserialize EVM block input");
 
+    // TODO: should be celestia header, then we commit(prevHeaderHash, headerHash) to program outputs
     let celestia_header_hash: TmHash = sp1_zkvm::io::read();
     let data_hash_bytes: Vec<u8> = sp1_zkvm::io::read_vec();
     let celestia_proof: Proof<TmSha2Hasher> = sp1_zkvm::io::read();
