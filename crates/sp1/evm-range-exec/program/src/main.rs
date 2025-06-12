@@ -58,7 +58,7 @@ pub fn main() {
         .collect();
 
     // ------------------------------
-    // 4. Verify sequential headers
+    // 4. Verify sequential headers (EVM and Celestia)
     // ------------------------------
 
     for window in outputs.windows(2).enumerate() {
@@ -74,6 +74,19 @@ pub fn main() {
         );
     }
 
+    for window in outputs.windows(2).enumerate() {
+        let (i, pair) = window;
+        let (prev, curr) = (&pair[0], &pair[1]);
+        assert_eq!(
+            curr.prev_celestia_header_hash,
+            prev.celestia_header_hash,
+            "verify sequential headers failed at index {}: expected {:?}, got {:?}",
+            i + 1,
+            prev.celestia_header_hash,
+            curr.prev_celestia_header_hash
+        );
+    }
+
     // ------------------------------
     // 5. Build and commit outputs
     // ------------------------------
@@ -81,11 +94,8 @@ pub fn main() {
     let first = outputs.first().expect("No outputs provided");
     let last = outputs.last().expect("No outputs provided");
 
-    let celestia_header_hashes: Vec<_> = outputs.iter().map(|o| o.celestia_header_hash).collect();
-
     let range_output = EvmRangeExecOutput {
-        celestia_header_hashes: celestia_header_hashes,
-        celestia_header_hash: [0u8; 32], // TODO: assign this correctly
+        celestia_header_hash: last.celestia_header_hash,
         trusted_height: first.prev_height,
         trusted_state_root: first.prev_state_root,
         new_state_root: last.new_state_root,

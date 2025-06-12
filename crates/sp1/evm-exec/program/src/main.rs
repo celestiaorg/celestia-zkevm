@@ -152,9 +152,13 @@ pub fn main() {
         blob_commitment: blob.commitment.into(),
         header_hash: header.hash_slow().into(),
         prev_header_hash: header.parent_hash.into(),
-        // celestia header hash is currently an input... we should input the header itself, and commit to
+        // TODO: celestia header hash is currently an input... we should input the header itself, and commit to
         // the header hash and the header.block_id.last_header_hash
         celestia_header_hash: celestia_header_hash
+            .as_bytes()
+            .try_into()
+            .expect("invalid Celestia header hash length"),
+        prev_celestia_header_hash: celestia_header_hash
             .as_bytes()
             .try_into()
             .expect("invalid Celestia header hash length"),

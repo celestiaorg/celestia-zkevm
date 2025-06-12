@@ -20,6 +20,7 @@ pub struct EvmBlockExecOutput {
     pub header_hash: [u8; 32],
     pub prev_header_hash: [u8; 32],
     pub celestia_header_hash: [u8; 32],
+    pub prev_celestia_header_hash: [u8; 32],
     pub new_height: u64,
     pub new_state_root: [u8; 32],
     pub prev_height: u64,
@@ -28,11 +29,6 @@ pub struct EvmBlockExecOutput {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EvmRangeExecOutput {
-    // TODO: remove in favour of celestia_header_hash (latest)
-    // celestia_header_hashes is the range of Celestia blocks that include all
-    // of the blob data the EVM roll-up has posted from oldest_header_hash to
-    // newest_header_hash.
-    pub celestia_header_hashes: Vec<[u8; 32]>, // provided by Celestia state machine (eventually x/header)
     // celestia_header_hash is the hash of the celestia header at which new_height is available.
     pub celestia_header_hash: [u8; 32],
     // trusted_height is the trusted height of the EVM application.
