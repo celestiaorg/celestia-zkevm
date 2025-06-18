@@ -1,33 +1,40 @@
-mod hex_bytes;
-
-use hex::encode_upper;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::fmt::{Display, Formatter, Result};
+
+mod hex_bytes;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EvmBlockExecOutput {
+    // blob_commitment is the blob commitment for the EVM block.
     #[serde(with = "hex_bytes")]
     pub blob_commitment: [u8; 32],
 
+    // header_hash is the hash of the EVM block header.
     #[serde(with = "hex_bytes")]
     pub header_hash: [u8; 32],
 
+    // prev_header_hash is the hash of the previous EVM block header.
     #[serde(with = "hex_bytes")]
     pub prev_header_hash: [u8; 32],
 
+    // celestia_header_hash is the merkle hash of the Celestia block header.
     #[serde(with = "hex_bytes")]
     pub celestia_header_hash: [u8; 32],
 
+    // prev_celestia_header_hash is the merkle hash of the previous Celestia block header.
     #[serde(with = "hex_bytes")]
     pub prev_celestia_header_hash: [u8; 32],
 
+    // new_height is the block number after the state transition function has been applied.
     pub new_height: u64,
 
+    // new_state_root is the EVM application state root after the state transition function has been applied.
     #[serde(with = "hex_bytes")]
     pub new_state_root: [u8; 32],
 
+    // prev_height is the block number before the state transition function has been applied.
     pub prev_height: u64,
 
+    // prev_state_root is the EVM application state root before the state transition function has been applied.
     #[serde(with = "hex_bytes")]
     pub prev_state_root: [u8; 32],
 }
@@ -35,36 +42,23 @@ pub struct EvmBlockExecOutput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EvmRangeExecOutput {
     // celestia_header_hash is the hash of the celestia header at which new_height is available.
+    #[serde(with = "hex_bytes")]
     pub celestia_header_hash: [u8; 32],
+
     // trusted_height is the trusted height of the EVM application.
     pub trusted_height: u64,
+
+    #[serde(with = "hex_bytes")]
     // trusted_state_root is the state commitment root of the EVM application at trusted_height.
     pub trusted_state_root: [u8; 32],
+
     // new_height is the EVM application block number after N state transitions.
     pub new_height: u64,
+
     // new_state_root is the computed state root of the EVM application after
     // executing N blocks from trusted_height to new_height.
+    #[serde(with = "hex_bytes")]
     pub new_state_root: [u8; 32],
-}
-
-impl Display for EvmBlockExecOutput {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        writeln!(f, "EvmBlockExecOutput {{")?;
-        writeln!(f, "  blob_commitment: {}", encode_upper(self.blob_commitment))?;
-        writeln!(f, "  header_hash: {}", encode_upper(self.header_hash))?;
-        writeln!(f, "  prev_header_hash: {}", encode_upper(self.prev_header_hash))?;
-        writeln!(f, "  celestia_header_hash: {}", encode_upper(self.celestia_header_hash))?;
-        writeln!(
-            f,
-            "  prev_celestia_header_hash: {}",
-            encode_upper(self.prev_celestia_header_hash)
-        )?;
-        writeln!(f, "  new_height:                {}", self.new_height)?;
-        writeln!(f, "  new_state_root:            {}", encode_upper(self.new_state_root))?;
-        writeln!(f, "  prev_height:               {}", self.prev_height)?;
-        writeln!(f, "  prev_state_root:           {}", encode_upper(self.prev_state_root))?;
-        write!(f, "}}")
-    }
 }
 
 /// A buffer of serializable/deserializable objects.

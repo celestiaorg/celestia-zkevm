@@ -1,4 +1,4 @@
-use hex::{encode_upper, FromHex};
+use hex::FromHex;
 use serde::Deserialize;
 use serde::{self, Deserializer, Serializer};
 
@@ -6,7 +6,7 @@ pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    let hex_str = encode_upper(bytes);
+    let hex_str = hex::encode_upper(bytes);
     serializer.serialize_str(&hex_str)
 }
 
