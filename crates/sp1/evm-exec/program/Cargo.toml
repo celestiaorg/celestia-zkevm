@@ -4,7 +4,6 @@ name = "evm-exec-program"
 edition = "2021"
 
 [dependencies]
-sp1-zkvm = "5.0.0"
 evm-exec-types = { path = "../../evm-exec-types" }
 
 alloy-sol-types = { workspace = true }
@@ -15,6 +14,9 @@ hex = "0.4.3"
 nmt-rs = "*"
 rsp-client-executor = { workspace = true }
 reth-primitives = { workspace = true }
+serde_cbor = { workspace = true }
+serde_json = { workspace = true }
 sha3 = { workspace = true }
+sp1-zkvm = { workspace = true }
 tendermint = { workspace = true }
 tendermint-proto = { workspace = true }

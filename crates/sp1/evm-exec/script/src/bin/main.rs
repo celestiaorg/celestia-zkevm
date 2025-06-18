@@ -1,6 +1,3 @@
-//! TODO: This is a skeleton script which can be adapted to allow script execution or proof generation
-//! by providing data to parse for the ProverClient stdin.
-//!
 //! An end-to-end example of using the SP1 SDK to generate a proof of a program that can be executed
 //! or have a core proof generated.
 //!
@@ -12,9 +9,18 @@
 //! ```shell
 //! RUST_LOG=info cargo run --release -- --prove
 //! ```
+use std::fs;
+use std::fs::File;
+use std::io::BufReader;
 
 use clap::Parser;
+use eq_common::KeccakInclusionToDataRootProofInput;
+use evm_exec_types::EvmBlockExecOutput;
+use nmt_rs::{simple_merkle::proof::Proof, TmSha2Hasher};
+use rsp_client_executor::io::EthClientExecutorInput;
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
+use tendermint::block::header::Header;
+use tendermint_proto::Protobuf;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
@@ -28,12 +34,9 @@ struct Args {
 
     #[arg(long)]
     prove: bool,
-
-    #[arg(long, default_value = "20")]
-    n: u32,
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Setup the logger.
     sp1_sdk::utils::setup_logger();
     dotenv::dotenv().ok();
@@ -51,43 +54,67 @@ fn main() {
 
     // Setup the inputs.
     let mut stdin = SP1Stdin::new();
-    stdin.write(&args.n);
-
-    println!("n: {}", args.n);
+    write_proof_inputs(&mut stdin)?;
 
     if args.execute {
-        // Execute the program
-        let (_output, report) = client.execute(EVM_EXEC_ELF, &stdin).run().unwrap();
-        println!("Program executed successfully.");
+        // Execute the program.
+        let (output, report) = client.execute(EVM_EXEC_ELF, &stdin).run().unwrap();
+        println!("Program executed successfully!");
 
-        // // Read the output.
-        // let decoded = PublicValuesStruct::abi_decode(output.as_slice()).unwrap();
-        // let PublicValuesStruct { n, a, b } = decoded;
-        // println!("n: {}", n);
-        // println!("a: {}", a);
-        // println!("b: {}", b);
-
-        // let (expected_a, expected_b) = fibonacci_lib::fibonacci(n);
-        // assert_eq!(a, expected_a);
-        // assert_eq!(b, expected_b);
-        // println!("Values are correct!");
+        // Read the output.
+        let block_exec_output: EvmBlockExecOutput = bincode::deserialize(output.as_slice())?;
+        println!("Outputs: {}", serde_json::to_string_pretty(&block_exec_output)?);
 
         // Record the number of cycles executed.
         println!("Number of cycles: {}", report.total_instruction_count());
     } else {
         // Setup the program for proving.
-        // let (pk, vk) = client.setup(FIBONACCI_ELF);
+        let (pk, vk) = client.setup(EVM_EXEC_ELF);
 
-        // // Generate the proof
-        // let proof = client
-        //     .prove(&pk, &stdin)
-        //     .run()
-        //     .expect("failed to generate proof");
+        // Generate the proof.
+        let proof = client
+            .prove(&pk, &stdin)
+            .compressed()
+            .run()
+            .expect("failed to generate proof");
 
-        // println!("Successfully generated proof!");
+        println!("Successfully generated proof!");
 
-        // // Verify the proof.
-        // client.verify(&proof, &vk).expect("failed to verify proof");
+        // Verify the proof.
+        client.verify(&proof, &vk).expect("failed to verify proof");
         println!("Successfully verified proof!");
     }
+
+    Ok(())
+}
+
+/// write_proof_inputs writes the program inputs to provided SP1Stdin
+fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<(), Box<dyn std::error::Error>> {
+    let blob_proof_data = fs::read("testdata/blob_proof.bin")?;
+    let blob_proof: KeccakInclusionToDataRootProofInput = bincode::deserialize(&blob_proof_data)?;
+    stdin.write(&blob_proof);
+
+    let client_input_data = fs::read("testdata/client_input.bin")?;
+    let client_executor_input: EthClientExecutorInput = bincode::deserialize(&client_input_data)?;
+    stdin.write(&client_executor_input);
+
+    let header_file = File::open("testdata/header.json")?;
+    let reader = BufReader::new(header_file);
+    let header: Header = serde_json::from_reader(reader)?;
+    // TODO: maybe use cbor here. there seems to be an issue with writing tendermint block headers with bincode
+    // perhaps protobuf related...
+    let header_bytes = serde_json::to_vec(&header).unwrap();
+    stdin.write_vec(header_bytes);
+
+    let data_hash = header.data_hash.unwrap().encode_vec();
+    stdin.write_vec(data_hash);
+
+    let data_root_proof_data = fs::read("testdata/data_root_proof.bin")?;
+    let data_root_proof: Proof<TmSha2Hasher> = bincode::deserialize(&data_root_proof_data)?;
+    stdin.write(&data_root_proof);
+
+    let trusted_state_root = client_executor_input.parent_state.state_root().as_slice().to_vec();
+    stdin.write_vec(trusted_state_root);
+
+    Ok(())
 }

@@ -1,29 +1,34 @@
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+mod hex_bytes;
 
-// TODO: Remove this type when happy to do so!
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BlEvmBlockExecOutput {
-    pub blob_commitment: [u8; 32], // confirm needed?
-    pub header_hash: [u8; 32],
-    pub prev_header_hash: [u8; 32],
-    pub height: u64,
-    pub gas_used: u64,         // confirm needed?
-    pub beneficiary: [u8; 20], // confirm needed?
-    pub state_root: [u8; 32],
-    pub celestia_header_hash: [u8; 32],
-    pub trusted_state_root: [u8; 32],
-}
+use hex::encode_upper;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::fmt::{Display, Formatter, Result};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EvmBlockExecOutput {
+    #[serde(with = "hex_bytes")]
     pub blob_commitment: [u8; 32],
+
+    #[serde(with = "hex_bytes")]
     pub header_hash: [u8; 32],
+
+    #[serde(with = "hex_bytes")]
     pub prev_header_hash: [u8; 32],
+
+    #[serde(with = "hex_bytes")]
     pub celestia_header_hash: [u8; 32],
+
+    #[serde(with = "hex_bytes")]
     pub prev_celestia_header_hash: [u8; 32],
+
     pub new_height: u64,
+
+    #[serde(with = "hex_bytes")]
     pub new_state_root: [u8; 32],
+
     pub prev_height: u64,
+
+    #[serde(with = "hex_bytes")]
     pub prev_state_root: [u8; 32],
 }
 
@@ -40,6 +45,26 @@ pub struct EvmRangeExecOutput {
     // new_state_root is the computed state root of the EVM application after
     // executing N blocks from trusted_height to new_height.
     pub new_state_root: [u8; 32],
+}
+
+impl Display for EvmBlockExecOutput {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        writeln!(f, "EvmBlockExecOutput {{")?;
+        writeln!(f, "  blob_commitment: {}", encode_upper(self.blob_commitment))?;
+        writeln!(f, "  header_hash: {}", encode_upper(self.header_hash))?;
+        writeln!(f, "  prev_header_hash: {}", encode_upper(self.prev_header_hash))?;
+        writeln!(f, "  celestia_header_hash: {}", encode_upper(self.celestia_header_hash))?;
+        writeln!(
+            f,
+            "  prev_celestia_header_hash: {}",
+            encode_upper(self.prev_celestia_header_hash)
+        )?;
+        writeln!(f, "  new_height:                {}", self.new_height)?;
+        writeln!(f, "  new_state_root:            {}", encode_upper(self.new_state_root))?;
+        writeln!(f, "  prev_height:               {}", self.prev_height)?;
+        writeln!(f, "  prev_state_root:           {}", encode_upper(self.prev_state_root))?;
+        write!(f, "}}")
+    }
 }
 
 /// A buffer of serializable/deserializable objects.
@@ -73,8 +98,7 @@ impl Buffer {
 
     /// Read the serializable object from the buffer.
     pub fn read<T: Serialize + DeserializeOwned>(&mut self) -> T {
-        let result: T =
-            bincode::deserialize(&self.data[self.ptr..]).expect("failed to deserialize");
+        let result: T = bincode::deserialize(&self.data[self.ptr..]).expect("failed to deserialize");
         let nb_bytes = bincode::serialized_size(&result).expect("failed to get serialized size");
         self.ptr += nb_bytes as usize;
         result

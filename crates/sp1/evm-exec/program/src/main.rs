@@ -17,7 +17,7 @@ use evm_exec_types::EvmBlockExecOutput;
 use nmt_rs::{simple_merkle::proof::Proof, simple_merkle::tree::MerkleHash, TmSha2Hasher};
 use rsp_client_executor::{executor::EthClientExecutor, io::EthClientExecutorInput};
 use sha3::{Digest, Keccak256};
-use tendermint::Hash as TmHash;
+use tendermint::block::Header;
 
 pub fn main() {
     // -----------------------------
@@ -32,8 +32,10 @@ pub fn main() {
         bincode::deserialize(&sp1_zkvm::io::read_vec())
             .expect("failed to deserialize EVM block input");
 
-    // TODO: should be celestia header, then we commit(prevHeaderHash, headerHash) to program outputs
-    let celestia_header_hash: TmHash = sp1_zkvm::io::read();
+    let celestia_header_bytes: Vec<u8> = sp1_zkvm::io::read_vec();
+    let celestia_header: Header = serde_json::from_slice(&celestia_header_bytes)
+        .expect("failed to deserialize celestia header");
+
     let data_hash_bytes: Vec<u8> = sp1_zkvm::io::read_vec();
     let celestia_proof: Proof<TmSha2Hasher> = sp1_zkvm::io::read();
     let trusted_state_root: Vec<u8> = sp1_zkvm::io::read_vec();
@@ -46,7 +48,11 @@ pub fn main() {
     println!("cycle-tracker-start: assert trusted state root");
 
     assert_eq!(
-        client_executor_input.parent_state.state_root().as_slice(),
+        client_executor_input
+            .parent_state
+            .state_root()
+            .as_slice()
+            .to_vec(),
         trusted_state_root,
         "parent state root does not match trusted root"
     );
@@ -114,10 +120,7 @@ pub fn main() {
     let hasher = TmSha2Hasher {};
     celestia_proof
         .verify_range(
-            celestia_header_hash
-                .as_bytes()
-                .try_into()
-                .expect("invalid Celestia hash length"),
+            celestia_header.hash().as_bytes().try_into().unwrap(),
             &[hasher.hash_leaf(&data_hash_bytes)],
         )
         .expect("Celestia inclusion proof failed");
@@ -153,22 +156,24 @@ pub fn main() {
         blob_commitment: blob.commitment.into(),
         header_hash: header.hash_slow().into(),
         prev_header_hash: header.parent_hash.into(),
-        // TODO: celestia header hash is currently an input... we should input the header itself, and commit to
-        // the header hash and the header.block_id.last_header_hash
-        celestia_header_hash: celestia_header_hash
+        celestia_header_hash: celestia_header
+            .hash()
             .as_bytes()
             .try_into()
-            .expect("invalid Celestia header hash length"),
-        prev_celestia_header_hash: celestia_header_hash
+            .expect("celestia_header_hash must be exactly 32 bytes"),
+        prev_celestia_header_hash: celestia_header
+            .last_block_id
+            .unwrap()
+            .hash
             .as_bytes()
             .try_into()
-            .expect("invalid Celestia header hash length"),
+            .expect("prev_celestia_header_hash must be exactly 32 bytes"),
         new_height: header.number,
         new_state_root: header.state_root.into(),
         prev_height: header.number - 1,
         prev_state_root: trusted_state_root
             .try_into()
-            .expect("trusted state root must be exactly 32 bytes"),
+            .expect("prev_state_root must be exactly 32 bytes"),
     };
 
     sp1_zkvm::io::commit(&output);

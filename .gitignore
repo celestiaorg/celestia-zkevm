@@ -4,7 +4,6 @@
 .env
 
 build
-*.bin
 
 **/hyperlane_db
 **/proof-with-pis.json

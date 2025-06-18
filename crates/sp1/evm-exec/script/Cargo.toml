@@ -2,8 +2,7 @@
 version = "0.1.0"
 name = "evm-exec-script"
 edition = "2021"
-# default-run = "evm-exec"
-default-run = "vkey"
+default-run = "evm-exec"
 
 [[bin]]
 name = "evm-exec"
@@ -14,13 +13,23 @@ name = "vkey"
 path = "src/bin/vkey.rs"
 
 [dependencies]
-sp1-sdk = "5.0.0"
-serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
-serde = { version = "1.0.200", default-features = false, features = ["derive"] }
+evm-exec-types = { path = "../../evm-exec-types" }
+
+bincode = { workspace = true }
 clap = { version = "4.0", features = ["derive", "env"] }
-tracing = "0.1.40"
-hex = "0.4.3"
 dotenv = "0.15.0"
+eq-common = { workspace = true }
+hex = { workspace = true }
+nmt-rs = { workspace = true }
+rsp-client-executor = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, default-features = false, features = [
+    "alloc",
+] }
+sp1-sdk = { workspace = true }
+tendermint = { workspace = true }
+tendermint-proto = { workspace = true }
+tracing = "0.1.40"
 
 [build-dependencies]
-sp1-build = "5.0.0"
+sp1-build = { workspace = true }
