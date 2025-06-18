@@ -29,15 +29,18 @@ pub fn main() {
     let data_root = Hash::Sha256(blob_proof.data_root);
 
     let client_executor_input: EthClientExecutorInput =
-        bincode::deserialize(&sp1_zkvm::io::read_vec())
-            .expect("failed to deserialize EVM block input");
+        bincode::deserialize(&sp1_zkvm::io::read_vec()).expect("failed to deserialize EVM block input");
 
     let celestia_header_bytes: Vec<u8> = sp1_zkvm::io::read_vec();
-    let celestia_header: Header = serde_json::from_slice(&celestia_header_bytes)
-        .expect("failed to deserialize celestia header");
+    let celestia_header: Header =
+        serde_json::from_slice(&celestia_header_bytes).expect("failed to deserialize celestia header");
 
+    // TODO(removal): why do we need? we can take data root from blob proof and prove that against celestia header
     let data_hash_bytes: Vec<u8> = sp1_zkvm::io::read_vec();
+    // TODO(rename): rename this, it is not apparent that this is the data root to header proof
     let celestia_proof: Proof<TmSha2Hasher> = sp1_zkvm::io::read();
+    // TODO(removal): we probably don't need to take this as input, only commit as output from client_executor_input.parent_state.state_root
+    // we can commit it as output and then plug in the trusted field from on-chain ISM data
     let trusted_state_root: Vec<u8> = sp1_zkvm::io::read_vec();
 
     println!("cycle-tracker-end: deserialize input");
@@ -48,11 +51,7 @@ pub fn main() {
     println!("cycle-tracker-start: assert trusted state root");
 
     assert_eq!(
-        client_executor_input
-            .parent_state
-            .state_root()
-            .as_slice()
-            .to_vec(),
+        client_executor_input.parent_state.state_root().as_slice().to_vec(),
         trusted_state_root,
         "parent state root does not match trusted root"
     );
@@ -64,15 +63,14 @@ pub fn main() {
     // -----------------------------
     println!("cycle-tracker-start: create blob");
 
-    let blob = Blob::new(blob_proof.namespace_id, blob_proof.data, AppVersion::V3)
-        .expect("failed to construct Celestia blob");
+    let blob =
+        Blob::new(blob_proof.namespace_id, blob_proof.data, AppVersion::V3).expect("failed to construct Celestia blob");
 
     println!("cycle-tracker-end: create blob");
 
     println!("cycle-tracker-start: compute keccak hash");
 
-    let computed_keccak_hash: [u8; 32] =
-        Keccak256::new().chain_update(&blob.data).finalize().into();
+    let computed_keccak_hash: [u8; 32] = Keccak256::new().chain_update(&blob.data).finalize().into();
 
     println!("cycle-tracker-end: compute keccak hash");
 
@@ -106,9 +104,7 @@ pub fn main() {
 
     println!("cycle-tracker-start: verify share proof");
 
-    share_proof
-        .verify(data_root)
-        .expect("ShareProof verification failed");
+    share_proof.verify(data_root).expect("ShareProof verification failed");
 
     println!("cycle-tracker-end: verify share proof");
 
@@ -154,8 +150,8 @@ pub fn main() {
 
     let output = EvmBlockExecOutput {
         blob_commitment: blob.commitment.into(),
-        header_hash: header.hash_slow().into(),
-        prev_header_hash: header.parent_hash.into(),
+        header_hash: header.hash_slow().into(), // TODO(removal): what do we need this for?
+        prev_header_hash: header.parent_hash.into(), // TODO(removal): what do we need this for?
         celestia_header_hash: celestia_header
             .hash()
             .as_bytes()
