@@ -9,6 +9,7 @@
 //! ```shell
 //! RUST_LOG=info cargo run -p evm-exec-script --release -- --prove
 //! ```
+use std::error::Error;
 use std::fs;
 
 use clap::Parser;
@@ -34,12 +35,10 @@ struct Args {
     prove: bool,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Setup the logger.
+fn main() -> Result<(), Box<dyn Error>> {
     sp1_sdk::utils::setup_logger();
     dotenv::dotenv().ok();
 
-    // Parse the command line arguments.
     let args = Args::parse();
 
     if args.execute == args.prove {
@@ -47,10 +46,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
 
-    // Setup the prover client.
     let client = ProverClient::from_env();
 
-    // Setup the inputs.
     let mut stdin = SP1Stdin::new();
     write_proof_inputs(&mut stdin)?;
 
@@ -91,7 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// write_proof_inputs writes the program inputs to provided SP1Stdin
-fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<(), Box<dyn std::error::Error>> {
+fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<(), Box<dyn Error>> {
     let blob_proof_data = fs::read("testdata/blob_proof.bin")?;
     let blob_proof: KeccakInclusionToDataRootProofInput = bincode::deserialize(&blob_proof_data)?;
     stdin.write(&blob_proof);

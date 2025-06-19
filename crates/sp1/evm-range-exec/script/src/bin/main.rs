@@ -12,9 +12,13 @@
 //! ```shell
 //! RUST_LOG=info cargo run --release -- --prove
 //! ```
+use std::error::Error;
 
 use clap::Parser;
-use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
+use sp1_sdk::{include_elf, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
+
+/// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
+pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_RANGE_EXEC_ELF: &[u8] = include_elf!("evm-range-exec-program");
@@ -28,17 +32,12 @@ struct Args {
 
     #[arg(long)]
     prove: bool,
-
-    #[arg(long, default_value = "20")]
-    n: u32,
 }
 
-fn main() {
-    // Setup the logger.
+fn main() -> Result<(), Box<dyn Error>> {
     sp1_sdk::utils::setup_logger();
     dotenv::dotenv().ok();
 
-    // Parse the command line arguments.
     let args = Args::parse();
 
     if args.execute == args.prove {
@@ -46,48 +45,46 @@ fn main() {
         std::process::exit(1);
     }
 
-    // Setup the prover client.
     let client = ProverClient::from_env();
 
-    // Setup the inputs.
     let mut stdin = SP1Stdin::new();
-    stdin.write(&args.n);
-
-    println!("n: {}", args.n);
+    write_proof_inputs(&mut stdin)?;
 
     if args.execute {
-        // Execute the program
+        // Execute the program.
         let (_output, report) = client.execute(EVM_RANGE_EXEC_ELF, &stdin).run().unwrap();
         println!("Program executed successfully.");
 
-        // // Read the output.
-        // let decoded = PublicValuesStruct::abi_decode(output.as_slice()).unwrap();
-        // let PublicValuesStruct { n, a, b } = decoded;
-        // println!("n: {}", n);
-        // println!("a: {}", a);
-        // println!("b: {}", b);
-
-        // let (expected_a, expected_b) = fibonacci_lib::fibonacci(n);
-        // assert_eq!(a, expected_a);
-        // assert_eq!(b, expected_b);
-        // println!("Values are correct!");
+        // TODO: Read the output.
 
         // Record the number of cycles executed.
         println!("Number of cycles: {}", report.total_instruction_count());
     } else {
         // Setup the program for proving.
-        // let (pk, vk) = client.setup(FIBONACCI_ELF);
+        let (pk, vk) = client.setup(EVM_RANGE_EXEC_ELF);
 
-        // // Generate the proof
-        // let proof = client
-        //     .prove(&pk, &stdin)
-        //     .run()
-        //     .expect("failed to generate proof");
+        // Generate the proof.
+        let proof = client
+            .prove(&pk, &stdin)
+            .groth16()
+            .run()
+            .expect("failed to generate proof");
 
-        // println!("Successfully generated proof!");
+        println!("Successfully generated proof!");
 
-        // // Verify the proof.
-        // client.verify(&proof, &vk).expect("failed to verify proof");
+        // Verify the proof.
+        client.verify(&proof, &vk).expect("failed to verify proof");
         println!("Successfully verified proof!");
     }
+
+    Ok(())
+}
+
+/// write_proof_inputs writes the program inputs to provided SP1Stdin
+fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<(), Box<dyn Error>> {
+    let proof = SP1ProofWithPublicValues::load("testdata/proofs/proof-with-pis.bin")?;
+    // stdin.write_proof(&proof.proof, vk)
+    stdin.write(&proof.public_values.to_vec());
+
+    Ok(())
 }
