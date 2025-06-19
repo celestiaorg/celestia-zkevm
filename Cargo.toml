@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "crates/block-prover",
     "crates/evm-prover",
     "crates/sp1/evm-exec/program",
     "crates/sp1/evm-exec/script",
@@ -17,6 +16,7 @@ bincode = "1.3.3"
 celestia-rpc = "0.11"
 celestia-types = "0.11"
 eq-common = "0.1.4"
+ethers = { version = "2.0", features = ["ws", "rustls"] }
 hex = "0.4.3"
 nmt-rs = "*"
 reth-chainspec = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.3", default-features = false }

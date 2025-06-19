@@ -1,31 +1,44 @@
-use std::convert::TryFrom;
+//! A script that generates proof input data for a range of EVM blocks.
+//!
+//! This tool connects to an EVM reth node and a Celestia data availability node, then collects and prepares:
+//! - STF input (client execution input)
+//! - Blob inclusion proof input
+//! - Celestia header JSON
+//! - Data root proof for Celestia header
+//!
+//! For each block, the generated inputs are written to a directory structure:
+//! `testdata/inputs/block-<number>/...`
+//!
+//! You can run this script using the following command from the root of this repository:
+//! ```shell
+//! RUST_LOG=info cargo run -p evm-exec-script --bin data-gen --release -- --start <START_BLOCK> --end <END_BLOCK>
+//! ```
+//!
+//! Replace `<START_BLOCK>` and `<END_BLOCK>` with the desired inclusive block range.
 use std::env;
 use std::error::Error;
 use std::fs;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{Result, anyhow};
-use base64::{Engine as _, engine::general_purpose};
+use anyhow::{anyhow, Result};
+use base64::{engine::general_purpose, Engine as _};
+use clap::Parser;
 use eyre::Context;
 use reqwest::StatusCode;
 use serde::{Deserialize, Deserializer};
 use sha3::{Digest, Keccak256};
+use tokio_retry::strategy::{jitter, ExponentialBackoff};
 use tokio_retry::Retry;
-use tokio_retry::strategy::{ExponentialBackoff, jitter};
 
 use alloy_provider::ProviderBuilder;
 use celestia_rpc::{BlobClient, Client, HeaderClient, ShareClient};
 use celestia_types::nmt::{MerkleHash, Namespace};
 use celestia_types::{Blob, Commitment, ExtendedHeader, ShareProof};
 use eq_common::KeccakInclusionToDataRootProofInput;
-use ethers::{
-    providers::{Http, Middleware, Provider},
-    types::BlockNumber,
-};
 use nmt_rs::{
-    TmSha2Hasher,
     simple_merkle::{db::MemDb, proof::Proof, tree::MerkleTree},
+    TmSha2Hasher,
 };
 use reth_chainspec::ChainSpec;
 use rsp_host_executor::EthHostExecutor;
@@ -33,14 +46,25 @@ use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
 use tendermint::merkle::Hash as TmHash;
 use tendermint_proto::{
-    Protobuf,
     v0_38::{types::BlockId as RawBlockId, version::Consensus as RawConsensusVersion},
+    Protobuf,
 };
 
 mod config {
     pub const CELESTIA_RPC_URL: &str = "http://localhost:26658";
     pub const EVM_RPC_URL: &str = "http://localhost:8545";
     pub const INDEXER_URL: &str = "http://localhost:8080";
+}
+
+/// The arguments for the command.
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[arg(long)]
+    start: u64,
+
+    #[arg(long)]
+    end: u64,
 }
 
 /// Loads the genesis file from disk and converts it into a ChainSpec
@@ -246,23 +270,11 @@ fn prepare_header_fields(header: &ExtendedHeader) -> Vec<Vec<u8>> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let provider = Provider::<Http>::try_from(config::EVM_RPC_URL)?;
-    let latest_block = provider.get_block(BlockNumber::Latest).await?;
-
-    let block_number = latest_block.unwrap().number.unwrap().as_u64();
-    println!("Generating proof data for block: {:#?}", block_number);
+    let args = Args::parse();
+    let block_numbers: Vec<u64> = (args.start..=args.end).collect();
 
     let genesis_path = env::var("GENESIS_PATH").expect("GENESIS_PATH must be set");
     let (genesis, chain_spec) = load_chain_spec_from_genesis(&genesis_path)?;
-
-    generate_and_write_stf(
-        config::EVM_RPC_URL,
-        block_number,
-        chain_spec,
-        genesis,
-        "testdata/client_input.bin",
-    )
-    .await?;
 
     let namespace_hex = env::var("CELESTIA_NAMESPACE").expect("CELESTIA_NAMESPACE must be set");
     let namespace = Namespace::new_v0(&hex::decode(namespace_hex)?)?;
@@ -271,32 +283,50 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .await
         .context("Failed creating Celestia RPC client")?;
 
-    let (blob, header, _) =
-        fetch_blob_and_header(&celestia_client, config::INDEXER_URL, block_number, namespace).await?;
+    for block_number in block_numbers {
+        println!("\nProcessing block: {}", block_number);
 
-    let header_json = serde_json::to_string_pretty(&header.header)?;
-    fs::write("testdata/header.json", header_json)?;
+        // Create output dir: testdata/inputs/block-{block_number}/
+        let block_dir = format!("testdata/inputs/block-{}", block_number);
+        fs::create_dir_all(&block_dir)?;
 
-    let share_proof = verify_blob_inclusion(&celestia_client, &header, &blob).await?;
-    let proof_input = build_blob_proof_input(&blob, namespace, &header, &share_proof);
-
-    let enc_blob_proof = bincode::serialize(&proof_input)?;
-    fs::write("testdata/blob_proof.bin", enc_blob_proof)?;
-
-    let (data_root, data_root_proof) = build_data_root_proof_input(&header)?;
-
-    let hasher = TmSha2Hasher {};
-    data_root_proof
-        .verify_range(
-            &header.header.hash().as_bytes().try_into().unwrap(),
-            &[hasher.hash_leaf(&data_root)], // NOTE: that data_root has been encoded by encode_vec() which is a trait that comes from Protobuf
+        let stf_path = format!("{}/client_input.bin", block_dir);
+        generate_and_write_stf(
+            config::EVM_RPC_URL,
+            block_number,
+            chain_spec.clone(),
+            genesis.clone(),
+            &stf_path,
         )
-        .expect("failed to verify header proof");
+        .await?;
 
-    let data_root_proof_enc = bincode::serialize(&data_root_proof)?;
-    fs::write("testdata/data_root_proof.bin", data_root_proof_enc)?;
+        let (blob, header, _) =
+            fetch_blob_and_header(&celestia_client, config::INDEXER_URL, block_number, namespace).await?;
 
-    println!("Successfully generated proof input data");
+        let header_json = serde_json::to_string_pretty(&header.header)?;
+        fs::write(format!("{}/header.json", block_dir), header_json)?;
+
+        let share_proof = verify_blob_inclusion(&celestia_client, &header, &blob).await?;
+        let proof_input = build_blob_proof_input(&blob, namespace, &header, &share_proof);
+        let blob_proof_enc = bincode::serialize(&proof_input)?;
+        fs::write(format!("{}/blob_proof.bin", block_dir), blob_proof_enc)?;
+
+        let (data_root, data_root_proof) = build_data_root_proof_input(&header)?;
+        let hasher = TmSha2Hasher {};
+        data_root_proof
+            .verify_range(
+                &header.header.hash().as_bytes().try_into().unwrap(),
+                &[hasher.hash_leaf(&data_root)],
+            )
+            .expect("failed to verify header proof");
+
+        fs::write(
+            format!("{}/data_root_proof.bin", block_dir),
+            bincode::serialize(&data_root_proof)?,
+        )?;
+
+        println!("Successfully generated proof input data for block: {}", block_number);
+    }
 
     Ok(())
 }

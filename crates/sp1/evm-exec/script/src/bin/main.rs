@@ -1,13 +1,18 @@
 //! An end-to-end example of using the SP1 SDK to generate a proof of a program that can be executed
 //! or have a core proof generated.
 //!
+//! The program loads input files from a block-specific directory (e.g., `testdata/inputs/block-1010/`)
+//! and writes the resulting proof to `testdata/proofs/proof-with-pis-<height>.bin`.
+//!
+//! You must provide the block number via `--height`, along with either `--execute` or `--prove`.
+//!
 //! You can run this script using the following command from the root of this repository:
 //! ```shell
-//! RUST_LOG=info cargo run -p evm-exec-script --release -- --execute
+//! RUST_LOG=info cargo run -p evm-exec-script --release -- --execute --block-number 1010
 //! ```
 //! or
 //! ```shell
-//! RUST_LOG=info cargo run -p evm-exec-script --release -- --prove
+//! RUST_LOG=info cargo run -p evm-exec-script --release -- --prove --block-number 1010
 //! ```
 use std::error::Error;
 use std::fs;
@@ -33,6 +38,9 @@ struct Args {
 
     #[arg(long)]
     prove: bool,
+
+    #[arg(long)]
+    height: u64,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -46,10 +54,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         std::process::exit(1);
     }
 
+    if args.height == 0 {
+        eprintln!("Error: You must specify a block number using --height");
+        std::process::exit(1);
+    }
+
+    let height = args.height;
+    let input_dir = format!("testdata/inputs/block-{height}");
+
     let client = ProverClient::from_env();
 
     let mut stdin = SP1Stdin::new();
-    write_proof_inputs(&mut stdin)?;
+    write_proof_inputs(&mut stdin, &input_dir)?;
 
     if args.execute {
         // Execute the program.
@@ -76,8 +92,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("Successfully generated proof!");
 
         // Save the proof and reload.
-        proof.save("testdata/proofs/proof-with-pis.bin")?;
-        let deserialized_proof = SP1ProofWithPublicValues::load("testdata/proofs/proof-with-pis.bin")?;
+        let proof_path = format!("testdata/proofs/proof-with-pis-{height}.bin");
+        proof.save(&proof_path)?;
+        let deserialized_proof = SP1ProofWithPublicValues::load(&proof_path)?;
 
         // Verify the proof.
         client.verify(&deserialized_proof, &vk).expect("failed to verify proof");
@@ -87,17 +104,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// write_proof_inputs writes the program inputs to provided SP1Stdin
-fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<(), Box<dyn Error>> {
-    let blob_proof_data = fs::read("testdata/blob_proof.bin")?;
-    let blob_proof: KeccakInclusionToDataRootProofInput = bincode::deserialize(&blob_proof_data)?;
+/// write_proof_inputs writes the program inputs to the provided SP1Stdin read from the input directory.
+fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str) -> Result<(), Box<dyn Error>> {
+    let blob_proof: KeccakInclusionToDataRootProofInput =
+        bincode::deserialize(&fs::read(format!("{input_dir}/blob_proof.bin"))?)?;
     stdin.write(&blob_proof);
 
-    let client_input_data = fs::read("testdata/client_input.bin")?;
-    let client_executor_input: EthClientExecutorInput = bincode::deserialize(&client_input_data)?;
+    let client_executor_input: EthClientExecutorInput =
+        bincode::deserialize(&fs::read(format!("{input_dir}/client_input.bin"))?)?;
     stdin.write(&client_executor_input);
 
-    let header_json = fs::read_to_string("testdata/header.json")?;
+    let header_json = fs::read_to_string(format!("{input_dir}/header.json"))?;
     let header: Header = serde_json::from_str(&header_json)?;
     let header_raw = serde_cbor::to_vec(&header)?;
     stdin.write_vec(header_raw);
@@ -105,8 +122,8 @@ fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<(), Box<dyn Error>> {
     let data_hash = header.data_hash.unwrap().encode_vec();
     stdin.write_vec(data_hash);
 
-    let data_root_proof_data = fs::read("testdata/data_root_proof.bin")?;
-    let data_root_proof: Proof<TmSha2Hasher> = bincode::deserialize(&data_root_proof_data)?;
+    let data_root_proof: Proof<TmSha2Hasher> =
+        bincode::deserialize(&fs::read(format!("{input_dir}/data_root_proof.bin"))?)?;
     stdin.write(&data_root_proof);
 
     let trusted_state_root = client_executor_input.parent_state.state_root().as_slice().to_vec();
