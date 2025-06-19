@@ -74,19 +74,18 @@ pub fn main() {
             prev.header_hash,
             curr.prev_header_hash
         );
-    }
 
-    for window in outputs.windows(2).enumerate() {
-        let (i, pair) = window;
-        let (prev, curr) = (&pair[0], &pair[1]);
-        assert_eq!(
-            curr.prev_celestia_header_hash,
-            prev.celestia_header_hash,
-            "verify sequential Celestia headers failed at index {}: expected {:?}, got {:?}",
-            i + 1,
-            prev.celestia_header_hash,
-            curr.prev_celestia_header_hash
-        );
+        // Only check sequentiality if the inclusion height changed.
+        if curr.celestia_header_hash != prev.celestia_header_hash {
+            assert_eq!(
+                curr.prev_celestia_header_hash,
+                prev.celestia_header_hash,
+                "verify sequential Celestia headers failed at index {}: expected {:?}, got {:?}",
+                i + 1,
+                prev.celestia_header_hash,
+                curr.prev_celestia_header_hash
+            );
+        }
     }
 
     // ------------------------------

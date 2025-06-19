@@ -2,8 +2,7 @@
 version = "0.1.0"
 name = "evm-range-exec-script"
 edition = "2021"
-# default-run = "evm-range-exec"
-default-run = "vkey"
+default-run = "evm-range-exec"
 
 [[bin]]
 name = "evm-range-exec"
@@ -14,9 +13,12 @@ name = "vkey"
 path = "src/bin/vkey.rs"
 
 [dependencies]
+evm-exec-types = { path = "../../evm-exec-types" }
+
+bincode = { workspace = true }
 clap = { version = "4.0", features = ["derive", "env"] }
 dotenv = "0.15.0"
-hex = "0.4.3"
+hex = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, features = ["alloc"] }
 sp1-sdk = { workspace = true }

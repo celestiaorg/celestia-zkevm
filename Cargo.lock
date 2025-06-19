@@ -3274,8 +3274,10 @@ dependencies = [
 name = "evm-range-exec-script"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "clap",
  "dotenv",
+ "evm-exec-types",
  "hex",
  "serde",
  "serde_json",
