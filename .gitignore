@@ -6,8 +6,6 @@
 build
 
 **/hyperlane_db
-**/proof-with-pis.json
-**/proof-with-io.json
 **/target
 
 /tmp
