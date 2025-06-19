@@ -150,9 +150,9 @@ pub fn main() {
     println!("cycle-tracker-start: commit public outputs");
 
     let output = EvmBlockExecOutput {
-        blob_commitment: blob.commitment.into(), // TODO(removal): what do we need this for? keep or remove?
-        header_hash: header.hash_slow().into(),  // TODO(removal): what do we need this for? keep or remove?
-        prev_header_hash: header.parent_hash.into(), // TODO(removal): what do we need this for? keep or remove?
+        blob_commitment: blob.commitment.into(),
+        header_hash: header.hash_slow().into(),
+        prev_header_hash: header.parent_hash.into(),
         celestia_header_hash: celestia_header
             .hash()
             .as_bytes()
