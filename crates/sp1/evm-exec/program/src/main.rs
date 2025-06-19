@@ -1,8 +1,8 @@
 //! An SP1 program that verifies inclusion of an EVM block in a Celestia block and executes it.
 //!
-//! 1. Accepts an EVM block and associated Celestia proofs
+//! 1. Accepts an EVM block STF and associated Celestia proofs
 //! 2. Verifies that the EVM block was included in the Celestia block
-//! 3. Executes the EVM block
+//! 3. Executes the EVM block STF
 //! 4. Commits the resulting EVM and Celestia block metadata as public outputs
 
 #![no_main]
@@ -26,19 +26,17 @@ pub fn main() {
     println!("cycle-tracker-start: deserialize input");
 
     let blob_proof: KeccakInclusionToDataRootProofInput = sp1_zkvm::io::read();
-    let data_root = Hash::Sha256(blob_proof.data_root);
 
-    let client_executor_input: EthClientExecutorInput =
-        bincode::deserialize(&sp1_zkvm::io::read_vec()).expect("failed to deserialize EVM block input");
+    let client_executor_input: EthClientExecutorInput = sp1_zkvm::io::read();
 
-    let celestia_header_bytes: Vec<u8> = sp1_zkvm::io::read_vec();
+    let celestia_header_raw: Vec<u8> = sp1_zkvm::io::read_vec();
     let celestia_header: Header =
-        serde_json::from_slice(&celestia_header_bytes).expect("failed to deserialize celestia header");
+        serde_cbor::from_slice(&celestia_header_raw).expect("failed to deserialize celestia header");
 
     // TODO(removal): why do we need? we can take data root from blob proof and prove that against celestia header
     let data_hash_bytes: Vec<u8> = sp1_zkvm::io::read_vec();
-    // TODO(rename): rename this, it is not apparent that this is the data root to header proof
-    let celestia_proof: Proof<TmSha2Hasher> = sp1_zkvm::io::read();
+
+    let data_hash_proof: Proof<TmSha2Hasher> = sp1_zkvm::io::read();
     // TODO(removal): we probably don't need to take this as input, only commit as output from client_executor_input.parent_state.state_root
     // we can commit it as output and then plug in the trusted field from on-chain ISM data
     let trusted_state_root: Vec<u8> = sp1_zkvm::io::read_vec();
@@ -49,9 +47,10 @@ pub fn main() {
     // 2. Check trusted state root
     // -----------------------------
     println!("cycle-tracker-start: assert trusted state root");
-
+    // TODO(removal): same as above. commit trusted state root as output from client_executor_input.parent_header().state_root
+    // then plug in the trusted field from on-chain data when verifying proof
     assert_eq!(
-        client_executor_input.parent_state.state_root().as_slice().to_vec(),
+        client_executor_input.parent_header().state_root.to_vec(),
         trusted_state_root,
         "parent state root does not match trusted root"
     );
@@ -86,8 +85,9 @@ pub fn main() {
     // -----------------------------
     // 4. Construct and verify ShareProof
     // -----------------------------
-    println!("cycle-tracker-start: convert blob to shares");
+    println!("cycle-tracker-start: construct blob share proof");
 
+    let data_root = Hash::Sha256(blob_proof.data_root);
     let share_data = blob.to_shares().expect("failed to convert blob to shares");
 
     let share_proof = ShareProof {
@@ -100,7 +100,7 @@ pub fn main() {
         row_proof: blob_proof.row_proof,
     };
 
-    println!("cycle-tracker-end: convert blob to shares");
+    println!("cycle-tracker-end: construct blob share proof");
 
     println!("cycle-tracker-start: verify share proof");
 
@@ -114,7 +114,7 @@ pub fn main() {
     println!("cycle-tracker-start: verify data root");
 
     let hasher = TmSha2Hasher {};
-    celestia_proof
+    data_hash_proof
         .verify_range(
             celestia_header.hash().as_bytes().try_into().unwrap(),
             &[hasher.hash_leaf(&data_hash_bytes)],
@@ -149,9 +149,9 @@ pub fn main() {
     println!("cycle-tracker-start: commit public outputs");
 
     let output = EvmBlockExecOutput {
-        blob_commitment: blob.commitment.into(),
-        header_hash: header.hash_slow().into(), // TODO(removal): what do we need this for?
-        prev_header_hash: header.parent_hash.into(), // TODO(removal): what do we need this for?
+        blob_commitment: blob.commitment.into(), // TODO(removal): what do we need this for? keep or remove?
+        header_hash: header.hash_slow().into(),  // TODO(removal): what do we need this for? keep or remove?
+        prev_header_hash: header.parent_hash.into(), // TODO(removal): what do we need this for? keep or remove?
         celestia_header_hash: celestia_header
             .hash()
             .as_bytes()

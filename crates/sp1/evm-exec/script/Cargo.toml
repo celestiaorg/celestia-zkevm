@@ -23,6 +23,7 @@ hex = { workspace = true }
 nmt-rs = { workspace = true }
 rsp-client-executor = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_cbor = { workspace = true }
 serde_json = { workspace = true, default-features = false, features = [
     "alloc",
 ] }

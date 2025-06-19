@@ -15,7 +15,6 @@ nmt-rs = "*"
 rsp-client-executor = { workspace = true }
 reth-primitives = { workspace = true }
 serde_cbor = { workspace = true }
-serde_json = { workspace = true }
 sha3 = { workspace = true }
 sp1-zkvm = { workspace = true }
 tendermint = { workspace = true }

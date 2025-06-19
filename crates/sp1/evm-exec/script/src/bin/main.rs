@@ -10,8 +10,6 @@
 //! RUST_LOG=info cargo run --release -- --prove
 //! ```
 use std::fs;
-use std::fs::File;
-use std::io::BufReader;
 
 use clap::Parser;
 use eq_common::KeccakInclusionToDataRootProofInput;
@@ -98,13 +96,10 @@ fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<(), Box<dyn std::error::Er
     let client_executor_input: EthClientExecutorInput = bincode::deserialize(&client_input_data)?;
     stdin.write(&client_executor_input);
 
-    let header_file = File::open("testdata/header.json")?;
-    let reader = BufReader::new(header_file);
-    let header: Header = serde_json::from_reader(reader)?;
-    // TODO: maybe use cbor here. there seems to be an issue with writing tendermint block headers with bincode
-    // perhaps protobuf related...
-    let header_bytes = serde_json::to_vec(&header).unwrap();
-    stdin.write_vec(header_bytes);
+    let header_json = fs::read_to_string("testdata/header.json")?;
+    let header: Header = serde_json::from_str(&header_json)?;
+    let header_raw = serde_cbor::to_vec(&header)?;
+    stdin.write_vec(header_raw);
 
     let data_hash = header.data_hash.unwrap().encode_vec();
     stdin.write_vec(data_hash);
