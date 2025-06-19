@@ -1,13 +1,13 @@
 //! An end-to-end example of using the SP1 SDK to generate a proof of a program that can be executed
 //! or have a core proof generated.
 //!
-//! You can run this script using the following command:
+//! You can run this script using the following command from the root of this repository:
 //! ```shell
-//! RUST_LOG=info cargo run --release -- --execute
+//! RUST_LOG=info cargo run -p evm-exec-script --release -- --execute
 //! ```
 //! or
 //! ```shell
-//! RUST_LOG=info cargo run --release -- --prove
+//! RUST_LOG=info cargo run -p evm-exec-script --release -- --prove
 //! ```
 use std::fs;
 
@@ -16,7 +16,7 @@ use eq_common::KeccakInclusionToDataRootProofInput;
 use evm_exec_types::EvmBlockExecOutput;
 use nmt_rs::{simple_merkle::proof::Proof, TmSha2Hasher};
 use rsp_client_executor::io::EthClientExecutorInput;
-use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
+use sp1_sdk::{include_elf, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
 use tendermint::block::header::Header;
 use tendermint_proto::Protobuf;
 
@@ -78,8 +78,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!("Successfully generated proof!");
 
+        // Save the proof and reload.
+        proof.save("testdata/proofs/proof-with-pis.bin")?;
+        let deserialized_proof = SP1ProofWithPublicValues::load("testdata/proofs/proof-with-pis.bin")?;
+
         // Verify the proof.
-        client.verify(&proof, &vk).expect("failed to verify proof");
+        client.verify(&deserialized_proof, &vk).expect("failed to verify proof");
         println!("Successfully verified proof!");
     }
 
