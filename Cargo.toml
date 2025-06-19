@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "crates/evm-prover",
     "crates/sp1/evm-exec/program",
     "crates/sp1/evm-exec/script",
     "crates/sp1/evm-exec-types",
