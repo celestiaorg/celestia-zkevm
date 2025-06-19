@@ -25,6 +25,8 @@ pub fn main() {
     // 1. Deserialize inputs
     // ------------------------------
 
+    // TODO(damian): There is no need to read N verifier keys here as we are verifying the same type of proof multiple times.
+    // The vkey is deterministic and derived from the setup phase of the ELF.
     let vkeys = sp1_zkvm::io::read::<Vec<[u32; 8]>>();
     let public_values = sp1_zkvm::io::read::<Vec<Vec<u8>>>();
 
@@ -94,7 +96,7 @@ pub fn main() {
     let first = outputs.first().expect("No outputs provided");
     let last = outputs.last().expect("No outputs provided");
 
-    let range_output = EvmRangeExecOutput {
+    let output = EvmRangeExecOutput {
         celestia_header_hash: last.celestia_header_hash,
         trusted_height: first.prev_height,
         trusted_state_root: first.prev_state_root,
@@ -102,5 +104,5 @@ pub fn main() {
         new_height: last.new_height,
     };
 
-    sp1_zkvm::io::commit(&range_output);
+    sp1_zkvm::io::commit(&output);
 }
