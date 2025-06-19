@@ -8,11 +8,11 @@
 //!
 //! You can run this script using the following command from the root of this repository:
 //! ```shell
-//! RUST_LOG=info cargo run -p evm-exec-script --release -- --execute --block-number 1010
+//! RUST_LOG=info cargo run -p evm-exec-script --release -- --execute --height 1010
 //! ```
 //! or
 //! ```shell
-//! RUST_LOG=info cargo run -p evm-exec-script --release -- --prove --block-number 1010
+//! RUST_LOG=info cargo run -p evm-exec-script --release -- --prove --height 1010
 //! ```
 use std::error::Error;
 use std::fs;

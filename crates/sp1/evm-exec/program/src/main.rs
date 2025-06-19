@@ -1,9 +1,10 @@
-//! An SP1 program that verifies inclusion of an EVM block in a Celestia block and executes it.
+//! An SP1 program that verifies inclusion of an EVM reth block in the Celestia data availability network
+//! and executes its state transition function.
 //!
-//! 1. Accepts an EVM block STF and associated Celestia proofs
-//! 2. Verifies that the EVM block was included in the Celestia block
-//! 3. Executes the EVM block STF
-//! 4. Commits the resulting EVM and Celestia block metadata as public outputs
+//! 1. Accepts an EVM block STF and associated Celestia proofs.
+//! 2. Verifies that the EVM block was included in the Celestia block.
+//! 3. Executes the EVM block STF.
+//! 4. Commits the resulting EVM and Celestia block metadata as public outputs.
 
 #![no_main]
 

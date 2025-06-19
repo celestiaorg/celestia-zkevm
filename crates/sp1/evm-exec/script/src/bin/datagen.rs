@@ -11,7 +11,7 @@
 //!
 //! You can run this script using the following command from the root of this repository:
 //! ```shell
-//! RUST_LOG=info cargo run -p evm-exec-script --bin data-gen --release -- --start <START_BLOCK> --end <END_BLOCK>
+//! cargo run -p evm-exec-script --bin data-gen --release -- --start <START_BLOCK> --end <END_BLOCK>
 //! ```
 //!
 //! Replace `<START_BLOCK>` and `<END_BLOCK>` with the desired inclusive block range.
