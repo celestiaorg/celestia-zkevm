@@ -1,16 +1,13 @@
-//! TODO: This is a skeleton script which can be adapted to allow script execution or proof generation
-//! by providing data to parse for the ProverClient stdin.
-//!
 //! An end-to-end example of using the SP1 SDK to generate a proof of a program that can be executed
 //! or have a core proof generated.
 //!
-//! You can run this script using the following command:
+//! You can run this script using the following command from the root of this repository:
 //! ```shell
-//! RUST_LOG=info cargo run --release -- --execute
+//! RUST_LOG=info cargo run -p evm-range-exec-script --release -- --execute
 //! ```
 //! or
 //! ```shell
-//! RUST_LOG=info cargo run --release -- --prove
+//! RUST_LOG=info cargo run -p evm-range-exec-script --release -- --prove
 //! ```
 use std::error::Error;
 use std::fs;
