@@ -1,0 +1,21 @@
+[package]
+name = "evm-prover"
+version = "0.1.0"
+edition = "2024"
+
+[build-dependencies]
+tonic-build = "0.10"
+prost-build = "0.12"
+walkdir = "2.5.0"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4", features = ["derive"] }
+dirs = "5"
+prost = "0.12"
+serde = { workspace = true, features = ["derive"] }
+serde_yaml = "0.9"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
+tonic = { version = "0.10", features = ["transport"] }
+tonic-reflection = "0.10"
