@@ -1,24 +1,39 @@
 # Contributing
 
-## Proto Generation
+Thank you for your interest in contributing to repository! 🎉  
+We welcome all contributions, whether it's fixing bugs, improving documentation, or implementing new features.
 
-This repo uses protobuf to define the interfaces between several services. To help with this, this
-repo relies on [buf](https://buf.build). If you modify the protos you can regenerate them using:
+## Getting Started
 
-```shell
-make proto-gen
-```
+1. **Fork and clone the repository:**
 
-## Helpful commands
+We encourage contributors to maintain their own fork of the repository. 
 
-```shell
-# See the running containers
-docker ps
+   ```bash
+   git clone https://github.com/{owner}/celestia-zkevm-hl-testnet.git
+   cd celestia-zkevm-hl-testnet
+   ```
 
-# You can view the logs from a running container via Docker UI or:
-docker logs beacond
-docker logs celestia-network-bridge
-docker logs celestia-network-validator
-docker logs simapp-validator
-docker logs reth
-```
+2. **Install prerequisites from README.md**
+
+Please refer to the [`README.md`](../README.md). Follow the instructions to install the listed dependencies required to work with the repository.
+
+## Pull Requests
+
+When opening a PR:
+
+- Provide a clear title and description of the change.
+- Link to any related issues.
+- Ensure CI checks pass.
+- If your change impacts user-facing behavior, consider updating documentation or examples.
+
+## Reporting Issues
+
+If you encounter bugs or have feature suggestions, please [open an issue](https://github.com/celestiaorg/celestia-zkevm-hl-testnet/issues) with a clear description and reproduction steps if applicable.
+
+## Community
+
+Feel free to reach out via:
+
+- [Celestia community chanels](https://celestia.org/community/)
+- Issues and Discussions tabs on GitHub
