@@ -1,0 +1,22 @@
+[package]
+version = "0.1.0"
+name = "evm-range-exec-program"
+edition = "2021"
+
+[dependencies]
+evm-exec-types = { path = "../../evm-exec-types" }
+
+alloy-sol-types = { workspace = true }
+celestia-types = { workspace = true }
+bincode = { workspace = true }
+hex = "0.4.3"
+hex-literal = "0.4.1"
+nmt-rs = "*"
+reth-primitives = { workspace = true }
+rsp-client-executor = { workspace = true }
+serde = { workspace = true, features = ["derive", "std"] }
+serde_cbor = "0.11.2"
+sha2 = "0.10.8"
+sp1-zkvm = { workspace = true, features = ["verify"] }
+tendermint = { workspace = true }
+tendermint-proto = { workspace = true }

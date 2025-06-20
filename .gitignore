@@ -1,8 +1,12 @@
+.cargo
+.DS_Store
 .tmp
 .env
+
 build
-/target
-*.bin
-bin
 
 **/hyperlane_db
+**/target
+
+/tmp
+pgo-data.profdata

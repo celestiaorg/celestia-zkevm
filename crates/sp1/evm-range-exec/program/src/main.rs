@@ -1,0 +1,107 @@
+//! An SP1 program that verifies a sequence of N `evm-exec` proofs.
+//!
+//! It accepts:
+//! - N verification keys
+//! - N serialized public values (each from a `EvmBlockExecOutput`)
+//!
+//! It performs:
+//! 1. Proof verification for each input
+//! 2. Sequential header verification (i.e., block continuity)
+//! 3. Aggregation of metadata into a `EvmRangeExecOutput`
+//!
+//! It commits:
+//! - The trusted block height and state root
+//! - The new block height and state root
+//! - The latest Celestia header hash from the sequence
+
+#![no_main]
+sp1_zkvm::entrypoint!(main);
+
+use evm_exec_types::{Buffer, EvmBlockExecOutput, EvmRangeExecOutput};
+use sha2::{Digest, Sha256};
+
+pub fn main() {
+    // ------------------------------
+    // 1. Deserialize inputs
+    // ------------------------------
+
+    // TODO(damian): There is no need to read N verifier keys here as we are verifying the same type of proof multiple times.
+    // The vkey is deterministic and derived from the setup phase of the ELF.
+    let vkeys = sp1_zkvm::io::read::<Vec<[u32; 8]>>();
+    let public_values = sp1_zkvm::io::read::<Vec<Vec<u8>>>();
+
+    assert_eq!(
+        vkeys.len(),
+        public_values.len(),
+        "mismatch between number of verification keys and public value blobs"
+    );
+
+    let proof_count = vkeys.len();
+
+    // ------------------------------
+    // 2. Verify proofs
+    // ------------------------------
+
+    for i in 0..proof_count {
+        let digest = Sha256::digest(&public_values[i]);
+        sp1_zkvm::lib::verify::verify_sp1_proof(&vkeys[i], &digest.into());
+    }
+
+    // ------------------------------
+    // 3. Parse public values into outputs
+    // ------------------------------
+
+    let outputs: Vec<EvmBlockExecOutput> = public_values
+        .iter()
+        .map(|bytes| {
+            let mut buffer = Buffer::from(bytes);
+            buffer.read::<EvmBlockExecOutput>()
+        })
+        .collect();
+
+    // ------------------------------
+    // 4. Verify sequential headers (EVM and Celestia)
+    // ------------------------------
+
+    for window in outputs.windows(2).enumerate() {
+        let (i, pair) = window;
+        let (prev, curr) = (&pair[0], &pair[1]);
+        assert_eq!(
+            curr.prev_header_hash,
+            prev.header_hash,
+            "verify sequential EVM headers failed at index {}: expected {:?}, got {:?}",
+            i + 1,
+            prev.header_hash,
+            curr.prev_header_hash
+        );
+
+        // Only check sequentiality if the inclusion height changed.
+        if curr.celestia_header_hash != prev.celestia_header_hash {
+            assert_eq!(
+                curr.prev_celestia_header_hash,
+                prev.celestia_header_hash,
+                "verify sequential Celestia headers failed at index {}: expected {:?}, got {:?}",
+                i + 1,
+                prev.celestia_header_hash,
+                curr.prev_celestia_header_hash
+            );
+        }
+    }
+
+    // ------------------------------
+    // 5. Build and commit outputs
+    // ------------------------------
+
+    let first = outputs.first().expect("No outputs provided");
+    let last = outputs.last().expect("No outputs provided");
+
+    let output = EvmRangeExecOutput {
+        celestia_header_hash: last.celestia_header_hash,
+        trusted_height: first.prev_height,
+        trusted_state_root: first.prev_state_root,
+        new_state_root: last.new_state_root,
+        new_height: last.new_height,
+    };
+
+    sp1_zkvm::io::commit(&output);
+}
