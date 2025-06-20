@@ -25,9 +25,9 @@ sequenceDiagram
 
     %% Step 2: Generate proofs and message
     Note over Relayer: Parse EventDispatch event
-    Relayer->>CelestiaProver: Query state transition and inclusion proofs
-    Note over CelestiaProver: Build state transition and inclusion proofs
-    CelestiaProver-->>Relayer: Return SP1 proofs
+    Relayer->>CelestiaProverService: Query state transition and inclusion proofs
+    Note over CelestiaProverService: Build state transition and inclusion proofs
+    CelestiaProverService-->>Relayer: Return SP1 proofs
     Relayer->>Relayer: Encode message metadata with SP1 proofs
 
     %% Step 3: Verify proofs and process message
