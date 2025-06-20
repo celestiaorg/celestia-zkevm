@@ -48,8 +48,8 @@ pub struct EvmRangeExecOutput {
     // trusted_height is the trusted height of the EVM application.
     pub trusted_height: u64,
 
-    #[serde(with = "hex_bytes")]
     // trusted_state_root is the state commitment root of the EVM application at trusted_height.
+    #[serde(with = "hex_bytes")]
     pub trusted_state_root: [u8; 32],
 
     // new_height is the EVM application block number after N state transitions.
