@@ -47,12 +47,12 @@ Subsequently, this results in a Hyperlane `EventDispatch` carrying a message pay
 The relayer watches for `EventDispatch` emissions. When detected, it queries Celestia for the stored message commitment (based on a standardised storage path). The commitment serves as proof that the origin chain has locked the funds as well as a replay-protection mechanism.
 4.	**Proof generation by CelestiaProverService.**
 In order for the EVM chain to mint synthetic tokens on behalf of the locked collateral tokens, the relayer must present two SP1 proofs:
-	•	A state transition proof showing Celestia’s current state evolved from a previously known (trusted) state. This allows the EVM to trust the new state root.
-	•	A state inclusion proof showing that the commitment (message ID) is a valid Merkle leaf in the Celestia state tree.
+	- A state transition proof showing Celestia’s current state evolved from a previously known (trusted) state. This allows the EVM to trust the new state root.
+	- A state inclusion proof showing that the commitment (message ID) is a valid Merkle leaf in the Celestia state tree.
 5.	**SP1 proof generation.**
 The relayer submits these queries to the `CelestiaProverService`, which runs zk circuits built using SP1:
-	•	One circuit verifies header-to-header state transitions using the Tendermint lightclient skipping-verification algorithm.
-	•	The other verifies IAVL Merkle inclusion of the commitment (message ID).
+	- One circuit verifies header-to-header state transitions using the Tendermint lightclient skipping-verification algorithm.
+	- The other verifies IAVL Merkle inclusion of the commitment (message ID).
 6.	**Relayer submits proofs + message to EVM.**
 Once both proofs are ready, the relayer encodes them into `ZKConsensusISMMetadata` alongside the Hyperlane message to be relayed. A `MsgProcessMessage` is then submitted to the EVM chain.
 7.	**EVM verifies proofs and processes the message.**
@@ -103,13 +103,13 @@ Subsequently, this results in a Hyperlane `EventDispatch` carrying a message pay
 The relayer watches for `EventDispatch` emissions. When detected, it queries the EVM chain for the stored message commitment (based on a standardised storage path). The commitment serves as proof that the origin chain has locked the funds as well as a replay-protection mechanism.
 4.	**Proof generation by EvmProverService.**
 In order for Celestia to mint synthetic tokens on behalf of the locked collateral tokens, the relayer must present two SP1 proofs:
-	•	A state transition proof showing the EVM chain's current state evolved from a previously known (trusted) state. This allows Celestia to trust the new state root.
-	•	A state inclusion proof showing that the commitment (message ID) is a valid Merkle leaf in the EVM chain state tree.
+	- A state transition proof showing the EVM chain's current state evolved from a previously known (trusted) state. This allows Celestia to trust the new state root.
+	- A state inclusion proof showing that the commitment (message ID) is a valid Merkle leaf in the EVM chain state tree.
 5.	**SP1 proof generation.**
 The relayer submits these queries to the `EvmProverService`, which runs zk circuits built using SP1:
-	•	The first circuit verifies sequential EVM header-to-header state transitions using [RSP](https://github.com/succinctlabs/rsp/tree/main) and additionally proves blob inclusion in Celestia’s data availability layer.
-	•	The second circuit aggregates a range of such proofs to mimic skipping verification, enabling Celestia to fast-forward its trusted view of EVM chain state.
-    •   The third circuit verifies Merkle inclusion of the commitment (message ID).
+	- The first circuit verifies sequential EVM header-to-header state transitions using [RSP](https://github.com/succinctlabs/rsp/tree/main) and additionally proves blob inclusion in Celestia’s data availability layer.
+	- The second circuit aggregates a range of such proofs to mimic skipping verification, enabling Celestia to fast-forward its trusted view of EVM chain state.
+    - The third circuit verifies Merkle inclusion of the commitment (message ID).
 6.	**Relayer submits proofs + message to Celestia.**
 Once both proofs are ready, the relayer encodes them into `ZKExecutionISMMetadata` alongside the Hyperlane message to be relayed. A `MsgProcessMessage` is then submitted to Celestia.
 7.	**Celestia verifies proofs and processes the message.**
