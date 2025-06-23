@@ -21,7 +21,7 @@ use clap::Parser;
 use eq_common::KeccakInclusionToDataRootProofInput;
 use evm_exec_types::EvmBlockExecOutput;
 use nmt_rs::{simple_merkle::proof::Proof, TmSha2Hasher};
-use rsp_client_executor::io::{EthClientExecutorInput, WitnessInput};
+use rsp_client_executor::io::EthClientExecutorInput;
 use sp1_sdk::{include_elf, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
 use tendermint::block::header::Header;
 
