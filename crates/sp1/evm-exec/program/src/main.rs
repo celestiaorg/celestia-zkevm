@@ -16,9 +16,13 @@ use celestia_types::{blob::Blob, hash::Hash, AppVersion, ShareProof};
 use eq_common::KeccakInclusionToDataRootProofInput;
 use evm_exec_types::EvmBlockExecOutput;
 use nmt_rs::{simple_merkle::proof::Proof, simple_merkle::tree::MerkleHash, TmSha2Hasher};
-use rsp_client_executor::{executor::EthClientExecutor, io::EthClientExecutorInput};
+use rsp_client_executor::{
+    executor::EthClientExecutor,
+    io::{EthClientExecutorInput, WitnessInput},
+};
 use sha3::{Digest, Keccak256};
 use tendermint::block::Header;
+use tendermint_proto::Protobuf;
 
 pub fn main() {
     // -----------------------------
@@ -34,32 +38,12 @@ pub fn main() {
     let celestia_header: Header =
         serde_cbor::from_slice(&celestia_header_raw).expect("failed to deserialize celestia header");
 
-    // TODO(removal): why do we need? we can take data root from blob proof and prove that against celestia header
-    let data_hash_bytes: Vec<u8> = sp1_zkvm::io::read_vec();
-
     let data_hash_proof: Proof<TmSha2Hasher> = sp1_zkvm::io::read();
-    // TODO(removal): we probably don't need to take this as input, only commit as output from client_executor_input.parent_state.state_root
-    // we can commit it as output and then plug in the trusted field from on-chain ISM data
-    let trusted_state_root: Vec<u8> = sp1_zkvm::io::read_vec();
 
     println!("cycle-tracker-end: deserialize input");
 
     // -----------------------------
-    // 2. Check trusted state root
-    // -----------------------------
-    println!("cycle-tracker-start: assert trusted state root");
-    // TODO(removal): same as above. commit trusted state root as output from client_executor_input.parent_header().state_root
-    // then plug in the trusted field from on-chain data when verifying proof
-    assert_eq!(
-        client_executor_input.parent_header().state_root.to_vec(),
-        trusted_state_root,
-        "parent state root does not match trusted root"
-    );
-
-    println!("cycle-tracker-end: assert trusted state root");
-
-    // -----------------------------
-    // 3. Build Blob, compute and validate hash
+    // 2. Build Blob, compute and validate hash
     // -----------------------------
     println!("cycle-tracker-start: create blob");
 
@@ -84,7 +68,7 @@ pub fn main() {
     println!("cycle-tracker-end: check keccak hash");
 
     // -----------------------------
-    // 4. Construct and verify ShareProof
+    // 3. Construct and verify ShareProof
     // -----------------------------
     println!("cycle-tracker-start: construct blob share proof");
 
@@ -110,7 +94,7 @@ pub fn main() {
     println!("cycle-tracker-end: verify share proof");
 
     // -----------------------------
-    // 5. Verify data root inclusion in Celestia header
+    // 4. Verify data root inclusion in Celestia header
     // -----------------------------
     println!("cycle-tracker-start: verify data root");
 
@@ -118,14 +102,14 @@ pub fn main() {
     data_hash_proof
         .verify_range(
             celestia_header.hash().as_bytes().try_into().unwrap(),
-            &[hasher.hash_leaf(&data_hash_bytes)],
+            &[hasher.hash_leaf(&data_root.encode_vec())],
         )
         .expect("Celestia inclusion proof failed");
 
     println!("cycle-tracker-end: verify data root");
 
     // -----------------------------
-    // 6. Execute EVM block
+    // 5. Execute EVM block
     // -----------------------------
     println!("cycle-tracker-start: execute EVM block");
 
@@ -139,13 +123,13 @@ pub fn main() {
     );
 
     let header = executor
-        .execute(client_executor_input)
+        .execute(client_executor_input.clone())
         .expect("EVM block execution failed");
 
     println!("cycle-tracker-end: execute EVM block");
 
     // -----------------------------
-    // 7. Build and commit outputs
+    // 6. Build and commit outputs
     // -----------------------------
     println!("cycle-tracker-start: commit public outputs");
 
@@ -168,7 +152,8 @@ pub fn main() {
         new_height: header.number,
         new_state_root: header.state_root.into(),
         prev_height: header.number - 1,
-        prev_state_root: trusted_state_root
+        prev_state_root: client_executor_input
+            .state_anchor()
             .try_into()
             .expect("prev_state_root must be exactly 32 bytes"),
     };

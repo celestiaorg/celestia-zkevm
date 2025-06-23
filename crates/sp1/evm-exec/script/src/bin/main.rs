@@ -21,10 +21,9 @@ use clap::Parser;
 use eq_common::KeccakInclusionToDataRootProofInput;
 use evm_exec_types::EvmBlockExecOutput;
 use nmt_rs::{simple_merkle::proof::Proof, TmSha2Hasher};
-use rsp_client_executor::io::EthClientExecutorInput;
+use rsp_client_executor::io::{EthClientExecutorInput, WitnessInput};
 use sp1_sdk::{include_elf, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
 use tendermint::block::header::Header;
-use tendermint_proto::Protobuf;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
@@ -119,15 +118,9 @@ fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str) -> Result<(), Box<d
     let header_raw = serde_cbor::to_vec(&header)?;
     stdin.write_vec(header_raw);
 
-    let data_hash = header.data_hash.unwrap().encode_vec();
-    stdin.write_vec(data_hash);
-
     let data_root_proof: Proof<TmSha2Hasher> =
         bincode::deserialize(&fs::read(format!("{input_dir}/data_root_proof.bin"))?)?;
     stdin.write(&data_root_proof);
-
-    let trusted_state_root = client_executor_input.parent_state.state_root().as_slice().to_vec();
-    stdin.write_vec(trusted_state_root);
 
     Ok(())
 }
