@@ -1,4 +1,6 @@
 use std::path::PathBuf;
+
+use sp1_build::build_program_with_args;
 use walkdir::WalkDir;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,10 +24,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .out_dir("src/proto")
         .compile(&proto_files, &["../../proto"])?;
 
-    // This build.rs can be extended to compile the SP1 programs and output the elfs to a standard path
-    // from which we can then consume them: e.g. output to evm-prover/artifacts or evm-prover/elf
-    // consume from prover/prover.rs with include_elf!("../../artifacts/evm-exec-elf")
-    // ref: https://docs.succinct.xyz/docs/sp1/writing-programs/compiling#build-script
+    build_program_with_args("../sp1/evm-exec/program", Default::default());
+    build_program_with_args("../sp1/evm-range-exec/program", Default::default());
 
     Ok(())
 }
