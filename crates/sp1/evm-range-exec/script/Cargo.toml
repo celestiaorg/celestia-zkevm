@@ -9,6 +9,10 @@ name = "evm-range-exec"
 path = "src/bin/main.rs"
 
 [[bin]]
+name = "parser"
+path = "src/bin/parser.rs"
+
+[[bin]]
 name = "vkey"
 path = "src/bin/vkey.rs"
 
