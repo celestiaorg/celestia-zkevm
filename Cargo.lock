@@ -2679,6 +2679,8 @@ dependencies = [
  "prost-build 0.12.6",
  "serde",
  "serde_yaml",
+ "sp1-build",
+ "sp1-sdk",
  "tokio",
  "tokio-stream",
  "tonic 0.10.2",
