@@ -35,7 +35,7 @@ The compiled ELF can then be included within the application binary using the `i
 
 This program contains a `script` crate for convenience and to demonstrate how the program is used.
 
-The `script` crate contains two binaries and depends proofs generated from `evm-exec` and output to the `testdata` directory maintained at the root of the repository, thus all `cargo` commands should be run from there.
+The `script` crate contains three binaries and depends on proofs generated from `evm-exec` and output to the `testdata` directory maintained at the root of the repository, thus all `cargo` commands should be run from there.
 
 1. Run the `vkey` binary to output the verifier key for the `evm-range-exec` program.
 
@@ -59,6 +59,21 @@ Run the `evm-range-exec` binary in proving mode.
 
     ```shell
     RUST_LOG=info cargo run -p evm-range-exec-script --release -- --prove
+    ```
+
+3. The `parser` binary can be used to read an existing `SP1ProofWithPublicValues` from `testdata/groth16-proof.bin` and split it into its constituent components:
+the Groth16 proof and the associated public inputs.
+
+This is useful for working with external tools or runtimes which require the raw proof and public inputs as distinct artifacts.
+
+The script expects an existing file at `testdata/groth16-proof.bin` and will output:
+- `testdata/proof.bin`: the Groth16 proof bytes
+- `testdata/sp1-inputs.bin`: the serialized public values
+
+Run the `parser` binary to split the proof into the raw Groth16 proof and associated public values.
+
+    ```shell
+    RUST_LOG=info cargo run -p evm-range-exec-script --bin parser --release
     ```
 
 Please refer to https://docs.succinct.xyz/docs/sp1/introduction for more comprehensive documentation on Succinct SP1.

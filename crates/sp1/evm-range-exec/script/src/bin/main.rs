@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         // Read the output.
         let range_exec_output: EvmRangeExecOutput = bincode::deserialize(output.as_slice())?;
-        println!("Outputs: {}", serde_json::to_string_pretty(&range_exec_output)?);
+        println!("Outputs: {}", range_exec_output);
 
         // Record the number of cycles executed.
         println!("Number of cycles: {}", report.total_instruction_count());
