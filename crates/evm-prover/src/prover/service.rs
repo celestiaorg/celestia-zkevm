@@ -1,10 +1,16 @@
+use std::sync::Arc;
+
+use celestia_types::nmt::Namespace;
+use reth_chainspec::ChainSpec;
+use rsp_primitives::genesis::Genesis;
 use tonic::{Request, Response, Status};
 
 use crate::proto::celestia::prover::v1::prover_server::Prover;
 use crate::proto::celestia::prover::v1::{
-    InfoRequest, InfoResponse, ProveStateMembershipRequest, ProveStateMembershipResponse,
-    ProveStateTransitionRequest, ProveStateTransitionResponse,
+    InfoRequest, InfoResponse, ProveStateMembershipRequest, ProveStateMembershipResponse, ProveStateTransitionRequest,
+    ProveStateTransitionResponse,
 };
+use crate::prover::prover::BlockProver;
 
 #[derive(Default)]
 pub struct ProverService {}
@@ -24,17 +30,13 @@ impl Prover for ProverService {
         &self,
         _request: Request<ProveStateTransitionRequest>,
     ) -> Result<Response<ProveStateTransitionResponse>, Status> {
-        Err(Status::unimplemented(
-            "prove_state_transition is unimplemented",
-        ))
+        Err(Status::unimplemented("prove_state_transition is unimplemented"))
     }
 
     async fn prove_state_membership(
         &self,
         _request: Request<ProveStateMembershipRequest>,
     ) -> Result<Response<ProveStateMembershipResponse>, Status> {
-        Err(Status::unimplemented(
-            "prove_state_membership is unimplemented",
-        ))
+        Err(Status::unimplemented("prove_state_membership is unimplemented"))
     }
 }
