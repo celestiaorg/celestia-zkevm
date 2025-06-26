@@ -10,6 +10,8 @@ sp1-build = { workspace = true }
 walkdir = "2.5.0"
 
 [dependencies]
+evm-exec-types = { path = "../sp1/evm-exec-types" }
+
 anyhow = "1.0"
 alloy-provider = { workspace = true }
 async-trait = "0.1.88"
@@ -27,6 +29,7 @@ rsp-host-executor = { workspace = true }
 rsp-primitives = { workspace = true }
 rsp-rpc-db = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_cbor = { workspace = true }
 serde_yaml = "0.9"
 sha3 = { workspace = true }
 sp1-sdk = { workspace = true }

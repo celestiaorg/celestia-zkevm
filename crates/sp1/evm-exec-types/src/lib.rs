@@ -1,42 +1,50 @@
 use std::fmt::{Display, Formatter, Result};
 
+use eq_common::KeccakInclusionToDataRootProofInput;
 use hex::encode;
+use nmt_rs::{simple_merkle::proof::Proof, TmSha2Hasher};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use sp1_sdk::SP1ProofWithPublicValues;
+use tendermint::block::Header;
+
+#[derive(Serialize, Deserialize)]
+pub struct BlockExecInput {
+    // blob_proof is an inclusion proof of blob data availability in Celestia.
+    pub blob_proof: KeccakInclusionToDataRootProofInput,
+    // data_root_proof is an inclusion proof of the data root within the Celestia header.
+    pub data_root_proof: Proof<TmSha2Hasher>,
+    // header is the Celestia block header at which the blob data is available.
+    pub header: Header,
+    // state_transition_fn is the application of the blob data applied to the EVM state machine.
+    pub state_transition_fn: Vec<u8>,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct EvmBlockExecOutput {
+pub struct BlockExecOutput {
     // blob_commitment is the blob commitment for the EVM block.
     pub blob_commitment: [u8; 32],
-
     // header_hash is the hash of the EVM block header.
     pub header_hash: [u8; 32],
-
     // prev_header_hash is the hash of the previous EVM block header.
     pub prev_header_hash: [u8; 32],
-
     // celestia_header_hash is the merkle hash of the Celestia block header.
     pub celestia_header_hash: [u8; 32],
-
     // prev_celestia_header_hash is the merkle hash of the previous Celestia block header.
     pub prev_celestia_header_hash: [u8; 32],
-
     // new_height is the block number after the state transition function has been applied.
     pub new_height: u64,
-
     // new_state_root is the EVM application state root after the state transition function has been applied.
     pub new_state_root: [u8; 32],
-
     // prev_height is the block number before the state transition function has been applied.
     pub prev_height: u64,
-
     // prev_state_root is the EVM application state root before the state transition function has been applied.
     pub prev_state_root: [u8; 32],
 }
 
 /// Display trait implementation to format hashes as hex encoded output.
-impl Display for EvmBlockExecOutput {
+impl Display for BlockExecOutput {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        writeln!(f, "EvmBlockExecOutput {{")?;
+        writeln!(f, "BlockExecOutput {{")?;
         writeln!(f, "  blob_commitment:             {}", encode(self.blob_commitment))?;
         writeln!(f, "  header_hash:                 {}", encode(self.header_hash))?;
         writeln!(f, "  prev_header_hash:            {}", encode(self.prev_header_hash))?;
@@ -58,29 +66,33 @@ impl Display for EvmBlockExecOutput {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct BlockRangeExecInput {
+    // proofs is a vector of SP1 proofs with their associated public values
+    pub proofs: Vec<SP1ProofWithPublicValues>,
+    // vkeys is a vector of SP1 verifier key digests
+    pub vkeys: Vec<[u8; 32]>,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
-pub struct EvmRangeExecOutput {
+pub struct BlockRangeExecOutput {
     // celestia_header_hash is the hash of the celestia header at which new_height is available.
     pub celestia_header_hash: [u8; 32],
-
     // trusted_height is the trusted height of the EVM application.
     pub trusted_height: u64,
-
     // trusted_state_root is the state commitment root of the EVM application at trusted_height.
     pub trusted_state_root: [u8; 32],
-
     // new_height is the EVM application block number after N state transitions.
     pub new_height: u64,
-
     // new_state_root is the computed state root of the EVM application after
     // executing N blocks from trusted_height to new_height.
     pub new_state_root: [u8; 32],
 }
 
 /// Display trait implementation to format hashes as hex encoded output.
-impl Display for EvmRangeExecOutput {
+impl Display for BlockRangeExecOutput {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        writeln!(f, "EvmRangeExecOutput {{")?;
+        writeln!(f, "BlockRangeExecOutput {{")?;
         writeln!(
             f,
             "  celestia_header_hash:        {}",

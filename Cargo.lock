@@ -2664,8 +2664,12 @@ name = "evm-exec-types"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "eq-common",
  "hex",
+ "nmt-rs",
  "serde",
+ "sp1-sdk",
+ "tendermint",
 ]
 
 [[package]]
@@ -2681,6 +2685,7 @@ dependencies = [
  "clap",
  "dirs",
  "eq-common",
+ "evm-exec-types",
  "nmt-rs",
  "prost 0.12.6",
  "prost-build 0.12.6",
@@ -2690,6 +2695,7 @@ dependencies = [
  "rsp-primitives",
  "rsp-rpc-db",
  "serde",
+ "serde_cbor",
  "serde_yaml",
  "sha3",
  "sp1-build",
