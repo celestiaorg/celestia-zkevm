@@ -1,8 +1,3 @@
-use std::sync::Arc;
-
-use celestia_types::nmt::Namespace;
-use reth_chainspec::ChainSpec;
-use rsp_primitives::genesis::Genesis;
 use tonic::{Request, Response, Status};
 
 use crate::proto::celestia::prover::v1::prover_server::Prover;
@@ -10,7 +5,6 @@ use crate::proto::celestia::prover::v1::{
     InfoRequest, InfoResponse, ProveStateMembershipRequest, ProveStateMembershipResponse, ProveStateTransitionRequest,
     ProveStateTransitionResponse,
 };
-use crate::prover::prover::BlockProver;
 
 #[derive(Default)]
 pub struct ProverService {}

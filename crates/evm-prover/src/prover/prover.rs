@@ -1,17 +1,9 @@
-use std::sync::Arc;
-
-use alloy_provider::ProviderBuilder;
 use anyhow::Result;
-use celestia_rpc::{BlobClient, Client, HeaderClient, ShareClient};
-use celestia_types::nmt::Namespace;
-use celestia_types::{Blob, Commitment, ExtendedHeader, ShareProof};
+use async_trait::async_trait;
+use celestia_types::{Commitment, ExtendedHeader};
 use eq_common::KeccakInclusionToDataRootProofInput;
-use reth_chainspec::ChainSpec;
-use rsp_host_executor::EthHostExecutor;
-use rsp_primitives::genesis::Genesis;
-use rsp_rpc_db::RpcDb;
-use sha3::{Digest, Keccak256};
-use sp1_sdk::include_elf;
+use nmt_rs::{simple_merkle::proof::Proof, TmSha2Hasher};
+use sp1_sdk::{include_elf, EnvProver, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
@@ -19,90 +11,110 @@ pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_RANGE_EXEC_ELF: &[u8] = include_elf!("evm-range-exec-program");
 
-pub struct BlockProver {
-    pub evm_rpc_url: String,
-    pub celestia_rpc_url: String,
-    pub chain_spec: Arc<ChainSpec>,
-    pub genesis: Genesis,
-    pub namespace: Namespace,
+/// Config defines metadata about the program binary (ELF), proof mode and any static keys.
+pub struct Config {
+    pub elf: &'static [u8],
+    pub proof_mode: SP1ProofMode,
 }
 
-impl BlockProver {
-    pub async fn new(
-        evm_rpc_url: String,
-        celestia_rpc_url: String,
-        chain_spec: Arc<ChainSpec>,
-        genesis: Genesis,
-        namespace: Namespace,
-    ) -> Result<Self> {
-        Ok(Self {
-            evm_rpc_url,
-            celestia_rpc_url,
-            chain_spec,
-            genesis,
-            namespace,
-        })
-    }
+/// ProgramProver is a trait implemented per SP1 program*.
+///
+/// Associated types let each program pick its own Input and Output context.
+#[async_trait]
+pub trait ProgramProver {
+    /// Context needed to build the stdin for this program.
+    type Input: Send + 'static;
+    /// Output data to return alongside the proof.
+    type Output: Send + 'static;
 
-    pub async fn generate_stf(&self, block_number: u64) -> Result<Vec<u8>> {
-        let host_executor = EthHostExecutor::eth(self.chain_spec.clone(), None);
-        let provider = ProviderBuilder::new().on_http(self.evm_rpc_url.parse()?);
-        let rpc_db = RpcDb::new(provider.clone(), block_number - 1);
+    /// Returns the prover config
+    fn cfg(&self) -> &Config;
 
-        let client_input = host_executor
-            .execute(block_number, &rpc_db, &provider, self.genesis.clone(), None, false)
-            .await?;
+    /// Build the program stdin from the prover inputs.
+    fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin>;
 
-        Ok(bincode::serialize(&client_input)?)
-    }
+    /// Prove produces a proof and parsed outputs.
+    /// The default implementation matches the configured proof mode and program elf from the prover config.
+    async fn prove(&self, input: Self::Input) -> Result<(SP1ProofWithPublicValues, Self::Output)> {
+        let cfg = self.cfg();
+        let stdin = self.build_stdin(input)?;
 
-    pub async fn inclusion_height(&self, _block_number: u64) -> Result<(u64, Commitment)> {
-        panic!("TODO(unimplemented): Query rollkit rpc for DA inclusion height");
-    }
+        // TODO: cache (pk, vk) in the cfg struct?
+        let (pk, _vk) = self.prover().setup(cfg.elf);
 
-    pub async fn blob_inclusion_proof(
-        &self,
-        inclusion_height: u64,
-        commitment: Commitment,
-    ) -> Result<(KeccakInclusionToDataRootProofInput, ExtendedHeader)> {
-        let celestia_client = Client::new(&self.celestia_rpc_url, None).await?;
-
-        let blob = celestia_client
-            .blob_get(inclusion_height, self.namespace, commitment)
-            .await?;
-        let header = celestia_client.header_get_by_height(inclusion_height).await?;
-        let share_proof = self.verify_blob_inclusion(&header, &blob).await?;
-
-        let keccak_hash: [u8; 32] = Keccak256::new().chain_update(&blob.data).finalize().into();
-
-        let input = KeccakInclusionToDataRootProofInput {
-            data: blob.data.clone(),
-            namespace_id: self.namespace,
-            share_proofs: share_proof.share_proofs.clone(),
-            row_proof: share_proof.row_proof.clone(),
-            data_root: header.dah.hash().as_bytes().try_into()?,
-            keccak_hash,
+        let proof: SP1ProofWithPublicValues = match cfg.proof_mode {
+            SP1ProofMode::Core => self.prover().prove(&pk, &stdin).core().run()?,
+            SP1ProofMode::Compressed => self.prover().prove(&pk, &stdin).compressed().run()?,
+            SP1ProofMode::Groth16 => self.prover().prove(&pk, &stdin).groth16().run()?,
+            SP1ProofMode::Plonk => self.prover().prove(&pk, &stdin).plonk().run()?,
         };
 
-        Ok((input, header))
+        let output = self.post_process(proof.clone());
+
+        Ok((proof, output))
     }
 
-    async fn verify_blob_inclusion(&self, header: &ExtendedHeader, blob: &Blob) -> Result<ShareProof> {
-        let eds_size = header.dah.row_roots().len() as u64;
-        let ods_size = eds_size / 2;
-        let first_row_index = blob.index.unwrap() / eds_size;
-        let ods_index = blob.index.unwrap() - (first_row_index * ods_size);
+    /// Returns the SP1 Prover.
+    fn prover(&self) -> &EnvProver;
 
-        let mut header = header.clone();
-        header.header.version.app = 3;
+    /// Parse or convert program outputs.
+    fn post_process(&self, proof: SP1ProofWithPublicValues) -> Self::Output;
+}
 
-        let celestia_client = Client::new(&self.celestia_rpc_url, None).await?;
-        let range_response = celestia_client
-            .share_get_range(&header, ods_index, ods_index + blob.shares_len() as u64)
-            .await?;
+pub struct BlockExecProver {
+    config: Config,
+    prover: EnvProver,
+    // extend with custom state, e.g. celestia rpc, evm rpc, etc...
+}
 
-        let share_proof = range_response.proof;
-        share_proof.verify(header.dah.hash())?;
-        Ok(share_proof)
+pub struct BlockExecInput {/* Inputs required */}
+
+pub struct BlockExecOutput {/* Parsed outputs */}
+
+#[async_trait]
+impl ProgramProver for BlockExecProver {
+    type Input = BlockExecInput;
+    type Output = BlockExecOutput;
+
+    fn cfg(&self) -> &Config {
+        &self.config
     }
+
+    fn build_stdin(&self, _input: Self::Input) -> Result<SP1Stdin> {
+        let stdin = SP1Stdin::new();
+        Ok(stdin)
+    }
+
+    fn post_process(&self, _proof: SP1ProofWithPublicValues) -> Self::Output {
+        let output = BlockExecOutput {};
+        output
+    }
+
+    fn prover(&self) -> &EnvProver {
+        &self.prover
+    }
+}
+
+impl BlockExecProver {
+    async fn generate_stf(&self, _block_number: u64) -> Result<Vec<u8>> {
+        unimplemented!("TODO: RSP generation of state transition func (client_executor_input)")
+    }
+
+    async fn inclusion_height(&self, _block_number: u64) -> Result<(u64, Commitment)> {
+        unimplemented!("TODO: Query rollkit rpc for DA inclusion height");
+    }
+
+    async fn blob_inclusion_proof(
+        &self,
+        _inclusion_height: u64,
+        _commitment: Commitment,
+    ) -> Result<(KeccakInclusionToDataRootProofInput, ExtendedHeader)> {
+        unimplemented!("TODO: Query celestia rpc and construct blob inclusion proof");
+    }
+
+    fn data_root_proof(&self, _header: &ExtendedHeader) -> Result<(Vec<u8>, Proof<TmSha2Hasher>)> {
+        unimplemented!("TODO: Build the data root to header hash inclusion proof")
+    }
+
+    /* ...additional helpers fns */
 }

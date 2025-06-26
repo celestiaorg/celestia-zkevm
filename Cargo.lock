@@ -2674,12 +2674,14 @@ version = "0.1.0"
 dependencies = [
  "alloy-provider",
  "anyhow",
+ "async-trait",
  "bincode",
  "celestia-rpc",
  "celestia-types",
  "clap",
  "dirs",
  "eq-common",
+ "nmt-rs",
  "prost 0.12.6",
  "prost-build 0.12.6",
  "reqwest",
@@ -2689,14 +2691,10 @@ dependencies = [
  "rsp-rpc-db",
  "serde",
  "serde_yaml",
-<<<<<<< HEAD
+ "sha3",
  "sp1-build",
  "sp1-sdk",
-=======
- "sha3",
- "sp1-sdk",
  "tendermint",
->>>>>>> 352431d (feat(wip): begin block prover impl)
  "tokio",
  "tokio-stream",
  "tonic 0.10.2",
