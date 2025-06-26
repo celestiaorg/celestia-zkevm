@@ -39,7 +39,6 @@ pub trait ProgramProver {
         let cfg = self.cfg();
         let stdin = self.build_stdin(input)?;
 
-        // TODO: cache (pk, vk) in the cfg struct?
         let (pk, _vk) = self.prover().setup(cfg.elf);
 
         let proof: SP1ProofWithPublicValues = match cfg.proof_mode {
