@@ -17,7 +17,7 @@
 #![no_main]
 sp1_zkvm::entrypoint!(main);
 
-use evm_exec_types::{EvmBlockExecOutput, EvmRangeExecOutput, Buffer};
+use evm_exec_types::{Buffer, EvmBlockExecOutput, EvmRangeExecOutput};
 use sha2::{Digest, Sha256};
 
 pub fn main() {
