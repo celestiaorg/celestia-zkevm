@@ -213,6 +213,11 @@ pub struct BlockRangeExecInput {
     pub vkey: SP1VerifyingKey,
 }
 
+/// Output of a batch execution proof that validates N state transitions
+/// from a trusted starting point.
+///
+/// This contains the resulting commitments after applying a sequence of verified SP1 proofs,
+/// advancing the EVM application state from `trusted_height` to `new_height`.
 #[derive(Serialize, Deserialize)]
 pub struct BlockRangeExecOutput {
     // celestia_header_hash is the hash of the celestia header at which new_height is available.
