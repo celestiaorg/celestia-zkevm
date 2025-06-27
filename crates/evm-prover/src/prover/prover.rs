@@ -77,6 +77,10 @@ pub struct BlockExecProver {
     // extend with custom state, e.g. celestia rpc, evm rpc, etc...
 }
 
+/// Input to the EVM block execution proving circuit.
+///
+/// This input contains all necessary data to verify block execution and data
+/// availability of blob data in Celestia.
 #[derive(Serialize, Deserialize)]
 pub struct BlockExecInput {
     // blob_proof is an inclusion proof of blob data availability in Celestia.
@@ -89,6 +93,10 @@ pub struct BlockExecInput {
     pub state_transition_fn: Vec<u8>,
 }
 
+/// Output of the EVM block execution proving circuit.
+///
+/// This contains the resulting commitments after applying the state transition function and verifying
+/// data availability in Celestia.
 #[derive(Serialize, Deserialize)]
 pub struct BlockExecOutput {
     // blob_commitment is the blob commitment for the EVM block.
@@ -192,6 +200,11 @@ pub struct BlockRangeExecProver {
     prover: EnvProver,
 }
 
+/// Input to a batch execution proving system that verifies multiple SP1 proofs
+/// for a range of EVM blocks.
+///
+/// This is used to verify that N state transitions have occurred using a single
+/// verifying key, producing a new application state root.
 #[derive(Serialize, Deserialize)]
 pub struct BlockRangeExecInput {
     // proofs is a vector of SP1 proofs with their associated public values
