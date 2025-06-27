@@ -10,7 +10,7 @@ Run the following commands from the root of the repository.
 1. Install the binary to local Cargo binary directory `~/.cargo/bin`:
 
     ```shell
-    cargo install --path ./crates
+    cargo install --path ./crates/evm-prover
     ```
 
 2. Initialise a new `evm-prover` home directory and configuration file with defaults:
