@@ -11,12 +11,26 @@ walkdir = "2.5.0"
 
 [dependencies]
 anyhow = "1.0"
+alloy-provider = { workspace = true }
+async-trait = "0.1.88"
+bincode = { workspace = true }
+celestia-types = { workspace = true }
+celestia-rpc = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 dirs = "5"
+eq-common = { workspace = true }
+nmt-rs = { workspace = true }
 prost = "0.12"
+reqwest = { workspace = true }
+reth-chainspec = { workspace = true }
+rsp-host-executor = { workspace = true }
+rsp-primitives = { workspace = true }
+rsp-rpc-db = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_yaml = "0.9"
+sha3 = { workspace = true }
 sp1-sdk = { workspace = true }
+tendermint = { workspace = true }
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 tonic = { version = "0.10", features = ["transport"] }

@@ -19,6 +19,7 @@ eq-common = "0.1.4"
 ethers = { version = "2.0", features = ["ws", "rustls"] }
 hex = "0.4.3"
 nmt-rs = "*"
+reqwest = "0.12.20"
 reth-chainspec = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.3", default-features = false }
 reth-primitives = { git = "https://github.com/sp1-patches/reth", tag = "rsp-20240830", default-features = false, features = [
     "alloy-compat",
