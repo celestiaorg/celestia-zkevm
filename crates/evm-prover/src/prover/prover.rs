@@ -1,10 +1,15 @@
+#![allow(dead_code)]
+
 use anyhow::Result;
 use async_trait::async_trait;
 use celestia_types::{Commitment, ExtendedHeader};
 use eq_common::KeccakInclusionToDataRootProofInput;
-use evm_exec_types::{BlockExecInput, BlockExecOutput, BlockRangeExecInput, BlockRangeExecOutput};
 use nmt_rs::{simple_merkle::proof::Proof, TmSha2Hasher};
-use sp1_sdk::{include_elf, EnvProver, SP1ProofMode, SP1ProofWithPublicValues, SP1PublicValues, SP1Stdin};
+use serde::{Deserialize, Serialize};
+use sp1_sdk::{
+    include_elf, EnvProver, HashableKey, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
+};
+use tendermint::block::Header;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
@@ -70,6 +75,40 @@ pub struct BlockExecProver {
     config: Config,
     prover: EnvProver,
     // extend with custom state, e.g. celestia rpc, evm rpc, etc...
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct BlockExecInput {
+    // blob_proof is an inclusion proof of blob data availability in Celestia.
+    pub blob_proof: KeccakInclusionToDataRootProofInput,
+    // data_root_proof is an inclusion proof of the data root within the Celestia header.
+    pub data_root_proof: Proof<TmSha2Hasher>,
+    // header is the Celestia block header at which the blob data is available.
+    pub header: Header,
+    // state_transition_fn is the application of the blob data applied to the EVM state machine.
+    pub state_transition_fn: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct BlockExecOutput {
+    // blob_commitment is the blob commitment for the EVM block.
+    pub blob_commitment: [u8; 32],
+    // header_hash is the hash of the EVM block header.
+    pub header_hash: [u8; 32],
+    // prev_header_hash is the hash of the previous EVM block header.
+    pub prev_header_hash: [u8; 32],
+    // celestia_header_hash is the merkle hash of the Celestia block header.
+    pub celestia_header_hash: [u8; 32],
+    // prev_celestia_header_hash is the merkle hash of the previous Celestia block header.
+    pub prev_celestia_header_hash: [u8; 32],
+    // new_height is the block number after the state transition function has been applied.
+    pub new_height: u64,
+    // new_state_root is the EVM application state root after the state transition function has been applied.
+    pub new_state_root: [u8; 32],
+    // prev_height is the block number before the state transition function has been applied.
+    pub prev_height: u64,
+    // prev_state_root is the EVM application state root before the state transition function has been applied.
+    pub prev_state_root: [u8; 32],
 }
 
 #[async_trait]
@@ -153,6 +192,29 @@ pub struct BlockRangeExecProver {
     prover: EnvProver,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct BlockRangeExecInput {
+    // proofs is a vector of SP1 proofs with their associated public values
+    pub proofs: Vec<SP1ProofWithPublicValues>,
+    // vkey is the SP1 verifier key for verifying proofs
+    pub vkey: SP1VerifyingKey,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct BlockRangeExecOutput {
+    // celestia_header_hash is the hash of the celestia header at which new_height is available.
+    pub celestia_header_hash: [u8; 32],
+    // trusted_height is the trusted height of the EVM application.
+    pub trusted_height: u64,
+    // trusted_state_root is the state commitment root of the EVM application at trusted_height.
+    pub trusted_state_root: [u8; 32],
+    // new_height is the EVM application block number after N state transitions.
+    pub new_height: u64,
+    // new_state_root is the computed state root of the EVM application after
+    // executing N blocks from trusted_height to new_height.
+    pub new_state_root: [u8; 32],
+}
+
 #[async_trait]
 impl ProgramProver for BlockRangeExecProver {
     type Input = BlockRangeExecInput;
@@ -174,29 +236,20 @@ impl ProgramProver for BlockRangeExecProver {
     fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin> {
         let mut stdin = SP1Stdin::new();
 
-        let vkeys = input.vkeys;
-        stdin.write(&vkeys);
-
         let (proofs, public_values): (Vec<_>, Vec<_>) = input
             .proofs
             .into_iter()
             .map(|p| (p.proof, p.public_values.to_vec()))
             .unzip();
 
-        if proofs.len() != vkeys.len() {
-            return Err(anyhow::anyhow!(
-                "Mismatch between number of proofs ({}) and vkeys ({})",
-                proofs.len(),
-                vkeys.len()
-            ));
-        }
-
+        let vkeys = vec![input.vkey.hash_u32(); proofs.len()];
+        stdin.write(&vkeys);
         stdin.write(&public_values);
 
-        for (proof, vk_digest) in proofs.iter().zip(vkeys.iter()) {
+        for proof in proofs.iter() {
             match proof {
                 SP1Proof::Compressed(inner) => {
-                    stdin.write_proof(inner.clone(), *vk_digest);
+                    stdin.write_proof(*inner.clone(), input.vkey.vk.clone());
                 }
                 _ => {
                     return Err(anyhow::anyhow!("Expected compressed SP1 proof"));

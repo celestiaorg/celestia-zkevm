@@ -2668,7 +2668,6 @@ dependencies = [
  "hex",
  "nmt-rs",
  "serde",
- "sp1-sdk",
  "tendermint",
 ]
 
@@ -2685,7 +2684,6 @@ dependencies = [
  "clap",
  "dirs",
  "eq-common",
- "evm-exec-types",
  "nmt-rs",
  "prost 0.12.6",
  "prost-build 0.12.6",

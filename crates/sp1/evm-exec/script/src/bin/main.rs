@@ -19,7 +19,7 @@ use std::fs;
 
 use clap::Parser;
 use eq_common::KeccakInclusionToDataRootProofInput;
-use evm_exec_types::BlockExecOutput;
+use evm_exec_types::EvmBlockExecOutput;
 use nmt_rs::{simple_merkle::proof::Proof, TmSha2Hasher};
 use rsp_client_executor::io::EthClientExecutorInput;
 use sp1_sdk::{include_elf, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("Program executed successfully!");
 
         // Read the output.
-        let block_exec_output: BlockExecOutput = bincode::deserialize(output.as_slice())?;
+        let block_exec_output: EvmBlockExecOutput = bincode::deserialize(output.as_slice())?;
         println!("Outputs: {}", block_exec_output);
 
         // Record the number of cycles executed.

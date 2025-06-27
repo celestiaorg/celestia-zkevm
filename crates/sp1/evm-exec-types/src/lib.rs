@@ -1,26 +1,10 @@
 use std::fmt::{Display, Formatter, Result};
 
-use eq_common::KeccakInclusionToDataRootProofInput;
 use hex::encode;
-use nmt_rs::{simple_merkle::proof::Proof, TmSha2Hasher};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use sp1_sdk::SP1ProofWithPublicValues;
-use tendermint::block::Header;
-
-#[derive(Serialize, Deserialize)]
-pub struct BlockExecInput {
-    // blob_proof is an inclusion proof of blob data availability in Celestia.
-    pub blob_proof: KeccakInclusionToDataRootProofInput,
-    // data_root_proof is an inclusion proof of the data root within the Celestia header.
-    pub data_root_proof: Proof<TmSha2Hasher>,
-    // header is the Celestia block header at which the blob data is available.
-    pub header: Header,
-    // state_transition_fn is the application of the blob data applied to the EVM state machine.
-    pub state_transition_fn: Vec<u8>,
-}
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct BlockExecOutput {
+pub struct EvmBlockExecOutput {
     // blob_commitment is the blob commitment for the EVM block.
     pub blob_commitment: [u8; 32],
     // header_hash is the hash of the EVM block header.
@@ -42,9 +26,9 @@ pub struct BlockExecOutput {
 }
 
 /// Display trait implementation to format hashes as hex encoded output.
-impl Display for BlockExecOutput {
+impl Display for EvmBlockExecOutput {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        writeln!(f, "BlockExecOutput {{")?;
+        writeln!(f, "EvmBlockExecOutput {{")?;
         writeln!(f, "  blob_commitment:             {}", encode(self.blob_commitment))?;
         writeln!(f, "  header_hash:                 {}", encode(self.header_hash))?;
         writeln!(f, "  prev_header_hash:            {}", encode(self.prev_header_hash))?;
@@ -66,16 +50,8 @@ impl Display for BlockExecOutput {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct BlockRangeExecInput {
-    // proofs is a vector of SP1 proofs with their associated public values
-    pub proofs: Vec<SP1ProofWithPublicValues>,
-    // vkeys is a vector of SP1 verifier key digests
-    pub vkeys: Vec<[u8; 32]>,
-}
-
 #[derive(Serialize, Deserialize, Debug)]
-pub struct BlockRangeExecOutput {
+pub struct EvmRangeExecOutput {
     // celestia_header_hash is the hash of the celestia header at which new_height is available.
     pub celestia_header_hash: [u8; 32],
     // trusted_height is the trusted height of the EVM application.
@@ -90,9 +66,9 @@ pub struct BlockRangeExecOutput {
 }
 
 /// Display trait implementation to format hashes as hex encoded output.
-impl Display for BlockRangeExecOutput {
+impl Display for EvmRangeExecOutput {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        writeln!(f, "BlockRangeExecOutput {{")?;
+        writeln!(f, "EvmRangeExecOutput {{")?;
         writeln!(
             f,
             "  celestia_header_hash:        {}",

@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use celestia_types::{blob::Blob, hash::Hash, AppVersion, ShareProof};
 use eq_common::KeccakInclusionToDataRootProofInput;
-use evm_exec_types::BlockExecOutput;
+use evm_exec_types::EvmBlockExecOutput;
 use nmt_rs::{simple_merkle::proof::Proof, simple_merkle::tree::MerkleHash, TmSha2Hasher};
 use rsp_client_executor::{
     executor::EthClientExecutor,
@@ -133,7 +133,7 @@ pub fn main() {
     // -----------------------------
     println!("cycle-tracker-start: commit public outputs");
 
-    let output = BlockExecOutput {
+    let output = EvmBlockExecOutput {
         blob_commitment: blob.commitment.into(),
         header_hash: header.hash_slow().into(),
         prev_header_hash: header.parent_hash.into(),
