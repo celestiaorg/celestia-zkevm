@@ -98,6 +98,7 @@ services:
       - |
           lumen node \
             --chain /home/reth/eth-genesis.json \
+            --datadir /home/reth/eth-home \
             --metrics 0.0.0.0:9001 \
             --log.file.directory /home/reth/logs \
             --authrpc.addr 0.0.0.0 \
