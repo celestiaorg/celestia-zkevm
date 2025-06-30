@@ -60,8 +60,11 @@ services:
   rollkit-evm-single:
     image: ghcr.io/rollkit/rollkit-evm-single:pr-2394
     container_name: rollkit-evm-single
-    entrypoint: /usr/bin/entrypoint.sh
+    entrypoint: /scripts/entrypoint.sh
+    ports:
+      - "7331:7331"
     volumes:
+      - ./testnet/rollkit/entrypoint.sh:/scripts/entrypoint.sh:ro
       - evm-single-data:/data
     environment:
       - EVM_ENGINE_URL=http://reth:8551
