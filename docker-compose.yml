@@ -58,14 +58,16 @@ services:
       - celestia-zkevm-net
 
   rollkit-evm-single:
-    image: ghcr.io/rollkit/rollkit-evm-single:v0.1.3
+    image: ghcr.io/rollkit/rollkit-evm-single:pr-2394
     container_name: rollkit-evm-single
     entrypoint: /usr/bin/entrypoint.sh
+    volumes:
+      - evm-single-data:/data
     environment:
       - EVM_ENGINE_URL=http://reth:8551
       - EVM_ETH_URL=http://reth:8545
       - EVM_JWT_SECRET=f747494bb0fb338a0d71f5f9fe5b5034c17cc988c229b59fd71e005ee692e9bf
-      - EVM_GENESIS_HASH=0x06bab65f0fa3c9b1ba0da34e319d7a5cd948cd10ba33080b88f17d281880e344
+      - EVM_GENESIS_HASH=0x72fe82115f994fbc350021230af421d67c39c9d2ff19ba494f5651af7363ff03
       - EVM_BLOCK_TIME=1s
       - EVM_SIGNER_PASSPHRASE=secret
       - DA_ADDRESS=http://celestia-bridge:26658
@@ -80,33 +82,43 @@ services:
       - celestia-zkevm-net
   
   reth:
-    image: ghcr.io/paradigmxyz/reth:v1.3.11
     container_name: reth
+    image: ghcr.io/rollkit/lumen:latest
     ports:
-      - "9001:9001"   # Metrics
-      - "30303:30303" # P2P
-      - "8545:8545"   # HTTP
-      - "8551:8551"   # Auth RPC (Engine API)
+      - "9001:9001" # metrics
+      - "30303:30303" # eth/66 peering
+      - "8545:8545" # rpc
+      - "8551:8551" # engine
+      - "8546:8546" # ws
     volumes:
       - ./testnet/reth:/home/reth
       - reth:/home/reth/eth-home
     entrypoint: /bin/sh -c
     command:
       - |
-          reth node \
-          --chain /home/reth/eth-genesis.json \
-          --metrics 0.0.0.0:9001 \
-          --authrpc.addr 0.0.0.0 \
-          --authrpc.port 8551 \
-          --http \
-          --http.addr 0.0.0.0 \
-          --http.port 8545 \
-          --http.api "eth,net,web3,txpool" \
-          --authrpc.jwtsecret /home/reth/jwt.hex \
-          --datadir /home/reth/eth-home \
-          --ipcpath /home/reth/eth-home/eth-engine.ipc \
-          --disable-discovery \
-          --rpc.eth-proof-window 120000
+          lumen node \
+            --chain /home/reth/eth-genesis.json \
+            --datadir /home/reth/eth-home \
+            --metrics 0.0.0.0:9001 \
+            --authrpc.addr 0.0.0.0 \
+            --authrpc.port 8551 \
+            --authrpc.jwtsecret /home/reth/jwt.hex \
+            --http --http.addr 0.0.0.0 --http.port 8545 \
+            --http.api eth,net,web3,txpool \
+            --ws --ws.addr 0.0.0.0 --ws.port 8546 \
+            --ws.api eth,net,web3 \
+            --engine.persistence-threshold 0 \
+            --engine.memory-block-buffer-target 0 \
+            --disable-discovery \
+            --txpool.pending-max-count 200000 \
+            --txpool.pending-max-size 200 \
+            --txpool.queued-max-count 200000 \
+            --txpool.queued-max-size 200 \
+            --txpool.max-account-slots 2048 \
+            --txpool.max-new-txns 2048 \
+            --txpool.additional-validation-tasks 16 \
+            --rpc.eth-proof-window 120000 \
+            --rollkit.enable
     networks:
       - celestia-zkevm-net
 
@@ -145,6 +157,7 @@ volumes:
   celestia-bridge:
   hyperlane:
   reth:
+  evm-single-data:
 
 networks:
   celestia-zkevm-net:
