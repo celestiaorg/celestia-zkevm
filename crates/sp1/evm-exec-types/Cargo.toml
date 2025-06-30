@@ -5,8 +5,5 @@ edition = "2021"
 
 [dependencies]
 bincode = { workspace = true }
-eq-common = { workspace = true }
 hex = { workspace = true }
-nmt-rs = { workspace = true }
 serde = { workspace = true }
-tendermint = { workspace = true }
