@@ -2690,6 +2690,7 @@ dependencies = [
  "rsp-primitives",
  "rsp-rpc-db",
  "serde",
+ "serde_cbor",
  "serde_yaml",
  "sha3",
  "sp1-build",
