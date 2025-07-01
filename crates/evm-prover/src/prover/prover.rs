@@ -1,15 +1,33 @@
 #![allow(dead_code)]
+use std::result::Result::{Err, Ok};
+use std::sync::Arc;
 
-use anyhow::Result;
+use alloy_provider::ProviderBuilder;
+use anyhow::{bail, Result};
 use async_trait::async_trait;
-use celestia_types::{Commitment, ExtendedHeader};
+use celestia_rpc::HeaderClient;
+use celestia_rpc::{client::Client, BlobClient, ShareClient};
+use celestia_types::{nmt::Namespace, Blob, ExtendedHeader, ShareProof};
 use eq_common::KeccakInclusionToDataRootProofInput;
-use nmt_rs::{simple_merkle::proof::Proof, TmSha2Hasher};
+use nmt_rs::{
+    simple_merkle::{db::MemDb, proof::Proof, tree::MerkleTree},
+    TmSha2Hasher,
+};
+use prost::Message;
+use reth_chainspec::ChainSpec;
+use rollkit_types::v1::{store_service_client::StoreServiceClient, GetMetadataRequest, SignedData};
+use rsp_host_executor::EthHostExecutor;
+use rsp_primitives::genesis::Genesis;
+use rsp_rpc_db::RpcDb;
 use serde::{Deserialize, Serialize};
 use sp1_sdk::{
     include_elf, EnvProver, HashableKey, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
 };
 use tendermint::block::Header;
+use tendermint_proto::{
+    v0_38::{types::BlockId as RawBlockId, version::Consensus as RawConsensusVersion},
+    Protobuf,
+};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
@@ -17,8 +35,8 @@ pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_RANGE_EXEC_ELF: &[u8] = include_elf!("evm-range-exec-program");
 
-/// Config defines metadata about the program binary (ELF), proof mode and any static keys.
-pub struct Config {
+/// ProverConfig defines metadata about the program binary (ELF), proof mode and any static keys.
+pub struct ProverConfig {
     pub elf: &'static [u8],
     pub proof_mode: SP1ProofMode,
 }
@@ -34,7 +52,7 @@ pub trait ProgramProver {
     type Output: Send + 'static;
 
     /// Returns the program configuration containing the ELF and proof mode.
-    fn cfg(&self) -> &Config;
+    fn cfg(&self) -> &ProverConfig;
 
     /// Build the program stdin from the prover inputs.
     fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin>;
@@ -72,9 +90,23 @@ pub trait ProgramProver {
 /// for a zkVM program that takes a blob inclusion proof, data root proof, Celestia Header and
 /// EVM state transition function.
 pub struct BlockExecProver {
-    config: Config,
+    app: AppContext,
+    config: ProverConfig,
     prover: EnvProver,
-    // extend with custom state, e.g. celestia rpc, evm rpc, etc...
+}
+
+/// AppContext encapsulates the full set of RPC endpoints and configuration
+/// needed to fetch input data for execution and data availability proofs.
+///
+/// This separates RPC concerns from the proving logic, allowing `AppContext`
+/// to be responsible for gathering the data required for the proof system inputs.
+pub struct AppContext {
+    pub chain_spec: Arc<ChainSpec>,
+    pub genesis: Genesis,
+    pub namespace: Namespace,
+    pub celestia_rpc: String,
+    pub evm_rpc: String,
+    pub sequencer_rpc: String,
 }
 
 /// Input to the EVM block execution proving circuit.
@@ -125,7 +157,7 @@ impl ProgramProver for BlockExecProver {
     type Output = BlockExecOutput;
 
     /// Returns the program configuration containing the ELF and proof mode.
-    fn cfg(&self) -> &Config {
+    fn cfg(&self) -> &ProverConfig {
         &self.config
     }
 
@@ -162,27 +194,128 @@ impl ProgramProver for BlockExecProver {
 }
 
 impl BlockExecProver {
-    async fn generate_stf(&self, _block_number: u64) -> Result<Vec<u8>> {
-        unimplemented!("TODO: RSP generation of state transition func (client_executor_input)")
+    async fn generate_stf(&self, block_number: u64) -> Result<Vec<u8>> {
+        let host_executor = EthHostExecutor::eth(self.app.chain_spec.clone(), None);
+        let provider = ProviderBuilder::new().on_http(self.app.evm_rpc.parse()?);
+        let rpc_db = RpcDb::new(provider.clone(), block_number - 1);
+
+        let client_input = host_executor
+            .execute(block_number, &rpc_db, &provider, self.app.genesis.clone(), None, false)
+            .await?;
+
+        Ok(bincode::serialize(&client_input)?)
     }
 
-    async fn inclusion_height(&self, _block_number: u64) -> Result<(u64, Commitment)> {
-        unimplemented!("TODO: Query rollkit rpc for DA inclusion height");
+    async fn inclusion_height(&self, block_number: u64) -> Result<u64> {
+        let mut client = StoreServiceClient::connect(self.app.sequencer_rpc.clone()).await?;
+        let req = GetMetadataRequest {
+            key: format!("rhb/{}/h", block_number),
+        };
+
+        let resp = client.get_metadata(req).await?;
+        let height = u64::from_le_bytes(resp.into_inner().value[..8].try_into()?);
+
+        Ok(height)
     }
 
-    async fn blob_inclusion_proof(
-        &self,
-        _inclusion_height: u64,
-        _commitment: Commitment,
-    ) -> Result<(KeccakInclusionToDataRootProofInput, ExtendedHeader)> {
-        unimplemented!("TODO: Query celestia rpc and construct blob inclusion proof");
+    async fn extended_header(&self, height: u64) -> Result<ExtendedHeader> {
+        let client = Client::new(&self.app.celestia_rpc, None).await?;
+        let header = client.header_get_by_height(height).await?;
+
+        Ok(header)
     }
 
-    fn data_root_proof(&self, _header: &ExtendedHeader) -> Result<(Vec<u8>, Proof<TmSha2Hasher>)> {
-        unimplemented!("TODO: Build the data root to header hash inclusion proof")
+    async fn blob_for_height(&self, block_number: u64, inclusion_height: u64) -> Result<Blob> {
+        let client = Client::new(&self.app.celestia_rpc, None).await?;
+
+        let blobs = client
+            .blob_get_all(inclusion_height, &[self.app.namespace])
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("No blobs found at inclusion height {}", inclusion_height))?;
+
+        for blob in blobs {
+            let signed_data = match SignedData::decode(blob.data.as_slice()) {
+                Ok(data) => data,
+                Err(e) => {
+                    println!("Failed to decode SignedData: {:?}", e);
+                    continue;
+                }
+            };
+
+            let Some(metadata) = signed_data.data.and_then(|d| d.metadata) else {
+                continue;
+            };
+
+            if metadata.height == block_number {
+                return Ok(blob);
+            }
+        }
+
+        bail!(
+            "No blob found at block number {} and inclusion height {}",
+            block_number,
+            inclusion_height
+        );
     }
 
-    /* ...additional helpers fns */
+    async fn blob_inclusion_proof(&self, blob: Blob, header: ExtendedHeader) -> Result<ShareProof> {
+        let client = Client::new(&self.app.celestia_rpc, None).await?;
+
+        let eds_size = header.dah.row_roots().len() as u64;
+        let ods_size = eds_size / 2;
+        let first_row_index = blob.index.unwrap() / eds_size;
+        let ods_index = blob.index.unwrap() - (first_row_index * ods_size);
+
+        // NOTE: mutated the app version in the header as otherwise we run into v4 unsupported issues
+        let mut modified_header = header.clone();
+        modified_header.header.version.app = 3;
+
+        let range_response = client
+            .share_get_range(&modified_header, ods_index, ods_index + blob.shares_len() as u64)
+            .await?;
+
+        let share_proof = range_response.proof;
+        share_proof.verify(modified_header.dah.hash())?;
+
+        Ok(share_proof)
+    }
+
+    fn data_root_proof(&self, header: &ExtendedHeader) -> Result<(Vec<u8>, Proof<TmSha2Hasher>)> {
+        let mut header_field_tree: MerkleTree<MemDb<[u8; 32]>, TmSha2Hasher> =
+            MerkleTree::with_hasher(TmSha2Hasher::new());
+
+        let field_bytes = self.prepare_header_fields(header);
+        for leaf in field_bytes {
+            header_field_tree.push_raw_leaf(&leaf);
+        }
+
+        // The data_hash is the leaf at index 6 in the tree.
+        let (data_hash_bytes, data_hash_proof) = header_field_tree.get_index_with_proof(6);
+
+        // Verify the computed root matches the header hash
+        assert_eq!(header.hash().as_ref(), header_field_tree.root());
+
+        Ok((data_hash_bytes, data_hash_proof))
+    }
+
+    fn prepare_header_fields(&self, header: &ExtendedHeader) -> Vec<Vec<u8>> {
+        vec![
+            Protobuf::<RawConsensusVersion>::encode_vec(header.header.version),
+            header.header.chain_id.clone().encode_vec(),
+            header.header.height.encode_vec(),
+            header.header.time.encode_vec(),
+            Protobuf::<RawBlockId>::encode_vec(header.header.last_block_id.unwrap_or_default()),
+            header.header.last_commit_hash.unwrap_or_default().encode_vec(),
+            header.header.data_hash.unwrap_or_default().encode_vec(),
+            header.header.validators_hash.encode_vec(),
+            header.header.next_validators_hash.encode_vec(),
+            header.header.consensus_hash.encode_vec(),
+            header.header.app_hash.clone().encode_vec(),
+            header.header.last_results_hash.unwrap_or_default().encode_vec(),
+            header.header.evidence_hash.unwrap_or_default().encode_vec(),
+            header.header.proposer_address.encode_vec(),
+        ]
+    }
 }
 
 /// A prover for verifying and aggregating SP1 proofs over a range of blocks.
@@ -196,7 +329,7 @@ impl BlockExecProver {
 /// - All SP1 proofs must be in compressed format (`SP1Proof::Compressed`).
 /// - The number of `vkeys` must exactly match the number of `proofs`.
 pub struct BlockRangeExecProver {
-    config: Config,
+    config: ProverConfig,
     prover: EnvProver,
 }
 
@@ -239,7 +372,7 @@ impl ProgramProver for BlockRangeExecProver {
     type Output = BlockRangeExecOutput;
 
     /// Returns the program configuration containing the ELF and proof mode.
-    fn cfg(&self) -> &Config {
+    fn cfg(&self) -> &ProverConfig {
         &self.config
     }
 
