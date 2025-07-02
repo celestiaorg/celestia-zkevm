@@ -1,9 +1,10 @@
 #![allow(dead_code)]
+use std::fs;
 use std::result::Result::{Err, Ok};
 use std::sync::Arc;
 
 use alloy_provider::ProviderBuilder;
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use celestia_rpc::HeaderClient;
 use celestia_rpc::{client::Client, BlobClient, ShareClient};
@@ -15,13 +16,15 @@ use nmt_rs::{
 };
 use prost::Message;
 use reth_chainspec::ChainSpec;
+use rollkit_types::v1::SignedHeader;
 use rollkit_types::v1::{store_service_client::StoreServiceClient, GetMetadataRequest, SignedData};
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
 use serde::{Deserialize, Serialize};
 use sp1_sdk::{
-    include_elf, EnvProver, HashableKey, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
+    include_elf, EnvProver, HashableKey, ProverClient, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin,
+    SP1VerifyingKey,
 };
 use tendermint::block::Header;
 use tendermint_proto::{
@@ -84,17 +87,6 @@ pub trait ProgramProver {
     fn post_process(&self, proof: SP1ProofWithPublicValues) -> Result<Self::Output>;
 }
 
-/// A prover for generating SP1 proofs for EVM block execution and data availability in Celestia.
-///
-/// This struct is responsible for preparing the standard input (`SP1Stdin`)
-/// for a zkVM program that takes a blob inclusion proof, data root proof, Celestia Header and
-/// EVM state transition function.
-pub struct BlockExecProver {
-    app: AppContext,
-    config: ProverConfig,
-    prover: EnvProver,
-}
-
 /// AppContext encapsulates the full set of RPC endpoints and configuration
 /// needed to fetch input data for execution and data availability proofs.
 ///
@@ -107,6 +99,40 @@ pub struct AppContext {
     pub celestia_rpc: String,
     pub evm_rpc: String,
     pub sequencer_rpc: String,
+}
+
+impl AppContext {
+    pub fn from_config() -> Result<Self> {
+        let genesis = Genesis::Custom(fs::read_to_string("path").context("Failed to read genesis file from path")?);
+
+        let chain_spec = Arc::new(
+            (&genesis)
+                .try_into()
+                .map_err(|e| anyhow!("Failed to convert genesis to chain spec: {e}"))?,
+        );
+
+        let namespace = Namespace::new_v0(&hex::decode("namespace_hex")?).context("Failed to construct Namespace")?;
+
+        Ok(AppContext {
+            chain_spec: chain_spec,
+            genesis: genesis,
+            namespace: namespace,
+            celestia_rpc: "http://127.0.0.1:26658".to_string(),
+            evm_rpc: "http://127.0.0.1:8545".to_string(),
+            sequencer_rpc: "http://127.0.0.1:7331".to_string(),
+        })
+    }
+}
+
+/// A prover for generating SP1 proofs for EVM block execution and data availability in Celestia.
+///
+/// This struct is responsible for preparing the standard input (`SP1Stdin`)
+/// for a zkVM program that takes a blob inclusion proof, data root proof, Celestia Header and
+/// EVM state transition function.
+pub struct BlockExecProver {
+    pub app: AppContext,
+    pub config: ProverConfig,
+    pub prover: EnvProver,
 }
 
 /// Input to the EVM block execution proving circuit.
@@ -194,6 +220,24 @@ impl ProgramProver for BlockExecProver {
 }
 
 impl BlockExecProver {
+    /// Creates a new instance of [`BlockExecProver`] for the provided [`AppContext`] using default configuration
+    /// and prover environment settings.
+    pub fn new(app: AppContext) -> Self {
+        let config = BlockExecProver::default_config();
+        let prover = ProverClient::from_env();
+
+        Self { app, config, prover }
+    }
+
+    /// Returns the default prover configuration for the block execution program.
+    pub fn default_config() -> ProverConfig {
+        ProverConfig {
+            elf: EVM_EXEC_ELF,
+            proof_mode: SP1ProofMode::Compressed,
+        }
+    }
+
+    /// Generates the serialized state transition function (STF) input for a given EVM block number.
     async fn generate_stf(&self, block_number: u64) -> Result<Vec<u8>> {
         let host_executor = EthHostExecutor::eth(self.app.chain_spec.clone(), None);
         let provider = ProviderBuilder::new().on_http(self.app.evm_rpc.parse()?);
@@ -206,10 +250,11 @@ impl BlockExecProver {
         Ok(bincode::serialize(&client_input)?)
     }
 
+    /// Queries the inclusion height for the given EVM block number from the sequencer rpc.
     async fn inclusion_height(&self, block_number: u64) -> Result<u64> {
         let mut client = StoreServiceClient::connect(self.app.sequencer_rpc.clone()).await?;
         let req = GetMetadataRequest {
-            key: format!("rhb/{}/h", block_number),
+            key: format!("rhb/{}/d", block_number),
         };
 
         let resp = client.get_metadata(req).await?;
@@ -218,6 +263,7 @@ impl BlockExecProver {
         Ok(height)
     }
 
+    /// Queries the extended header from the Celestia data availability rpc.
     async fn extended_header(&self, height: u64) -> Result<ExtendedHeader> {
         let client = Client::new(&self.app.celestia_rpc, None).await?;
         let header = client.header_get_by_height(height).await?;
@@ -225,6 +271,8 @@ impl BlockExecProver {
         Ok(header)
     }
 
+    /// Queries all blobs from Celestia for the given inclusion height and filters them to find the blob for the
+    /// corresponding EVM block number.
     async fn blob_for_height(&self, block_number: u64, inclusion_height: u64) -> Result<Blob> {
         let client = Client::new(&self.app.celestia_rpc, None).await?;
 
@@ -233,11 +281,23 @@ impl BlockExecProver {
             .await?
             .ok_or_else(|| anyhow::anyhow!("No blobs found at inclusion height {}", inclusion_height))?;
 
+        println!("num blobs: {}", blobs.len());
+
         for blob in blobs {
             let signed_data = match SignedData::decode(blob.data.as_slice()) {
                 Ok(data) => data,
                 Err(e) => {
                     println!("Failed to decode SignedData: {:?}", e);
+
+                    let header = match SignedHeader::decode(blob.data.as_slice()) {
+                        Ok(header) => header,
+                        Err(e) => {
+                            println!("Failed to decode SignedHeader: {:?}", e);
+                            continue;
+                        }
+                    };
+
+                    println!("signed header height: {:?}", header.header.unwrap().height);
                     continue;
                 }
             };
@@ -246,19 +306,21 @@ impl BlockExecProver {
                 continue;
             };
 
+            println!("metadata.height {}", metadata.height);
             if metadata.height == block_number {
                 return Ok(blob);
             }
         }
 
         bail!(
-            "No blob found at block number {} and inclusion height {}",
+            "No blob found for block number {} at inclusion height {}",
             block_number,
             inclusion_height
         );
     }
 
-    async fn blob_inclusion_proof(&self, blob: Blob, header: ExtendedHeader) -> Result<ShareProof> {
+    /// Queries the Celestia data availability rpc for a ShareProof for the provided blob.
+    async fn blob_inclusion_proof(&self, blob: Blob, header: &ExtendedHeader) -> Result<ShareProof> {
         let client = Client::new(&self.app.celestia_rpc, None).await?;
 
         let eds_size = header.dah.row_roots().len() as u64;
@@ -280,40 +342,41 @@ impl BlockExecProver {
         Ok(share_proof)
     }
 
+    /// Creates an inclusion proof for the data availability root within the provided Header.
     fn data_root_proof(&self, header: &ExtendedHeader) -> Result<(Vec<u8>, Proof<TmSha2Hasher>)> {
-        let mut header_field_tree: MerkleTree<MemDb<[u8; 32]>, TmSha2Hasher> =
-            MerkleTree::with_hasher(TmSha2Hasher::new());
+        let mut tree = MerkleTree::<MemDb<[u8; 32]>, TmSha2Hasher>::with_hasher(TmSha2Hasher::new());
 
-        let field_bytes = self.prepare_header_fields(header);
-        for leaf in field_bytes {
-            header_field_tree.push_raw_leaf(&leaf);
+        for field in self.prepare_header_fields(header) {
+            tree.push_raw_leaf(&field);
         }
 
-        // The data_hash is the leaf at index 6 in the tree.
-        let (data_hash_bytes, data_hash_proof) = header_field_tree.get_index_with_proof(6);
+        let data_hash_index = 6;
+        let (data_hash, proof) = tree.get_index_with_proof(data_hash_index);
 
-        // Verify the computed root matches the header hash
-        assert_eq!(header.hash().as_ref(), header_field_tree.root());
+        assert_eq!(header.hash().as_ref(), tree.root());
 
-        Ok((data_hash_bytes, data_hash_proof))
+        Ok((data_hash, proof))
     }
 
+    /// Prepares leaf data for the provided Header.
     fn prepare_header_fields(&self, header: &ExtendedHeader) -> Vec<Vec<u8>> {
+        let h = &header.header;
+
         vec![
-            Protobuf::<RawConsensusVersion>::encode_vec(header.header.version),
-            header.header.chain_id.clone().encode_vec(),
-            header.header.height.encode_vec(),
-            header.header.time.encode_vec(),
-            Protobuf::<RawBlockId>::encode_vec(header.header.last_block_id.unwrap_or_default()),
-            header.header.last_commit_hash.unwrap_or_default().encode_vec(),
-            header.header.data_hash.unwrap_or_default().encode_vec(),
-            header.header.validators_hash.encode_vec(),
-            header.header.next_validators_hash.encode_vec(),
-            header.header.consensus_hash.encode_vec(),
-            header.header.app_hash.clone().encode_vec(),
-            header.header.last_results_hash.unwrap_or_default().encode_vec(),
-            header.header.evidence_hash.unwrap_or_default().encode_vec(),
-            header.header.proposer_address.encode_vec(),
+            Protobuf::<RawConsensusVersion>::encode_vec(h.version),
+            h.chain_id.clone().encode_vec(),
+            h.height.encode_vec(),
+            h.time.encode_vec(),
+            Protobuf::<RawBlockId>::encode_vec(h.last_block_id.unwrap_or_default()),
+            h.last_commit_hash.unwrap_or_default().encode_vec(),
+            h.data_hash.unwrap_or_default().encode_vec(),
+            h.validators_hash.encode_vec(),
+            h.next_validators_hash.encode_vec(),
+            h.consensus_hash.encode_vec(),
+            h.app_hash.clone().encode_vec(),
+            h.last_results_hash.unwrap_or_default().encode_vec(),
+            h.evidence_hash.unwrap_or_default().encode_vec(),
+            h.proposer_address.encode_vec(),
         ]
     }
 }
@@ -331,6 +394,25 @@ impl BlockExecProver {
 pub struct BlockRangeExecProver {
     config: ProverConfig,
     prover: EnvProver,
+}
+
+impl BlockRangeExecProver {
+    /// Creates a new instance of [`BlockRangeExecProver`] using default configuration
+    /// and prover environment settings.
+    pub fn new() -> Self {
+        let config = BlockRangeExecProver::default_config();
+        let prover = ProverClient::from_env();
+
+        Self { config, prover }
+    }
+
+    /// Returns the default prover configuration for the block execution program.
+    pub fn default_config() -> ProverConfig {
+        ProverConfig {
+            elf: EVM_RANGE_EXEC_ELF,
+            proof_mode: SP1ProofMode::Groth16,
+        }
+    }
 }
 
 /// Input to a batch execution proving system that verifies multiple SP1 proofs

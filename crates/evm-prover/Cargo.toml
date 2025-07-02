@@ -13,13 +13,13 @@ walkdir = "2.5.0"
 anyhow = "1.0"
 alloy-provider = { workspace = true }
 async-trait = "0.1.88"
-base64 = { workspace = true }
 bincode = { workspace = true }
 celestia-types = { workspace = true }
 celestia-rpc = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 dirs = "5"
 eq-common = { workspace = true }
+hex = { workspace = true }
 nmt-rs = { workspace = true }
 prost = "0.12"
 reqwest = { workspace = true }

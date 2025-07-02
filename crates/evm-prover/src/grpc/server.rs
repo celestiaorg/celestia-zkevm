@@ -17,7 +17,8 @@ pub async fn create_grpc_server(config: Config) -> Result<()> {
         .build()
         .unwrap();
 
-    let prover_serivce = ProverService::default();
+    // TODO: Extend the config and plumb in here
+    let prover_serivce = ProverService::new()?;
 
     Server::builder()
         .add_service(reflection_service)

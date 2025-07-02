@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+use anyhow::Result;
 use tonic::{Request, Response, Status};
 
 use crate::proto::celestia::prover::v1::prover_server::Prover;
@@ -5,9 +7,24 @@ use crate::proto::celestia::prover::v1::{
     InfoRequest, InfoResponse, ProveStateMembershipRequest, ProveStateMembershipResponse, ProveStateTransitionRequest,
     ProveStateTransitionResponse,
 };
+use crate::prover::prover::{AppContext, BlockExecProver, BlockRangeExecProver};
 
-#[derive(Default)]
-pub struct ProverService {}
+pub struct ProverService {
+    block_prover: BlockExecProver,
+    block_range_prover: BlockRangeExecProver,
+}
+
+impl ProverService {
+    pub fn new() -> Result<Self> {
+        let block_prover = BlockExecProver::new(AppContext::from_config()?);
+        let block_range_prover = BlockRangeExecProver::new();
+
+        Ok(ProverService {
+            block_prover,
+            block_range_prover,
+        })
+    }
+}
 
 #[tonic::async_trait]
 impl Prover for ProverService {

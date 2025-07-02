@@ -7,7 +7,7 @@ members = [
     "crates/sp1/evm-range-exec/program",
     "crates/sp1/evm-range-exec/script",
 ]
-resolver = "3"
+resolver = "2"
 
 [workspace.dependencies]
 alloy-provider = { version = "0.12.6" }
