@@ -135,90 +135,6 @@ pub struct BlockExecProver {
     pub prover: EnvProver,
 }
 
-/// Input to the EVM block execution proving circuit.
-///
-/// This input contains all necessary data to verify block execution and data
-/// availability of blob data in Celestia.
-#[derive(Serialize, Deserialize)]
-pub struct BlockExecInput {
-    // blob_proof is an inclusion proof of blob data availability in Celestia.
-    pub blob_proof: KeccakInclusionToDataRootProofInput,
-    // data_root_proof is an inclusion proof of the data root within the Celestia header.
-    pub data_root_proof: Proof<TmSha2Hasher>,
-    // header is the Celestia block header at which the blob data is available.
-    pub header: Header,
-    // state_transition_fn is the application of the blob data applied to the EVM state machine.
-    pub state_transition_fn: Vec<u8>,
-}
-
-/// Output of the EVM block execution proving circuit.
-///
-/// This contains the resulting commitments after applying the state transition function and verifying
-/// data availability in Celestia.
-#[derive(Serialize, Deserialize)]
-pub struct BlockExecOutput {
-    // blob_commitment is the blob commitment for the EVM block.
-    pub blob_commitment: [u8; 32],
-    // header_hash is the hash of the EVM block header.
-    pub header_hash: [u8; 32],
-    // prev_header_hash is the hash of the previous EVM block header.
-    pub prev_header_hash: [u8; 32],
-    // celestia_header_hash is the merkle hash of the Celestia block header.
-    pub celestia_header_hash: [u8; 32],
-    // prev_celestia_header_hash is the merkle hash of the previous Celestia block header.
-    pub prev_celestia_header_hash: [u8; 32],
-    // new_height is the block number after the state transition function has been applied.
-    pub new_height: u64,
-    // new_state_root is the EVM application state root after the state transition function has been applied.
-    pub new_state_root: [u8; 32],
-    // prev_height is the block number before the state transition function has been applied.
-    pub prev_height: u64,
-    // prev_state_root is the EVM application state root before the state transition function has been applied.
-    pub prev_state_root: [u8; 32],
-}
-
-#[async_trait]
-impl ProgramProver for BlockExecProver {
-    type Input = BlockExecInput;
-    type Output = BlockExecOutput;
-
-    /// Returns the program configuration containing the ELF and proof mode.
-    fn cfg(&self) -> &ProverConfig {
-        &self.config
-    }
-
-    /// Constructs the `SP1Stdin` input required for proving.
-    ///
-    /// This function serializes and writes structured input data into the
-    /// stdin buffer in the expected format for the SP1 program.
-    ///
-    /// # Errors
-    /// Returns an error if serialization of any input component fails.
-    fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin> {
-        let mut stdin = SP1Stdin::new();
-        stdin.write(&input.blob_proof);
-        stdin.write(&input.state_transition_fn);
-        stdin.write_vec(serde_cbor::to_vec(&input.header)?);
-        stdin.write(&input.data_root_proof);
-
-        Ok(stdin)
-    }
-
-    /// Parses the `SP1PublicValues` from the proof and converts it into the
-    /// program's custom output type.
-    ///
-    /// # Errors
-    /// - Returns an error if deserialization fails.
-    fn post_process(&self, proof: SP1ProofWithPublicValues) -> Result<Self::Output> {
-        Ok(bincode::deserialize::<BlockExecOutput>(proof.public_values.as_slice())?)
-    }
-
-    /// Returns the SP1 Prover.
-    fn prover(&self) -> &EnvProver {
-        &self.prover
-    }
-}
-
 impl BlockExecProver {
     /// Creates a new instance of [`BlockExecProver`] for the provided [`AppContext`] using default configuration
     /// and prover environment settings.
@@ -378,6 +294,90 @@ impl BlockExecProver {
             h.evidence_hash.unwrap_or_default().encode_vec(),
             h.proposer_address.encode_vec(),
         ]
+    }
+}
+
+/// Input to the EVM block execution proving circuit.
+///
+/// This input contains all necessary data to verify block execution and data
+/// availability of blob data in Celestia.
+#[derive(Serialize, Deserialize)]
+pub struct BlockExecInput {
+    // blob_proof is an inclusion proof of blob data availability in Celestia.
+    pub blob_proof: KeccakInclusionToDataRootProofInput,
+    // data_root_proof is an inclusion proof of the data root within the Celestia header.
+    pub data_root_proof: Proof<TmSha2Hasher>,
+    // header is the Celestia block header at which the blob data is available.
+    pub header: Header,
+    // state_transition_fn is the application of the blob data applied to the EVM state machine.
+    pub state_transition_fn: Vec<u8>,
+}
+
+/// Output of the EVM block execution proving circuit.
+///
+/// This contains the resulting commitments after applying the state transition function and verifying
+/// data availability in Celestia.
+#[derive(Serialize, Deserialize)]
+pub struct BlockExecOutput {
+    // blob_commitment is the blob commitment for the EVM block.
+    pub blob_commitment: [u8; 32],
+    // header_hash is the hash of the EVM block header.
+    pub header_hash: [u8; 32],
+    // prev_header_hash is the hash of the previous EVM block header.
+    pub prev_header_hash: [u8; 32],
+    // celestia_header_hash is the merkle hash of the Celestia block header.
+    pub celestia_header_hash: [u8; 32],
+    // prev_celestia_header_hash is the merkle hash of the previous Celestia block header.
+    pub prev_celestia_header_hash: [u8; 32],
+    // new_height is the block number after the state transition function has been applied.
+    pub new_height: u64,
+    // new_state_root is the EVM application state root after the state transition function has been applied.
+    pub new_state_root: [u8; 32],
+    // prev_height is the block number before the state transition function has been applied.
+    pub prev_height: u64,
+    // prev_state_root is the EVM application state root before the state transition function has been applied.
+    pub prev_state_root: [u8; 32],
+}
+
+#[async_trait]
+impl ProgramProver for BlockExecProver {
+    type Input = BlockExecInput;
+    type Output = BlockExecOutput;
+
+    /// Returns the program configuration containing the ELF and proof mode.
+    fn cfg(&self) -> &ProverConfig {
+        &self.config
+    }
+
+    /// Constructs the `SP1Stdin` input required for proving.
+    ///
+    /// This function serializes and writes structured input data into the
+    /// stdin buffer in the expected format for the SP1 program.
+    ///
+    /// # Errors
+    /// Returns an error if serialization of any input component fails.
+    fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin> {
+        let mut stdin = SP1Stdin::new();
+        stdin.write(&input.blob_proof);
+        stdin.write(&input.state_transition_fn);
+        stdin.write_vec(serde_cbor::to_vec(&input.header)?);
+        stdin.write(&input.data_root_proof);
+
+        Ok(stdin)
+    }
+
+    /// Parses the `SP1PublicValues` from the proof and converts it into the
+    /// program's custom output type.
+    ///
+    /// # Errors
+    /// - Returns an error if deserialization fails.
+    fn post_process(&self, proof: SP1ProofWithPublicValues) -> Result<Self::Output> {
+        Ok(bincode::deserialize::<BlockExecOutput>(proof.public_values.as_slice())?)
+    }
+
+    /// Returns the SP1 Prover.
+    fn prover(&self) -> &EnvProver {
+        &self.prover
     }
 }
 
