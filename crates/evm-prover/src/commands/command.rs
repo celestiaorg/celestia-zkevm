@@ -1,20 +1,25 @@
 use std::fs;
 
+use anyhow::{bail, Result};
+
 use crate::commands::cli::VERSION;
-use crate::config::config::{APP_HOME_DIR, CONFIG_FILE, Config};
+use crate::config::config::{Config, APP_HOME_DIR, CONFIG_DIR, CONFIG_FILE};
 use crate::grpc::server::create_grpc_server;
 
-pub fn init() -> anyhow::Result<()> {
-    let home_dir = dirs::home_dir()
-        .expect("cannot find home directory")
-        .join(APP_HOME_DIR);
+pub fn init() -> Result<()> {
+    let home_dir = dirs::home_dir().expect("cannot find home directory").join(APP_HOME_DIR);
 
     if !home_dir.exists() {
         println!("creating home directory at {:?}", home_dir);
         fs::create_dir_all(&home_dir)?;
     }
 
-    let config_path = home_dir.join(CONFIG_FILE);
+    let config_dir = home_dir.join(CONFIG_DIR);
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir)?;
+    }
+
+    let config_path = config_dir.join(CONFIG_FILE);
     if !config_path.exists() {
         println!("creating default config at {:?}", config_path);
         let config = Config::default();
@@ -27,11 +32,16 @@ pub fn init() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn start() -> anyhow::Result<()> {
+pub async fn start() -> Result<()> {
     let config_path = dirs::home_dir()
         .expect("cannot find home directory")
         .join(APP_HOME_DIR)
+        .join(CONFIG_DIR)
         .join(CONFIG_FILE);
+
+    if !config_path.exists() {
+        bail!("config file not found at {}", config_path.display());
+    }
 
     let config_yaml = fs::read_to_string(&config_path)?;
     let config: Config = serde_yaml::from_str(&config_yaml)?;

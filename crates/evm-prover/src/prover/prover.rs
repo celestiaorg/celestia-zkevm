@@ -6,8 +6,7 @@ use std::sync::Arc;
 use alloy_provider::ProviderBuilder;
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
-use celestia_rpc::HeaderClient;
-use celestia_rpc::{client::Client, BlobClient, ShareClient};
+use celestia_rpc::{client::Client, BlobClient, HeaderClient, ShareClient};
 use celestia_types::{nmt::Namespace, Blob, ExtendedHeader, ShareProof};
 use eq_common::KeccakInclusionToDataRootProofInput;
 use nmt_rs::{
@@ -31,6 +30,8 @@ use tendermint_proto::{
     v0_38::{types::BlockId as RawBlockId, version::Consensus as RawConsensusVersion},
     Protobuf,
 };
+
+use crate::config::config::{Config, APP_HOME_DIR};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
@@ -102,8 +103,13 @@ pub struct AppContext {
 }
 
 impl AppContext {
-    pub fn from_config() -> Result<Self> {
-        let genesis = Genesis::Custom(fs::read_to_string("path").context("Failed to read genesis file from path")?);
+    pub fn from_config(config: Config) -> Result<Self> {
+        let genesis_path = dirs::home_dir()
+            .expect("cannot find home directory")
+            .join(APP_HOME_DIR)
+            .join(config.genesis_path);
+        let raw_genesis = fs::read_to_string(genesis_path).context("Failed to read genesis file from path")?;
+        let genesis = Genesis::Custom(raw_genesis);
 
         let chain_spec = Arc::new(
             (&genesis)
@@ -111,15 +117,16 @@ impl AppContext {
                 .map_err(|e| anyhow!("Failed to convert genesis to chain spec: {e}"))?,
         );
 
-        let namespace = Namespace::new_v0(&hex::decode("namespace_hex")?).context("Failed to construct Namespace")?;
+        let raw_ns = hex::decode(config.namespace_hex)?;
+        let namespace = Namespace::new_v0(raw_ns.as_ref()).context("Failed to construct Namespace")?;
 
         Ok(AppContext {
             chain_spec: chain_spec,
             genesis: genesis,
             namespace: namespace,
-            celestia_rpc: "http://127.0.0.1:26658".to_string(),
-            evm_rpc: "http://127.0.0.1:8545".to_string(),
-            sequencer_rpc: "http://127.0.0.1:7331".to_string(),
+            celestia_rpc: config.celestia_rpc,
+            evm_rpc: config.evm_rpc,
+            sequencer_rpc: config.sequencer_rpc,
         })
     }
 }
