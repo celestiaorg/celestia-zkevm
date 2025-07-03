@@ -49,6 +49,7 @@ pub async fn start() -> Result<()> {
         bail!("config file not found at {}", config_path.display());
     }
 
+    println!("reading config file at {}", config_path.display());
     let config_yaml = fs::read_to_string(&config_path)?;
     let config: Config = serde_yaml::from_str(&config_yaml)?;
 
