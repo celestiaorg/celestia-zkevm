@@ -19,6 +19,7 @@ celestia-rpc = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 dirs = "5"
 eq-common = { workspace = true }
+hex = { workspace = true }
 nmt-rs = { workspace = true }
 prost = "0.12"
 reqwest = { workspace = true }
@@ -32,7 +33,10 @@ serde_yaml = "0.9"
 sha3 = { workspace = true }
 sp1-sdk = { workspace = true }
 tendermint = { workspace = true }
+tendermint-proto = { workspace = true }
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 tonic = { version = "0.10", features = ["transport"] }
 tonic-reflection = "0.10"
+
+rollkit-types = { git = "https://github.com/damiannolan/rollkit", branch = "damian/rust-lib", package = "rollkit-types" }

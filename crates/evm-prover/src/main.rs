@@ -6,7 +6,7 @@ mod grpc;
 mod proto;
 mod prover;
 
-use commands::cli::{CLI, Commands};
+use commands::cli::{Commands, CLI};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
