@@ -3,7 +3,7 @@ use std::fs;
 use anyhow::{bail, Result};
 
 use crate::commands::cli::VERSION;
-use crate::config::config::{Config, APP_HOME_DIR, CONFIG_DIR, CONFIG_FILE};
+use crate::config::config::{Config, APP_HOME_DIR, CONFIG_DIR, CONFIG_FILE, DEFAULT_GENESIS_JSON, GENESIS_FILE};
 use crate::grpc::server::create_grpc_server;
 
 pub fn init() -> Result<()> {
@@ -27,6 +27,12 @@ pub fn init() -> Result<()> {
         fs::write(config_path, yaml)?;
     } else {
         println!("config file already exists at {:?}", config_path);
+    }
+
+    let genesis_path = config_dir.join(GENESIS_FILE);
+    if !genesis_path.exists() {
+        println!("writing embedded genesis to {:?}", genesis_path);
+        fs::write(&genesis_path, DEFAULT_GENESIS_JSON)?;
     }
 
     Ok(())

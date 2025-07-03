@@ -6,6 +6,8 @@ pub const CONFIG_DIR: &str = "config";
 pub const CONFIG_FILE: &str = "config.yaml";
 pub const GENESIS_FILE: &str = "genesis.json";
 
+pub const DEFAULT_GENESIS_JSON: &str = include_str!("../../resources/genesis.json");
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     pub grpc_address: String,
