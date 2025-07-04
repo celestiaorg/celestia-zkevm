@@ -105,10 +105,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 /// write_proof_inputs writes the program inputs to the provided SP1Stdin read from the input directory.
 fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str) -> Result<(), Box<dyn Error>> {
-    let blob_proof: KeccakInclusionToDataRootProofInput =
-        bincode::deserialize(&fs::read(format!("{input_dir}/blob_proof.bin"))?)?;
-    stdin.write(&blob_proof);
-
     let client_executor_input: EthClientExecutorInput =
         bincode::deserialize(&fs::read(format!("{input_dir}/client_input.bin"))?)?;
     stdin.write(&client_executor_input);
@@ -117,6 +113,10 @@ fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str) -> Result<(), Box<d
     let header: Header = serde_json::from_str(&header_json)?;
     let header_raw = serde_cbor::to_vec(&header)?;
     stdin.write_vec(header_raw);
+
+    let blob_proof: KeccakInclusionToDataRootProofInput =
+        bincode::deserialize(&fs::read(format!("{input_dir}/blob_proof.bin"))?)?;
+    stdin.write(&blob_proof);
 
     let data_root_proof: Proof<TmSha2Hasher> =
         bincode::deserialize(&fs::read(format!("{input_dir}/data_root_proof.bin"))?)?;

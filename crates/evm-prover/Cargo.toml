@@ -3,6 +3,17 @@ name = "evm-prover"
 version = "0.1.0"
 edition = "2021"
 
+default-run = "main"
+
+[[bin]]
+name = "script"
+path = "src/script.rs"
+
+[[bin]]
+name = "main"
+path = "src/main.rs"
+
+
 [build-dependencies]
 tonic-build = "0.10"
 prost-build = "0.12"
@@ -24,6 +35,7 @@ nmt-rs = { workspace = true }
 prost = "0.12"
 reqwest = { workspace = true }
 reth-chainspec = { workspace = true }
+rsp-client-executor = { workspace = true }
 rsp-host-executor = { workspace = true }
 rsp-primitives = { workspace = true }
 rsp-rpc-db = { workspace = true }
