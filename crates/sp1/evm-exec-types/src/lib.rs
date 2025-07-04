@@ -5,10 +5,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EvmBlockExecOutput {
-    // blob_commitment is the blob commitment for the EVM block.
-    pub blob_commitment: [u8; 32],
-    // header_hash is the hash of the EVM block header.
-    pub header_hash: [u8; 32],
+    // new_header_hash is the hash of the latest EVM block header.
+    pub new_header_hash: [u8; 32],
     // prev_header_hash is the hash of the previous EVM block header.
     pub prev_header_hash: [u8; 32],
     // celestia_header_hash is the merkle hash of the Celestia block header.
@@ -29,8 +27,7 @@ pub struct EvmBlockExecOutput {
 impl Display for EvmBlockExecOutput {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         writeln!(f, "EvmBlockExecOutput {{")?;
-        writeln!(f, "  blob_commitment:             {}", encode(self.blob_commitment))?;
-        writeln!(f, "  header_hash:                 {}", encode(self.header_hash))?;
+        writeln!(f, "  header_hash:                 {}", encode(self.new_header_hash))?;
         writeln!(f, "  prev_header_hash:            {}", encode(self.prev_header_hash))?;
         writeln!(
             f,

@@ -68,10 +68,10 @@ pub fn main() {
         let (prev, curr) = (&pair[0], &pair[1]);
         assert_eq!(
             curr.prev_header_hash,
-            prev.header_hash,
+            prev.new_header_hash,
             "verify sequential EVM headers failed at index {}: expected {:?}, got {:?}",
             i + 1,
-            prev.header_hash,
+            prev.new_header_hash,
             curr.prev_header_hash
         );
 

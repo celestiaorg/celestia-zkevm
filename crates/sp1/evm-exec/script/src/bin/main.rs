@@ -17,6 +17,7 @@
 use std::error::Error;
 use std::fs;
 
+use celestia_types::{blob::Blob, AppVersion, ShareProof};
 use clap::Parser;
 use eq_common::KeccakInclusionToDataRootProofInput;
 use evm_exec_types::EvmBlockExecOutput;
@@ -59,12 +60,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let height = args.height;
-    let input_dir = format!("testdata/inputs/block-{height}");
+    let input_dir = format!("testdata/new_inputs/block-{height}");
 
     let client = ProverClient::from_env();
 
     let mut stdin = SP1Stdin::new();
-    write_proof_inputs(&mut stdin, &input_dir)?;
+    write_new_proof_inputs(&mut stdin, &input_dir)?;
 
     if args.execute {
         // Execute the program.
@@ -121,6 +122,95 @@ fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str) -> Result<(), Box<d
     let data_root_proof: Proof<TmSha2Hasher> =
         bincode::deserialize(&fs::read(format!("{input_dir}/data_root_proof.bin"))?)?;
     stdin.write(&data_root_proof);
+
+    Ok(())
+}
+
+fn write_new_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str) -> Result<(), Box<dyn Error>> {
+    // let mut count: u64 = 0;
+
+    // let mut entries: Vec<_> = fs::read_dir(input_dir)?
+    //     .filter_map(|e| {
+    //         let e = e.ok()?;
+    //         let path = e.path();
+    //         let name = path.file_name()?.to_str()?.to_string();
+
+    //         if name.starts_with("client_input-") {
+    //             Some((extract_suffix_number(&name)?, path))
+    //         } else {
+    //             None
+    //         }
+    //     })
+    //     .collect();
+
+    // entries.sort_by_key(|(num, _)| *num);
+
+    // for entry in entries {
+    //     // let entry = entry?;
+    //     let path = entry.1.to_path_buf();
+
+    //     // Filter only files with names like "client_input-<number>"
+    //     if let Some(filename) = path.file_name().and_then(|f| f.to_str()) {
+    //         if filename.starts_with("client_input-") {
+    //             count = count + 1;
+    //             let client_executor_input: EthClientExecutorInput = bincode::deserialize(&fs::read(&path)?)?;
+    //             stdin.write(&client_executor_input);
+    //         }
+    //     }
+    // }
+    // println!("wrote {} client inputs", count);
+    let mut inputs = vec![];
+
+    let client_executor_input: EthClientExecutorInput =
+        bincode::deserialize(&fs::read(format!("{input_dir}/client_input-45.bin"))?)?;
+
+    inputs.push(client_executor_input);
+
+    let client_executor_input2: EthClientExecutorInput =
+        bincode::deserialize(&fs::read(format!("{input_dir}/client_input-46.bin"))?)?;
+
+    inputs.push(client_executor_input2);
+
+    let client_executor_input3: EthClientExecutorInput =
+        bincode::deserialize(&fs::read(format!("{input_dir}/client_input-47.bin"))?)?;
+
+    inputs.push(client_executor_input3);
+
+    let client_executor_input4: EthClientExecutorInput =
+        bincode::deserialize(&fs::read(format!("{input_dir}/client_input-48.bin"))?)?;
+
+    inputs.push(client_executor_input4);
+
+    stdin.write(&inputs);
+
+    let header_json = fs::read_to_string(format!("{input_dir}/header.json"))?;
+    let header: Header = serde_json::from_str(&header_json)?;
+    let header_raw = serde_cbor::to_vec(&header)?;
+    stdin.write_vec(header_raw);
+
+    let blob_proof: KeccakInclusionToDataRootProofInput =
+        bincode::deserialize(&fs::read(format!("{input_dir}/blob_proof-48.bin"))?)?;
+
+    let blob =
+        Blob::new(blob_proof.namespace_id, blob_proof.data, AppVersion::V3).expect("failed to construct Celestia blob");
+
+    let share_data = blob.to_shares().expect("failed to convert blob to shares");
+
+    let mut share_proofs = vec![];
+
+    let share_proof = ShareProof {
+        data: share_data
+            .into_iter()
+            .map(|s| s.as_ref().try_into().expect("invalid share length"))
+            .collect(),
+        namespace_id: blob_proof.namespace_id,
+        row_proof: blob_proof.row_proof,
+        share_proofs: blob_proof.share_proofs,
+    };
+
+    share_proofs.push(share_proof);
+
+    stdin.write(&share_proofs);
 
     Ok(())
 }
