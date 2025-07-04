@@ -34,6 +34,12 @@ use tendermint_proto::{
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
 
+/// The sentinel data hash for empty transactions in sequencer SignedHeaders
+const DATA_HASH_FOR_EMPTY_TXS: [u8; 32] = [
+    110, 52, 11, 156, 255, 179, 122, 152, 156, 165, 68, 230, 187, 120, 10, 44, 120, 144, 29, 63, 179, 55, 56, 118, 133,
+    17, 163, 6, 23, 175, 160, 29,
+];
+
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
 
@@ -150,11 +156,6 @@ pub struct BlockExecProver {
     pub prover: EnvProver,
 }
 
-const DATA_HASH_FOR_EMPTY_TXS: [u8; 32] = [
-    110, 52, 11, 156, 255, 179, 122, 152, 156, 165, 68, 230, 187, 120, 10, 44, 120, 144, 29, 63, 179, 55, 56, 118, 133,
-    17, 163, 6, 23, 175, 160, 29,
-];
-
 impl BlockExecProver {
     /// Creates a new instance of [`BlockExecProver`] for the provided [`AppContext`] using default configuration
     /// and prover environment settings.
@@ -187,7 +188,7 @@ impl BlockExecProver {
     }
 
     /// Queries the inclusion height for the given EVM block number from the sequencer rpc.
-    pub async fn header_inclusion_height(&self, block_number: u64) -> Result<u64> {
+    async fn header_inclusion_height(&self, block_number: u64) -> Result<u64> {
         let mut client = StoreServiceClient::connect(self.app.sequencer_rpc.clone()).await?;
         let req = GetMetadataRequest {
             key: format!("rhb/{}/h", block_number),
@@ -199,7 +200,7 @@ impl BlockExecProver {
         Ok(height)
     }
 
-    pub async fn data_inclusion_height(&self, block_number: u64) -> Result<u64> {
+    async fn data_inclusion_height(&self, block_number: u64) -> Result<u64> {
         let mut client = StoreServiceClient::connect(self.app.sequencer_rpc.clone()).await?;
         let req = GetMetadataRequest {
             key: format!("rhb/{}/d", block_number),
@@ -212,7 +213,7 @@ impl BlockExecProver {
     }
 
     /// Queries the extended header from the Celestia data availability rpc.
-    pub async fn extended_header(&self, height: u64) -> Result<ExtendedHeader> {
+    async fn extended_header(&self, height: u64) -> Result<ExtendedHeader> {
         let client = Client::new(&self.app.celestia_rpc, None).await?;
         let header = client.header_get_by_height(height).await?;
 
@@ -221,7 +222,7 @@ impl BlockExecProver {
 
     /// Queries all blobs from Celestia for the given inclusion height and filters them to find the blob for the
     /// corresponding EVM block number.
-    pub async fn blob_for_height(&self, block_number: u64, inclusion_height: u64) -> Result<Blob> {
+    async fn blob_for_height(&self, block_number: u64, inclusion_height: u64) -> Result<Blob> {
         let client = Client::new(&self.app.celestia_rpc, None).await?;
 
         let blobs = client
@@ -280,7 +281,7 @@ impl BlockExecProver {
     }
 
     /// Queries the Celestia data availability rpc for a ShareProof for the provided blob.
-    pub async fn blob_inclusion_proof(&self, blob: Blob, header: &ExtendedHeader) -> Result<ShareProof> {
+    async fn blob_inclusion_proof(&self, blob: Blob, header: &ExtendedHeader) -> Result<ShareProof> {
         let client = Client::new(&self.app.celestia_rpc, None).await?;
 
         let eds_size = header.dah.row_roots().len() as u64;
@@ -303,7 +304,7 @@ impl BlockExecProver {
     }
 
     /// Creates an inclusion proof for the data availability root within the provided Header.
-    pub fn data_root_proof(&self, header: &ExtendedHeader) -> Result<(Vec<u8>, Proof<TmSha2Hasher>)> {
+    fn data_root_proof(&self, header: &ExtendedHeader) -> Result<(Vec<u8>, Proof<TmSha2Hasher>)> {
         let mut tree = MerkleTree::<MemDb<[u8; 32]>, TmSha2Hasher>::with_hasher(TmSha2Hasher::new());
 
         for field in self.prepare_header_fields(header) {
