@@ -2607,6 +2607,7 @@ dependencies = [
 name = "evm-exec-program"
 version = "0.1.0"
 dependencies = [
+ "alloy-consensus 0.12.6",
  "alloy-sol-types",
  "bincode",
  "celestia-types",
@@ -2640,6 +2641,7 @@ dependencies = [
  "eyre",
  "hex",
  "nmt-rs",
+ "regex",
  "reqwest",
  "reth-chainspec 1.3.2",
  "rsp-client-executor",

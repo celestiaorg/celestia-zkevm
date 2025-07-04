@@ -21,6 +21,7 @@ sp1_zkvm::entrypoint!(main);
 
 use std::sync::Arc;
 
+use alloy_consensus::Header as EvmHeader;
 use celestia_types::ShareProof;
 use evm_exec_types::EvmBlockExecOutput;
 use rsp_client_executor::{
@@ -44,9 +45,11 @@ pub fn main() {
     let blob_proofs: Vec<ShareProof> = sp1_zkvm::io::read();
 
     println!("cycle-tracker-end: deserialize inputs");
+
     // -----------------------------
     // 2. Execute the EVM block inputs
     // -----------------------------
+
     println!("cycle-tracker-start: execute EVM blocks");
 
     let executor = EthClientExecutor::eth(
@@ -61,18 +64,24 @@ pub fn main() {
     }
 
     println!("cycle-tracker-end: execute EVM blocks");
+
     // -----------------------------
-    // 3. Verify Blob inclusion if new Header contains transactions
+    // 3. Filter headers and verify blob inclusion
     // -----------------------------
     println!("cycle-tracker-start: verify blob inclusion for headers");
 
     // Filters headers with empty transaction roots
-    headers.retain(|header| !header.transaction_root_is_empty());
-    if headers.len() != blob_proofs.len() {
+    let filtered_headers: Vec<EvmHeader> = headers
+        .iter()
+        .cloned()
+        .filter(|header| !header.transaction_root_is_empty())
+        .collect();
+
+    if filtered_headers.len() != blob_proofs.len() {
         panic!("Number of headers with blob tx data do not match");
     }
 
-    for (header, blob_proof) in headers.iter().zip(blob_proofs) {
+    for (header, blob_proof) in filtered_headers.iter().zip(blob_proofs) {
         blob_proof.verify(celestia_header.data_hash.unwrap()).expect(&format!(
             "ShareProof verification failed for block number {}",
             header.number
@@ -83,14 +92,18 @@ pub fn main() {
     }
 
     println!("cycle-tracker-end: verify blob inclusion for headers");
+
     // -----------------------------
     // 4. Build and commit outputs
     // -----------------------------
     println!("cycle-tracker-start: commit public outputs");
 
+    let first = headers.first().unwrap();
+    let last = headers.last().unwrap();
+
     let output = EvmBlockExecOutput {
-        new_header_hash: headers.last().unwrap().hash_slow().into(),
-        prev_header_hash: headers.first().unwrap().parent_hash.into(),
+        new_header_hash: last.hash_slow().into(),
+        prev_header_hash: first.parent_hash.into(),
         celestia_header_hash: celestia_header
             .hash()
             .as_bytes()
@@ -103,9 +116,9 @@ pub fn main() {
             .as_bytes()
             .try_into()
             .expect("prev_celestia_header_hash must be exactly 32 bytes"),
-        new_height: headers.last().unwrap().number,
-        new_state_root: headers.last().unwrap().state_root.into(),
-        prev_height: headers.first().unwrap().number - 1,
+        new_height: last.number,
+        new_state_root: last.state_root.into(),
+        prev_height: first.number - 1,
         prev_state_root: executor_inputs
             .first()
             .unwrap()

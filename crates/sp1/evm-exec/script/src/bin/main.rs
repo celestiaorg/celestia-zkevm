@@ -17,11 +17,13 @@
 use std::error::Error;
 use std::fs;
 
+use anyhow::Context;
 use celestia_types::{blob::Blob, AppVersion, ShareProof};
 use clap::Parser;
 use eq_common::KeccakInclusionToDataRootProofInput;
 use evm_exec_types::EvmBlockExecOutput;
 use nmt_rs::{simple_merkle::proof::Proof, TmSha2Hasher};
+use regex::Regex;
 use rsp_client_executor::io::EthClientExecutorInput;
 use sp1_sdk::{include_elf, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
 use tendermint::block::header::Header;
@@ -127,59 +129,33 @@ fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str) -> Result<(), Box<d
 }
 
 fn write_new_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str) -> Result<(), Box<dyn Error>> {
-    // let mut count: u64 = 0;
+    let mut inputs = Vec::new();
 
-    // let mut entries: Vec<_> = fs::read_dir(input_dir)?
-    //     .filter_map(|e| {
-    //         let e = e.ok()?;
-    //         let path = e.path();
-    //         let name = path.file_name()?.to_str()?.to_string();
+    let re = Regex::new(r"client_input-(\d+)\.bin")?;
+    let mut entries: Vec<_> = fs::read_dir(input_dir)?
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let path = entry.path();
+            let filename = path.file_name()?.to_str()?;
 
-    //         if name.starts_with("client_input-") {
-    //             Some((extract_suffix_number(&name)?, path))
-    //         } else {
-    //             None
-    //         }
-    //     })
-    //     .collect();
+            // Extract the numeric suffix from the filename
+            let caps = re.captures(filename)?;
+            let index: usize = caps.get(1)?.as_str().parse().ok()?;
 
-    // entries.sort_by_key(|(num, _)| *num);
+            Some((index, path))
+        })
+        .collect();
 
-    // for entry in entries {
-    //     // let entry = entry?;
-    //     let path = entry.1.to_path_buf();
+    // Sort by the numeric suffix to maintain order
+    entries.sort_by_key(|(index, _)| *index);
 
-    //     // Filter only files with names like "client_input-<number>"
-    //     if let Some(filename) = path.file_name().and_then(|f| f.to_str()) {
-    //         if filename.starts_with("client_input-") {
-    //             count = count + 1;
-    //             let client_executor_input: EthClientExecutorInput = bincode::deserialize(&fs::read(&path)?)?;
-    //             stdin.write(&client_executor_input);
-    //         }
-    //     }
-    // }
-    // println!("wrote {} client inputs", count);
-    let mut inputs = vec![];
-
-    let client_executor_input: EthClientExecutorInput =
-        bincode::deserialize(&fs::read(format!("{input_dir}/client_input-45.bin"))?)?;
-
-    inputs.push(client_executor_input);
-
-    let client_executor_input2: EthClientExecutorInput =
-        bincode::deserialize(&fs::read(format!("{input_dir}/client_input-46.bin"))?)?;
-
-    inputs.push(client_executor_input2);
-
-    let client_executor_input3: EthClientExecutorInput =
-        bincode::deserialize(&fs::read(format!("{input_dir}/client_input-47.bin"))?)?;
-
-    inputs.push(client_executor_input3);
-
-    let client_executor_input4: EthClientExecutorInput =
-        bincode::deserialize(&fs::read(format!("{input_dir}/client_input-48.bin"))?)?;
-
-    inputs.push(client_executor_input4);
+    // Deserialize each file
+    for (_, path) in entries {
+        let bytes = fs::read(&path).with_context(|| format!("reading file {:?}", path))?;
+        let input: EthClientExecutorInput =
+            bincode::deserialize(&bytes).with_context(|| format!("deserializing file {:?}", path))?;
+        inputs.push(input);
+    }
 
     stdin.write(&inputs);
 

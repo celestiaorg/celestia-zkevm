@@ -31,6 +31,7 @@ eq-common = { workspace = true }
 eyre = "0.6.12"
 hex = { workspace = true }
 nmt-rs = { workspace = true }
+regex = "1.11.1"
 reqwest = "0.12.15"
 reth-chainspec = { workspace = true }
 rsp-client-executor = { workspace = true }
