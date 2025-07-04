@@ -31,7 +31,7 @@ use tendermint_proto::{
     Protobuf,
 };
 
-use crate::config::config::{Config, APP_HOME_DIR};
+use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
@@ -104,12 +104,7 @@ pub struct AppContext {
 
 impl AppContext {
     pub fn from_config(config: Config) -> Result<Self> {
-        let genesis_path = dirs::home_dir()
-            .expect("cannot find home directory")
-            .join(APP_HOME_DIR)
-            .join(config.genesis_path);
-        let raw_genesis = fs::read_to_string(genesis_path).context("Failed to read genesis file from path")?;
-        let genesis = Genesis::Custom(raw_genesis);
+        let genesis = AppContext::load_genesis().context("Error loading app genesis")?;
 
         let chain_spec = Arc::new(
             (&genesis)
@@ -128,6 +123,18 @@ impl AppContext {
             evm_rpc: config.evm_rpc,
             sequencer_rpc: config.sequencer_rpc,
         })
+    }
+
+    fn load_genesis() -> Result<Genesis> {
+        let path = dirs::home_dir()
+            .expect("cannot find home directory")
+            .join(APP_HOME)
+            .join(CONFIG_DIR)
+            .join(GENESIS_FILE);
+
+        let raw_genesis = fs::read_to_string(path).context("Failed to read genesis file from path")?;
+        let genesis = Genesis::Custom(raw_genesis);
+        Ok(genesis)
     }
 }
 

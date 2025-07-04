@@ -3,11 +3,11 @@ use std::fs;
 use anyhow::{bail, Result};
 
 use crate::commands::cli::VERSION;
-use crate::config::config::{Config, APP_HOME_DIR, CONFIG_DIR, CONFIG_FILE, DEFAULT_GENESIS_JSON, GENESIS_FILE};
+use crate::config::config::{Config, APP_HOME, CONFIG_DIR, CONFIG_FILE, DEFAULT_GENESIS_JSON, GENESIS_FILE};
 use crate::grpc::server::create_grpc_server;
 
 pub fn init() -> Result<()> {
-    let home_dir = dirs::home_dir().expect("cannot find home directory").join(APP_HOME_DIR);
+    let home_dir = dirs::home_dir().expect("cannot find home directory").join(APP_HOME);
 
     if !home_dir.exists() {
         println!("creating home directory at {:?}", home_dir);
@@ -41,7 +41,7 @@ pub fn init() -> Result<()> {
 pub async fn start() -> Result<()> {
     let config_path = dirs::home_dir()
         .expect("cannot find home directory")
-        .join(APP_HOME_DIR)
+        .join(APP_HOME)
         .join(CONFIG_DIR)
         .join(CONFIG_FILE);
 
