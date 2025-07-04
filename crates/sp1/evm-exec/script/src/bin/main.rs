@@ -16,13 +16,12 @@
 //! ```
 use std::error::Error;
 use std::fs;
+use std::path::{Path, PathBuf};
 
-use anyhow::Context;
-use celestia_types::{blob::Blob, AppVersion, ShareProof};
+use anyhow::{Context, Result};
+use celestia_types::ShareProof;
 use clap::Parser;
-use eq_common::KeccakInclusionToDataRootProofInput;
 use evm_exec_types::EvmBlockExecOutput;
-use nmt_rs::{simple_merkle::proof::Proof, TmSha2Hasher};
 use regex::Regex;
 use rsp_client_executor::io::EthClientExecutorInput;
 use sp1_sdk::{include_elf, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
@@ -67,7 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let client = ProverClient::from_env();
 
     let mut stdin = SP1Stdin::new();
-    write_new_proof_inputs(&mut stdin, &input_dir)?;
+    write_proof_inputs(&mut stdin, &input_dir)?;
 
     if args.execute {
         // Execute the program.
@@ -106,57 +105,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// write_proof_inputs writes the program inputs to the provided SP1Stdin read from the input directory.
 fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str) -> Result<(), Box<dyn Error>> {
-    let client_executor_input: EthClientExecutorInput =
-        bincode::deserialize(&fs::read(format!("{input_dir}/client_input.bin"))?)?;
-    stdin.write(&client_executor_input);
-
-    let header_json = fs::read_to_string(format!("{input_dir}/header.json"))?;
-    let header: Header = serde_json::from_str(&header_json)?;
-    let header_raw = serde_cbor::to_vec(&header)?;
-    stdin.write_vec(header_raw);
-
-    let blob_proof: KeccakInclusionToDataRootProofInput =
-        bincode::deserialize(&fs::read(format!("{input_dir}/blob_proof.bin"))?)?;
-    stdin.write(&blob_proof);
-
-    let data_root_proof: Proof<TmSha2Hasher> =
-        bincode::deserialize(&fs::read(format!("{input_dir}/data_root_proof.bin"))?)?;
-    stdin.write(&data_root_proof);
-
-    Ok(())
-}
-
-fn write_new_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str) -> Result<(), Box<dyn Error>> {
-    let mut inputs = Vec::new();
-
-    let re = Regex::new(r"client_input-(\d+)\.bin")?;
-    let mut entries: Vec<_> = fs::read_dir(input_dir)?
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            let filename = path.file_name()?.to_str()?;
-
-            // Extract the numeric suffix from the filename
-            let caps = re.captures(filename)?;
-            let index: usize = caps.get(1)?.as_str().parse().ok()?;
-
-            Some((index, path))
-        })
-        .collect();
-
-    // Sort by the numeric suffix to maintain order
-    entries.sort_by_key(|(index, _)| *index);
-
-    // Deserialize each file
-    for (_, path) in entries {
-        let bytes = fs::read(&path).with_context(|| format!("reading file {:?}", path))?;
-        let input: EthClientExecutorInput =
-            bincode::deserialize(&bytes).with_context(|| format!("deserializing file {:?}", path))?;
-        inputs.push(input);
-    }
-
+    let inputs = read_client_inputs(input_dir)?;
     stdin.write(&inputs);
 
     let header_json = fs::read_to_string(format!("{input_dir}/header.json"))?;
@@ -164,29 +114,61 @@ fn write_new_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str) -> Result<(), B
     let header_raw = serde_cbor::to_vec(&header)?;
     stdin.write_vec(header_raw);
 
-    let blob_proof: KeccakInclusionToDataRootProofInput =
-        bincode::deserialize(&fs::read(format!("{input_dir}/blob_proof-48.bin"))?)?;
-
-    let blob =
-        Blob::new(blob_proof.namespace_id, blob_proof.data, AppVersion::V3).expect("failed to construct Celestia blob");
-
-    let share_data = blob.to_shares().expect("failed to convert blob to shares");
-
-    let mut share_proofs = vec![];
-
-    let share_proof = ShareProof {
-        data: share_data
-            .into_iter()
-            .map(|s| s.as_ref().try_into().expect("invalid share length"))
-            .collect(),
-        namespace_id: blob_proof.namespace_id,
-        row_proof: blob_proof.row_proof,
-        share_proofs: blob_proof.share_proofs,
-    };
-
-    share_proofs.push(share_proof);
-
+    let share_proofs = read_share_proofs(input_dir)?;
     stdin.write(&share_proofs);
 
     Ok(())
+}
+
+/// Reads and deserializes ordered `EthClientExecutorInput` files from the given directory.
+fn read_client_inputs(input_dir: &str) -> Result<Vec<EthClientExecutorInput>> {
+    let pattern = Regex::new(r"^client_input-(\d+)\.bin$")?;
+
+    let mut indexed_paths: Vec<_> = fs::read_dir(input_dir)?
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let path = entry.path();
+            let file_name = path.file_name()?.to_str()?;
+            let caps = pattern.captures(file_name)?;
+            let index = caps.get(1)?.as_str().parse::<usize>().ok()?;
+            Some((index, path))
+        })
+        .collect();
+
+    indexed_paths.sort_by_key(|(index, _)| *index);
+
+    indexed_paths
+        .into_iter()
+        .map(|(_, path)| {
+            let bytes = fs::read(&path).with_context(|| format!("reading file {:?}", path))?;
+            bincode::deserialize::<EthClientExecutorInput>(&bytes)
+                .with_context(|| format!("deserializing file {:?}", path))
+        })
+        .collect()
+}
+
+/// Reads and deserializes ordered `ShareProof` files from the given directory.
+fn read_share_proofs(input_dir: &str) -> Result<Vec<ShareProof>> {
+    let pattern = Regex::new(r"^share_proof-(\d+)\.bin$")?;
+
+    let mut indexed_paths: Vec<_> = fs::read_dir(input_dir)?
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let path = entry.path();
+            let file_name = path.file_name()?.to_str()?;
+            let caps = pattern.captures(file_name)?;
+            let index = caps.get(1)?.as_str().parse::<u32>().ok()?;
+            Some((index, path))
+        })
+        .collect();
+
+    indexed_paths.sort_by_key(|(index, _)| *index);
+
+    indexed_paths
+        .into_iter()
+        .map(|(_, path)| {
+            let bytes = fs::read(&path).with_context(|| format!("reading file {:?}", path))?;
+            bincode::deserialize::<ShareProof>(&bytes).with_context(|| format!("deserializing file {:?}", path))
+        })
+        .collect()
 }
