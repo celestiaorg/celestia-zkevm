@@ -16,7 +16,7 @@ use nmt_rs::{
 use prost::Message;
 use reth_chainspec::ChainSpec;
 use rollkit_types::v1::SignedHeader;
-// use rollkit_types::v1::{store_service_client::StoreServiceClient, GetMetadataRequest, SignedData};
+use rollkit_types::v1::{store_service_client::StoreServiceClient, GetMetadataRequest, SignedData};
 use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
@@ -188,29 +188,29 @@ impl BlockExecProver {
     }
 
     /// Queries the inclusion height for the given EVM block number from the sequencer rpc.
-    // async fn header_inclusion_height(&self, block_number: u64) -> Result<u64> {
-    //     let mut client = StoreServiceClient::connect(self.app.sequencer_rpc.clone()).await?;
-    //     let req = GetMetadataRequest {
-    //         key: format!("rhb/{}/h", block_number),
-    //     };
+    async fn header_inclusion_height(&self, block_number: u64) -> Result<u64> {
+        let mut client = StoreServiceClient::connect(self.app.sequencer_rpc.clone()).await?;
+        let req = GetMetadataRequest {
+            key: format!("rhb/{}/h", block_number),
+        };
 
-    //     let resp = client.get_metadata(req).await?;
-    //     let height = u64::from_le_bytes(resp.into_inner().value[..8].try_into()?);
+        let resp = client.get_metadata(req).await?;
+        let height = u64::from_le_bytes(resp.into_inner().value[..8].try_into()?);
 
-    //     Ok(height)
-    // }
+        Ok(height)
+    }
 
-    // async fn data_inclusion_height(&self, block_number: u64) -> Result<u64> {
-    //     let mut client = StoreServiceClient::connect(self.app.sequencer_rpc.clone()).await?;
-    //     let req = GetMetadataRequest {
-    //         key: format!("rhb/{}/d", block_number),
-    //     };
+    async fn data_inclusion_height(&self, block_number: u64) -> Result<u64> {
+        let mut client = StoreServiceClient::connect(self.app.sequencer_rpc.clone()).await?;
+        let req = GetMetadataRequest {
+            key: format!("rhb/{}/d", block_number),
+        };
 
-    //     let resp = client.get_metadata(req).await?;
-    //     let height = u64::from_le_bytes(resp.into_inner().value[..8].try_into()?);
+        let resp = client.get_metadata(req).await?;
+        let height = u64::from_le_bytes(resp.into_inner().value[..8].try_into()?);
 
-    //     Ok(height)
-    // }
+        Ok(height)
+    }
 
     /// Queries the extended header from the Celestia data availability rpc.
     async fn extended_header(&self, height: u64) -> Result<ExtendedHeader> {
@@ -222,63 +222,63 @@ impl BlockExecProver {
 
     /// Queries all blobs from Celestia for the given inclusion height and filters them to find the blob for the
     /// corresponding EVM block number.
-    // async fn blob_for_height(&self, block_number: u64, inclusion_height: u64) -> Result<Blob> {
-    //     let client = Client::new(&self.app.celestia_rpc, None).await?;
+    async fn blob_for_height(&self, block_number: u64, inclusion_height: u64) -> Result<Blob> {
+        let client = Client::new(&self.app.celestia_rpc, None).await?;
 
-    //     let blobs = client
-    //         .blob_get_all(inclusion_height, &[self.app.namespace])
-    //         .await?
-    //         .ok_or_else(|| anyhow::anyhow!("No blobs found at inclusion height {}", inclusion_height))?;
+        let blobs = client
+            .blob_get_all(inclusion_height, &[self.app.namespace])
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("No blobs found at inclusion height {}", inclusion_height))?;
 
-    //     for blob in blobs {
-    //         let signed_header = match SignedHeader::decode(blob.data.as_slice()) {
-    //             Ok(data) => data.header.unwrap(),
-    //             Err(e) => {
-    //                 println!("Error in getting first signed header: {}", e);
-    //                 continue;
-    //             }
-    //         };
+        for blob in blobs {
+            let signed_header = match SignedHeader::decode(blob.data.as_slice()) {
+                Ok(data) => data.header.unwrap(),
+                Err(e) => {
+                    println!("Error in getting first signed header: {}", e);
+                    continue;
+                }
+            };
 
-    //         if signed_header.height != block_number {
-    //             continue;
-    //         }
+            if signed_header.height != block_number {
+                continue;
+            }
 
-    //         if signed_header.data_hash == DATA_HASH_FOR_EMPTY_TXS {
-    //             bail!("Empty transaction data for block Header: {:?}", signed_header.height);
-    //         }
+            if signed_header.data_hash == DATA_HASH_FOR_EMPTY_TXS {
+                bail!("Empty transaction data for block Header: {:?}", signed_header.height);
+            }
 
-    //         if signed_header.height == block_number {
-    //             let txs_inclusion_height = self.data_inclusion_height(block_number).await?;
+            if signed_header.height == block_number {
+                let txs_inclusion_height = self.data_inclusion_height(block_number).await?;
 
-    //             let blobs = client
-    //                 .blob_get_all(txs_inclusion_height, &[self.app.namespace])
-    //                 .await?
-    //                 .ok_or_else(|| anyhow::anyhow!("No blobs found at inclusion height {}", txs_inclusion_height))?;
+                let blobs = client
+                    .blob_get_all(txs_inclusion_height, &[self.app.namespace])
+                    .await?
+                    .ok_or_else(|| anyhow::anyhow!("No blobs found at inclusion height {}", txs_inclusion_height))?;
 
-    //             for blob in blobs {
-    //                 let signed_data = match SignedData::decode(blob.data.as_slice()) {
-    //                     Ok(data) => data,
-    //                     Err(_) => continue,
-    //                 };
+                for blob in blobs {
+                    let signed_data = match SignedData::decode(blob.data.as_slice()) {
+                        Ok(data) => data,
+                        Err(_) => continue,
+                    };
 
-    //                 let Some(metadata) = signed_data.data.and_then(|d| d.metadata) else {
-    //                     continue;
-    //                 };
+                    let Some(metadata) = signed_data.data.and_then(|d| d.metadata) else {
+                        continue;
+                    };
 
-    //                 if metadata.height == block_number {
-    //                     println!("Found txs blob for height {}", metadata.height);
-    //                     return Ok(blob);
-    //                 }
-    //             }
-    //         }
-    //     }
+                    if metadata.height == block_number {
+                        println!("Found txs blob for height {}", metadata.height);
+                        return Ok(blob);
+                    }
+                }
+            }
+        }
 
-    //     bail!(
-    //         "No blob found for block number {} at inclusion height {}",
-    //         block_number,
-    //         inclusion_height
-    //     );
-    // }
+        bail!(
+            "No blob found for block number {} at inclusion height {}",
+            block_number,
+            inclusion_height
+        );
+    }
 
     /// Queries the Celestia data availability rpc for a ShareProof for the provided blob.
     async fn blob_inclusion_proof(&self, blob: Blob, header: &ExtendedHeader) -> Result<ShareProof> {
