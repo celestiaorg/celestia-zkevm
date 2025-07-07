@@ -94,25 +94,6 @@ pub fn main() {
             header.number
         ));
 
-        // TODO: Verify blob tx data equivalency against header.transactions_root
-        // https://github.com/celestiaorg/celestia-zkevm-hl-testnet/issues/68
-        // let raw_blob: Vec<u8> = blob_proof
-        //     .data
-        //     .iter()
-        //     .flat_map(|chunk| chunk.as_slice()) // &[u8;512] -> &[u8]
-        //     .copied() // copy the bytes
-        //     .collect();
-        // let signed_data = match Data::decode(blob.data.as_slice()) {
-        //     Ok(data) => data,
-        //     Err(e) => panic!("Failed decoding blob data: {e}"),
-        // };
-
-        // let mut txs = Vec::with_capacity(signed_data.txs.len());
-        // for tx_bytes in signed_data.txs {
-        //     let tx = TransactionSigned::decode(&mut tx_bytes.as_slice()).expect("Failed decoding transaction");
-        //     txs.push(tx);
-        // }
-
         let shares: Vec<Share> = blob_proof
             .shares()
             .iter()
