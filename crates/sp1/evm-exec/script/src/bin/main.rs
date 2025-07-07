@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let height = args.height;
-    let input_dir = format!("testdata/new_inputs/block-{height}");
+    let input_dir = format!("testdata/inputs/block-{height}");
 
     let client = ProverClient::from_env();
 

@@ -31,6 +31,7 @@ eq-common = { workspace = true }
 eyre = "0.6.12"
 hex = { workspace = true }
 nmt-rs = { workspace = true }
+prost = "0.12"
 regex = "1.11.1"
 reqwest = "0.12.15"
 reth-chainspec = { workspace = true }
@@ -50,6 +51,8 @@ tendermint-proto = { workspace = true }
 tokio = { version = "1.44", features = ["full"] }
 tokio-retry = "0.3"
 tracing = "0.1.40"
+
+rollkit-types = { git = "https://github.com/damiannolan/rollkit", branch = "damian/rust-lib", package = "rollkit-types" }
 
 [build-dependencies]
 sp1-build = { workspace = true }
