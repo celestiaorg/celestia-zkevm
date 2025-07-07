@@ -41,3 +41,7 @@ sp1-sdk = "=4.1.4"
 sp1-zkvm = "=4.1.4"
 tendermint = "0.40.1"
 tendermint-proto = "*"
+
+bytes = "1.10.1"
+prost = "0.12"
+rollkit-types = { git = "https://github.com/damiannolan/rollkit", branch = "damian/rust-lib", package = "rollkit-types", default-features = false }

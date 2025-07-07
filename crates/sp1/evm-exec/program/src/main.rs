@@ -18,12 +18,19 @@
 #![no_main]
 
 sp1_zkvm::entrypoint!(main);
-
 use std::sync::Arc;
 
 use alloy_consensus::Header as EvmHeader;
+use bytes::Bytes;
+use celestia_types::Blob;
+use celestia_types::Share;
 use celestia_types::ShareProof;
 use evm_exec_types::EvmBlockExecOutput;
+use prost::Message;
+use reth_primitives::alloy_primitives::private::alloy_rlp::Decodable;
+use reth_primitives::proofs;
+use reth_primitives::TransactionSigned;
+use rollkit_types::v1::SignedData;
 use rsp_client_executor::{
     executor::EthClientExecutor,
     io::{EthClientExecutorInput, WitnessInput},
@@ -89,6 +96,48 @@ pub fn main() {
 
         // TODO: Verify blob tx data equivalency against header.transactions_root
         // https://github.com/celestiaorg/celestia-zkevm-hl-testnet/issues/68
+        // let raw_blob: Vec<u8> = blob_proof
+        //     .data
+        //     .iter()
+        //     .flat_map(|chunk| chunk.as_slice()) // &[u8;512] -> &[u8]
+        //     .copied() // copy the bytes
+        //     .collect();
+        // let signed_data = match Data::decode(blob.data.as_slice()) {
+        //     Ok(data) => data,
+        //     Err(e) => panic!("Failed decoding blob data: {e}"),
+        // };
+
+        // let mut txs = Vec::with_capacity(signed_data.txs.len());
+        // for tx_bytes in signed_data.txs {
+        //     let tx = TransactionSigned::decode(&mut tx_bytes.as_slice()).expect("Failed decoding transaction");
+        //     txs.push(tx);
+        // }
+
+        let shares: Vec<Share> = blob_proof
+            .shares()
+            .iter()
+            .map(|b| Share::from_raw(b).expect("Failed to parse raw shares"))
+            .collect();
+
+        let blob = Blob::reconstruct(&shares, celestia_types::AppVersion::V3).expect("Failed to reconstruct blob");
+
+        let signed_data = match SignedData::decode(Bytes::from(blob.data)) {
+            Ok(data) => data,
+            Err(e) => panic!("Failed decoding blob data: {e}"),
+        };
+
+        let mut txs = Vec::with_capacity(signed_data.data.clone().unwrap().txs.len());
+        for tx_bytes in signed_data.data.unwrap().txs {
+            let tx = TransactionSigned::decode(&mut tx_bytes.as_slice()).expect("Failed decoding transaction");
+            txs.push(tx);
+        }
+
+        let root = proofs::calculate_transaction_root(&txs);
+
+        assert_eq!(
+            root, header.transactions_root,
+            "Calculated root must be equal to header transactions root"
+        );
     }
 
     println!("cycle-tracker-end: verify blob inclusion for headers");
