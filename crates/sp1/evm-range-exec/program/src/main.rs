@@ -24,9 +24,6 @@ pub fn main() {
     // ------------------------------
     // 1. Deserialize inputs
     // ------------------------------
-
-    // TODO(damian): There is no need to read N verifier keys here as we are verifying the same type of proof multiple times.
-    // The vkey is deterministic and derived from the setup phase of the ELF.
     let vkeys = sp1_zkvm::io::read::<Vec<[u32; 8]>>();
     let public_values = sp1_zkvm::io::read::<Vec<Vec<u8>>>();
 
@@ -41,7 +38,6 @@ pub fn main() {
     // ------------------------------
     // 2. Verify proofs
     // ------------------------------
-
     for i in 0..proof_count {
         let digest = Sha256::digest(&public_values[i]);
         sp1_zkvm::lib::verify::verify_sp1_proof(&vkeys[i], &digest.into());
@@ -50,7 +46,6 @@ pub fn main() {
     // ------------------------------
     // 3. Parse public values into outputs
     // ------------------------------
-
     let outputs: Vec<EvmBlockExecOutput> = public_values
         .iter()
         .map(|bytes| {
@@ -62,36 +57,40 @@ pub fn main() {
     // ------------------------------
     // 4. Verify sequential headers (EVM and Celestia)
     // ------------------------------
-
     for window in outputs.windows(2).enumerate() {
         let (i, pair) = window;
         let (prev, curr) = (&pair[0], &pair[1]);
         assert_eq!(
-            curr.prev_header_hash,
-            prev.header_hash,
+            curr.prev_height,
+            prev.new_height,
             "verify sequential EVM headers failed at index {}: expected {:?}, got {:?}",
             i + 1,
-            prev.header_hash,
-            curr.prev_header_hash
+            prev.new_height,
+            curr.prev_height
         );
 
-        // Only check sequentiality if the inclusion height changed.
-        if curr.celestia_header_hash != prev.celestia_header_hash {
-            assert_eq!(
-                curr.prev_celestia_header_hash,
-                prev.celestia_header_hash,
-                "verify sequential Celestia headers failed at index {}: expected {:?}, got {:?}",
-                i + 1,
-                prev.celestia_header_hash,
-                curr.prev_celestia_header_hash
-            );
-        }
+        assert_eq!(
+            curr.prev_state_root,
+            prev.new_state_root,
+            "verify sequential EVM headers failed at index {}: expected {:?}, got {:?}",
+            i + 1,
+            prev.new_state_root,
+            curr.prev_state_root
+        );
+
+        assert_eq!(
+            curr.prev_celestia_header_hash,
+            prev.celestia_header_hash,
+            "verify sequential Celestia headers failed at index {}: expected {:?}, got {:?}",
+            i + 1,
+            prev.celestia_header_hash,
+            curr.prev_celestia_header_hash
+        );
     }
 
     // ------------------------------
     // 5. Build and commit outputs
     // ------------------------------
-
     let first = outputs.first().expect("No outputs provided");
     let last = outputs.last().expect("No outputs provided");
 

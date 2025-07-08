@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 evm-exec-types = { path = "../../evm-exec-types" }
 
+alloy-consensus = { workspace = true }
 alloy-sol-types = { workspace = true }
 bincode = { workspace = true }
 celestia-types = { workspace = true }

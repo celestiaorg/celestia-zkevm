@@ -1,142 +1,109 @@
-//! An SP1 program that verifies inclusion of an EVM reth block in the Celestia data availability network
-//! and executes its state transition function.
+//! An SP1 program that verifies inclusion of EVM reth blocks in the Celestia data availability network
+//! and executes their state transition functions.
 //!
-//! 1. Accepts an EVM block STF and associated Celestia proofs.
-//! 2. Verifies that the EVM block was included in the Celestia block.
-//! 3. Executes the EVM block STF.
-//! 4. Commits the resulting EVM and Celestia block metadata as public outputs.
-
+//! ## Functionality
+//!
+//! This program accepts a batch of EVM execution inputs along with a single Celestia block header
+//! and, if necessary, inclusion proofs for transaction blobs. It performs the following steps:
+//!
+//! 1. Deserializes a vector of [`EthClientExecutorInput`] values and a single Celestia block header.
+//! 2. Executes the EVM block state transition function (STF) for each input block.
+//! 3. If the EVM block contains transactions, verifies that the corresponding blob was included in
+//!    the specified Celestia block via a [`ShareProof`].
+//! 4. Commits an [`EvmBlockExecOutput`] structure as the public output of the program, containing:
+//!     - Final EVM block header hash and state root,
+//!     - Previous EVM header hash and state root (from the first input),
+//!     - Celestia header hashes (current and previous).
+//!
 #![no_main]
 
 sp1_zkvm::entrypoint!(main);
 
 use std::sync::Arc;
 
-use celestia_types::{blob::Blob, hash::Hash, AppVersion, ShareProof};
-use eq_common::KeccakInclusionToDataRootProofInput;
+use alloy_consensus::Header as EvmHeader;
+use celestia_types::ShareProof;
 use evm_exec_types::EvmBlockExecOutput;
-use nmt_rs::{simple_merkle::proof::Proof, simple_merkle::tree::MerkleHash, TmSha2Hasher};
 use rsp_client_executor::{
     executor::EthClientExecutor,
     io::{EthClientExecutorInput, WitnessInput},
 };
-use sha3::{Digest, Keccak256};
 use tendermint::block::Header;
-use tendermint_proto::Protobuf;
 
 pub fn main() {
     // -----------------------------
     // 1. Deserialize inputs
     // -----------------------------
-    println!("cycle-tracker-start: deserialize input");
+    println!("cycle-tracker-start: deserialize inputs");
 
-    let blob_proof: KeccakInclusionToDataRootProofInput = sp1_zkvm::io::read();
-
-    let client_executor_input: EthClientExecutorInput = sp1_zkvm::io::read();
+    let executor_inputs: Vec<EthClientExecutorInput> = sp1_zkvm::io::read();
 
     let celestia_header_raw: Vec<u8> = sp1_zkvm::io::read_vec();
     let celestia_header: Header =
         serde_cbor::from_slice(&celestia_header_raw).expect("failed to deserialize celestia header");
 
-    let data_hash_proof: Proof<TmSha2Hasher> = sp1_zkvm::io::read();
+    let blob_proofs: Vec<ShareProof> = sp1_zkvm::io::read();
 
-    println!("cycle-tracker-end: deserialize input");
-
-    // -----------------------------
-    // 2. Build Blob, compute and validate hash
-    // -----------------------------
-    println!("cycle-tracker-start: create blob");
-
-    let blob =
-        Blob::new(blob_proof.namespace_id, blob_proof.data, AppVersion::V3).expect("failed to construct Celestia blob");
-
-    println!("cycle-tracker-end: create blob");
-
-    println!("cycle-tracker-start: compute keccak hash");
-
-    let computed_keccak_hash: [u8; 32] = Keccak256::new().chain_update(&blob.data).finalize().into();
-
-    println!("cycle-tracker-end: compute keccak hash");
-
-    println!("cycle-tracker-start: check keccak hash");
-
-    assert_eq!(
-        computed_keccak_hash, blob_proof.keccak_hash,
-        "computed keccak hash does not match input"
-    );
-
-    println!("cycle-tracker-end: check keccak hash");
+    println!("cycle-tracker-end: deserialize inputs");
 
     // -----------------------------
-    // 3. Construct and verify ShareProof
+    // 2. Execute the EVM block inputs
     // -----------------------------
-    println!("cycle-tracker-start: construct blob share proof");
 
-    let data_root = Hash::Sha256(blob_proof.data_root);
-    let share_data = blob.to_shares().expect("failed to convert blob to shares");
-
-    let share_proof = ShareProof {
-        data: share_data
-            .into_iter()
-            .map(|s| s.as_ref().try_into().expect("invalid share length"))
-            .collect(),
-        namespace_id: blob_proof.namespace_id,
-        share_proofs: blob_proof.share_proofs,
-        row_proof: blob_proof.row_proof,
-    };
-
-    println!("cycle-tracker-end: construct blob share proof");
-
-    println!("cycle-tracker-start: verify share proof");
-
-    share_proof.verify(data_root).expect("ShareProof verification failed");
-
-    println!("cycle-tracker-end: verify share proof");
-
-    // -----------------------------
-    // 4. Verify data root inclusion in Celestia header
-    // -----------------------------
-    println!("cycle-tracker-start: verify data root");
-
-    let hasher = TmSha2Hasher {};
-    data_hash_proof
-        .verify_range(
-            celestia_header.hash().as_bytes().try_into().unwrap(),
-            &[hasher.hash_leaf(&data_root.encode_vec())],
-        )
-        .expect("Celestia inclusion proof failed");
-
-    println!("cycle-tracker-end: verify data root");
-
-    // -----------------------------
-    // 5. Execute EVM block
-    // -----------------------------
-    println!("cycle-tracker-start: execute EVM block");
+    println!("cycle-tracker-start: execute EVM blocks");
 
     let executor = EthClientExecutor::eth(
-        Arc::new(
-            (&client_executor_input.genesis)
-                .try_into()
-                .expect("invalid genesis block"),
-        ),
-        client_executor_input.custom_beneficiary,
+        Arc::new((&executor_inputs[0].genesis).try_into().expect("invalid genesis block")),
+        executor_inputs[0].custom_beneficiary,
     );
 
-    let header = executor
-        .execute(client_executor_input.clone())
-        .expect("EVM block execution failed");
+    let mut headers = Vec::with_capacity(executor_inputs.len());
+    for input in &executor_inputs {
+        let header = executor.execute(input.clone()).expect("EVM block execution failed");
+        headers.push(header);
+    }
 
-    println!("cycle-tracker-end: execute EVM block");
+    println!("cycle-tracker-end: execute EVM blocks");
 
     // -----------------------------
-    // 6. Build and commit outputs
+    // 3. Filter headers and verify blob inclusion
+    // -----------------------------
+    println!("cycle-tracker-start: verify blob inclusion for headers");
+
+    // Filters headers with empty transaction roots
+    let filtered_headers: Vec<EvmHeader> = headers
+        .iter()
+        .cloned()
+        .filter(|header| !header.transaction_root_is_empty())
+        .collect();
+
+    if filtered_headers.len() != blob_proofs.len() {
+        panic!("Number of headers with blob tx data do not match");
+    }
+
+    for (header, blob_proof) in filtered_headers.iter().zip(blob_proofs) {
+        blob_proof.verify(celestia_header.data_hash.unwrap()).expect(&format!(
+            "ShareProof verification failed for block number {}",
+            header.number
+        ));
+
+        // TODO: Verify blob tx data equivalency against header.transactions_root
+        // https://github.com/celestiaorg/celestia-zkevm-hl-testnet/issues/68
+    }
+
+    println!("cycle-tracker-end: verify blob inclusion for headers");
+
+    // -----------------------------
+    // 4. Build and commit outputs
     // -----------------------------
     println!("cycle-tracker-start: commit public outputs");
 
+    let first = headers.first().unwrap();
+    let last = headers.last().unwrap();
+
     let output = EvmBlockExecOutput {
-        blob_commitment: blob.commitment.into(),
-        header_hash: header.hash_slow().into(),
-        prev_header_hash: header.parent_hash.into(),
+        new_header_hash: last.hash_slow().into(),
+        prev_header_hash: first.parent_hash.into(),
         celestia_header_hash: celestia_header
             .hash()
             .as_bytes()
@@ -149,10 +116,12 @@ pub fn main() {
             .as_bytes()
             .try_into()
             .expect("prev_celestia_header_hash must be exactly 32 bytes"),
-        new_height: header.number,
-        new_state_root: header.state_root.into(),
-        prev_height: header.number - 1,
-        prev_state_root: client_executor_input
+        new_height: last.number,
+        new_state_root: last.state_root.into(),
+        prev_height: first.number - 1,
+        prev_state_root: executor_inputs
+            .first()
+            .unwrap()
             .state_anchor()
             .try_into()
             .expect("prev_state_root must be exactly 32 bytes"),

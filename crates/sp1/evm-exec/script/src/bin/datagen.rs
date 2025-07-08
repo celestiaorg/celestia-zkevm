@@ -1,60 +1,49 @@
 //! A script that generates proof input data for a range of EVM blocks.
 //!
-//! This tool connects to an EVM reth node and a Celestia data availability node, then collects and prepares:
+//! This tool connects to an EVM reth node, sequencer and a Celestia data availability node, then collects and prepares:
 //! - STF input (client execution input)
 //! - Blob inclusion proof input
 //! - Celestia header JSON
-//! - Data root proof for Celestia header
 //!
-//! For each block, the generated inputs are written to a directory structure:
-//! `testdata/inputs/block-<number>/...`
+//! For each Celestia block, the generated inputs are written to a directory structure:
+//! `testdata/inputs/block-<number>`
 //!
 //! You can run this script using the following command from the root of this repository:
 //! ```shell
-//! cargo run -p evm-exec-script --bin data-gen --release -- --start <START_BLOCK> --end <END_BLOCK>
+//! cargo run -p evm-exec-script --bin data-gen --release -- --start <START_BLOCK> --blocks <NUM_BLOCKS>
 //! ```
-//!
-//! Replace `<START_BLOCK>` and `<END_BLOCK>` with the desired inclusive block range.
 use std::env;
 use std::error::Error;
 use std::fs;
 use std::sync::Arc;
-use std::time::Duration;
-
-use anyhow::{anyhow, Result};
-use base64::{engine::general_purpose, Engine as _};
-use clap::Parser;
-use eyre::Context;
-use reqwest::StatusCode;
-use serde::{Deserialize, Deserializer};
-use sha3::{Digest, Keccak256};
-use tokio_retry::strategy::{jitter, ExponentialBackoff};
-use tokio_retry::Retry;
 
 use alloy_provider::ProviderBuilder;
+use anyhow::Result;
 use celestia_rpc::{BlobClient, Client, HeaderClient, ShareClient};
-use celestia_types::nmt::{MerkleHash, Namespace};
-use celestia_types::{Blob, Commitment, ExtendedHeader, ShareProof};
-use eq_common::KeccakInclusionToDataRootProofInput;
-use nmt_rs::{
-    simple_merkle::{db::MemDb, proof::Proof, tree::MerkleTree},
-    TmSha2Hasher,
-};
+use celestia_types::nmt::Namespace;
+use celestia_types::{Blob, ExtendedHeader, ShareProof};
+use clap::Parser;
+use eyre::Context;
+use prost::Message;
 use reth_chainspec::ChainSpec;
+use rollkit_types::v1::store_service_client::StoreServiceClient;
+use rollkit_types::v1::{GetMetadataRequest, SignedData, SignedHeader};
+use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
-use tendermint::merkle::Hash as TmHash;
-use tendermint_proto::{
-    v0_38::{types::BlockId as RawBlockId, version::Consensus as RawConsensusVersion},
-    Protobuf,
-};
 
 mod config {
     pub const CELESTIA_RPC_URL: &str = "http://localhost:26658";
     pub const EVM_RPC_URL: &str = "http://localhost:8545";
-    pub const INDEXER_URL: &str = "http://localhost:8080";
+    pub const ROLLKIT_URL: &str = "http://localhost:7331";
 }
+
+/// The sentinel data hash for empty transactions in sequencer SignedHeaders
+const DATA_HASH_FOR_EMPTY_TXS: [u8; 32] = [
+    110, 52, 11, 156, 255, 179, 122, 152, 156, 165, 68, 230, 187, 120, 10, 44, 120, 144, 29, 63, 179, 55, 56, 118, 133,
+    17, 163, 6, 23, 175, 160, 29,
+];
 
 /// The arguments for the command.
 #[derive(Parser, Debug)]
@@ -64,7 +53,7 @@ struct Args {
     start: u64,
 
     #[arg(long)]
-    end: u64,
+    blocks: u64,
 }
 
 /// Loads the genesis file from disk and converts it into a ChainSpec
@@ -76,14 +65,13 @@ fn load_chain_spec_from_genesis(path: &str) -> Result<(Genesis, Arc<ChainSpec>),
     Ok((genesis, chain_spec))
 }
 
-/// Generates the ClientExecutorInput and serializes it to a bincode file
-async fn generate_and_write_stf(
+/// Generates the client executor input (STF) for an EVM block.
+async fn generate_client_executor_input(
     rpc_url: &str,
     block_number: u64,
     chain_spec: Arc<ChainSpec>,
     genesis: Genesis,
-    path: &str,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<EthClientExecutorInput, Box<dyn Error>> {
     let host_executor = EthHostExecutor::eth(chain_spec.clone(), None);
 
     let provider = ProviderBuilder::new().on_http(rpc_url.parse().unwrap());
@@ -94,107 +82,24 @@ async fn generate_and_write_stf(
         .await
         .wrap_err_with(|| format!("Failed to execute block {}", block_number))?;
 
-    let encoded = bincode::serialize(&client_input).wrap_err("Failed to serialize client input to bincode")?;
-
-    fs::write(path, &encoded).wrap_err("Failed to write encoded client input to file")?;
-    Ok(())
+    Ok(client_input)
 }
 
-fn deserialize_base64<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    general_purpose::STANDARD.decode(&s).map_err(serde::de::Error::custom)
+/// Queries the tx data Celestia inclusion height for an EVM block.
+async fn data_inclusion_height(sequencer_rpc: String, block_number: u64) -> Result<u64> {
+    let mut client = StoreServiceClient::connect(sequencer_rpc.clone()).await?;
+    let req = GetMetadataRequest {
+        key: format!("rhb/{}/d", block_number),
+    };
+
+    let resp = client.get_metadata(req).await?;
+    let height = u64::from_le_bytes(resp.into_inner().value[..8].try_into()?);
+
+    Ok(height)
 }
 
-/// Response structure for the inclusion height API
-#[derive(Debug, Deserialize)]
-struct InclusionHeightResponse {
-    eth_block_number: u64,
-    celestia_height: u64,
-    #[serde(deserialize_with = "deserialize_base64")]
-    blob_commitment: Vec<u8>,
-}
-
-pub async fn get_data_availability_commitment(indexer_url: &str, evm_block_height: u64) -> Result<(u64, Vec<u8>)> {
-    let client = reqwest::Client::builder().timeout(Duration::from_secs(10)).build()?;
-
-    let url = format!(
-        "{}/inclusion_height/{}",
-        indexer_url.trim_end_matches('/'),
-        evm_block_height
-    );
-
-    // Retry strategy: exponential backoff starting at 500ms, up to 10 retries
-    let backoff = ExponentialBackoff::from_millis(500)
-        .max_delay(Duration::from_secs(10))
-        .map(jitter)
-        .take(10);
-
-    Retry::spawn(backoff, || {
-        let client = client.clone();
-        let url = url.clone();
-
-        async move {
-            let response = client
-                .get(&url)
-                .send()
-                .await
-                .map_err(|e| anyhow!("Request failed: {}", e))?;
-
-            match response.status() {
-                StatusCode::OK => {
-                    let data: InclusionHeightResponse = response
-                        .json()
-                        .await
-                        .map_err(|e| anyhow!("Failed to parse response JSON: {}", e))?;
-
-                    if data.eth_block_number != evm_block_height {
-                        return Err(anyhow!(
-                            "Sanity check failed: expected {}, got {}",
-                            evm_block_height,
-                            data.eth_block_number
-                        ));
-                    }
-
-                    Ok((data.celestia_height, data.blob_commitment))
-                }
-                status => {
-                    let body = response.text().await.unwrap_or_else(|_| "<failed to read body>".into());
-                    Err(anyhow!("Unexpected status code {}: {}", status, body))
-                }
-            }
-        }
-    })
-    .await
-}
-
-pub async fn fetch_blob_and_header(
-    client: &Client,
-    indexer_url: &str,
-    block_number: u64,
-    namespace: Namespace,
-) -> Result<(Blob, ExtendedHeader, Commitment)> {
-    let (inclusion_height, raw_commitment) = get_data_availability_commitment(indexer_url, block_number).await?;
-
-    let hash: TmHash = raw_commitment[..raw_commitment.len()].try_into().unwrap();
-    let commitment = Commitment::new(hash);
-
-    let blob = client.blob_get(inclusion_height, namespace, commitment).await?;
-
-    let header = client.header_get_by_height(inclusion_height).await?;
-
-    Ok((blob, header, commitment))
-}
-
-pub fn write_header_to_file(header: &ExtendedHeader, path: &str) -> Result<()> {
-    let json = serde_json::to_string_pretty(&header.header)?;
-    fs::write(path, json)?;
-    Ok(())
-}
-
-pub async fn verify_blob_inclusion(client: &Client, header: &ExtendedHeader, blob: &Blob) -> Result<ShareProof> {
+/// Queries the Celestia data availability node for a ShareProof for the provided blob.
+pub async fn blob_share_proof(client: &Client, header: &ExtendedHeader, blob: &Blob) -> Result<ShareProof> {
     let eds_size = header.dah.row_roots().len() as u64;
     let ods_size = eds_size / 2;
     let first_row_index = blob.index.unwrap() / eds_size;
@@ -213,65 +118,41 @@ pub async fn verify_blob_inclusion(client: &Client, header: &ExtendedHeader, blo
 
     Ok(share_proof)
 }
-
-pub fn build_blob_proof_input(
-    blob: &Blob,
-    namespace: Namespace,
+fn write_proof_inputs(
+    client_executor_input: EthClientExecutorInput,
     header: &ExtendedHeader,
-    share_proof: &ShareProof,
-) -> KeccakInclusionToDataRootProofInput {
-    let keccak_hash: [u8; 32] = Keccak256::new().chain_update(&blob.data).finalize().into();
+    share_proof: Option<ShareProof>,
+) -> Result<()> {
+    // Create output dir: testdata/inputs/block-{celestia_block_number}/
+    let block_dir = format!("testdata/inputs/block-{}", header.height());
+    fs::create_dir_all(&block_dir)?;
 
-    KeccakInclusionToDataRootProofInput {
-        data: blob.data.clone(),
-        namespace_id: namespace,
-        share_proofs: share_proof.share_proofs.clone(),
-        row_proof: share_proof.row_proof.clone(),
-        data_root: header.dah.hash().as_bytes().try_into().unwrap(),
-        keccak_hash,
+    let json = serde_json::to_string_pretty(&header.header)?;
+    fs::write(format!("{}/header.json", block_dir), json)?;
+
+    let evm_block_number = client_executor_input.current_block.number;
+    let encoded_input = bincode::serialize(&client_executor_input)?;
+    fs::write(
+        format!("{}/client_input-{}.bin", block_dir, evm_block_number),
+        encoded_input,
+    )?;
+
+    if let Some(share_proof) = share_proof {
+        let encoded_proof = bincode::serialize(&share_proof)?;
+        fs::write(
+            format!("{}/share_proof-{}.bin", block_dir, evm_block_number),
+            encoded_proof,
+        )?;
     }
-}
 
-fn build_data_root_proof_input(header: &ExtendedHeader) -> Result<(Vec<u8>, Proof<TmSha2Hasher>), Box<dyn Error>> {
-    let mut header_field_tree: MerkleTree<MemDb<[u8; 32]>, TmSha2Hasher> = MerkleTree::with_hasher(TmSha2Hasher::new());
-
-    let field_bytes = prepare_header_fields(header);
-    for leaf in field_bytes {
-        header_field_tree.push_raw_leaf(&leaf);
-    }
-
-    // The data_hash is the leaf at index 6 in the tree.
-    let (data_hash_bytes, data_hash_proof) = header_field_tree.get_index_with_proof(6);
-
-    // Verify the computed root matches the header hash
-    assert_eq!(header.hash().as_ref(), header_field_tree.root());
-
-    Ok((data_hash_bytes, data_hash_proof))
-}
-
-fn prepare_header_fields(header: &ExtendedHeader) -> Vec<Vec<u8>> {
-    vec![
-        Protobuf::<RawConsensusVersion>::encode_vec(header.header.version),
-        header.header.chain_id.clone().encode_vec(),
-        header.header.height.encode_vec(),
-        header.header.time.encode_vec(),
-        Protobuf::<RawBlockId>::encode_vec(header.header.last_block_id.unwrap_or_default()),
-        header.header.last_commit_hash.unwrap_or_default().encode_vec(),
-        header.header.data_hash.unwrap_or_default().encode_vec(),
-        header.header.validators_hash.encode_vec(),
-        header.header.next_validators_hash.encode_vec(),
-        header.header.consensus_hash.encode_vec(),
-        header.header.app_hash.clone().encode_vec(),
-        header.header.last_results_hash.unwrap_or_default().encode_vec(),
-        header.header.evidence_hash.unwrap_or_default().encode_vec(),
-        header.header.proposer_address.encode_vec(),
-    ]
+    Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
-    let block_numbers: Vec<u64> = (args.start..=args.end).collect();
+    let num_blocks = args.blocks;
+    let start_height = args.start;
 
     let genesis_path = env::var("GENESIS_PATH").expect("GENESIS_PATH must be set");
     let (genesis, chain_spec) = load_chain_spec_from_genesis(&genesis_path)?;
@@ -283,49 +164,54 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .await
         .context("Failed creating Celestia RPC client")?;
 
-    for block_number in block_numbers {
+    for block_number in start_height..(start_height + num_blocks) {
         println!("\nProcessing block: {}", block_number);
 
-        // Create output dir: testdata/inputs/block-{block_number}/
-        let block_dir = format!("testdata/inputs/block-{}", block_number);
-        fs::create_dir_all(&block_dir)?;
+        let blobs = celestia_client.blob_get_all(block_number, &[namespace]).await?.unwrap();
+        for blob in blobs {
+            let header = match SignedHeader::decode(blob.data.as_slice()) {
+                Ok(data) => data.header.unwrap(),
+                Err(_) => continue,
+            };
 
-        let stf_path = format!("{}/client_input.bin", block_dir);
-        generate_and_write_stf(
-            config::EVM_RPC_URL,
-            block_number,
-            chain_spec.clone(),
-            genesis.clone(),
-            &stf_path,
-        )
-        .await?;
+            println!(
+                "Got SignedHeader {} at Celestia height: {}",
+                header.height, block_number
+            );
 
-        let (blob, header, _) =
-            fetch_blob_and_header(&celestia_client, config::INDEXER_URL, block_number, namespace).await?;
+            let client_executor_input =
+                generate_client_executor_input(config::EVM_RPC_URL, header.height, chain_spec.clone(), genesis.clone())
+                    .await?;
 
-        let header_json = serde_json::to_string_pretty(&header.header)?;
-        fs::write(format!("{}/header.json", block_dir), header_json)?;
+            if header.data_hash != DATA_HASH_FOR_EMPTY_TXS {
+                let data_height = data_inclusion_height(config::ROLLKIT_URL.to_string(), header.height).await?;
 
-        let share_proof = verify_blob_inclusion(&celestia_client, &header, &blob).await?;
-        let proof_input = build_blob_proof_input(&blob, namespace, &header, &share_proof);
-        let blob_proof_enc = bincode::serialize(&proof_input)?;
-        fs::write(format!("{}/blob_proof.bin", block_dir), blob_proof_enc)?;
+                let data_blobs = celestia_client.blob_get_all(data_height, &[namespace]).await?.unwrap();
+                for data_blob in data_blobs {
+                    let tx_data = match SignedData::decode(data_blob.data.as_slice()) {
+                        Ok(data) => data.data.unwrap(),
+                        Err(_) => continue,
+                    };
 
-        let (data_root, data_root_proof) = build_data_root_proof_input(&header)?;
-        let hasher = TmSha2Hasher {};
-        data_root_proof
-            .verify_range(
-                &header.header.hash().as_bytes().try_into().unwrap(),
-                &[hasher.hash_leaf(&data_root)],
-            )
-            .expect("failed to verify header proof");
+                    if tx_data.metadata.unwrap().height == header.height {
+                        println!(
+                            "Got SignedData for Header {} at Celestia height: {}",
+                            header.height, data_height
+                        );
 
-        fs::write(
-            format!("{}/data_root_proof.bin", block_dir),
-            bincode::serialize(&data_root_proof)?,
-        )?;
+                        let extended_header = celestia_client.header_get_by_height(data_height).await?;
+                        let share_proof = blob_share_proof(&celestia_client, &extended_header, &data_blob).await?;
 
-        println!("Successfully generated proof input data for block: {}", block_number);
+                        write_proof_inputs(client_executor_input.clone(), &extended_header, Some(share_proof))?;
+                    }
+                }
+            } else {
+                let extended_header = celestia_client.header_get_by_height(block_number).await?;
+                write_proof_inputs(client_executor_input, &extended_header, None)?;
+            }
+        }
+
+        println!("Finished processing blobs for Celestia block: {}", block_number);
     }
 
     Ok(())

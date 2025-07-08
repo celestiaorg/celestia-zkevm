@@ -10,6 +10,7 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
+alloy-consensus = { version = "0.12.6" }
 alloy-provider = { version = "0.12.6" }
 alloy-sol-types = { version = "0.8.0", default-features = false }
 base64 = "0.22.1"
