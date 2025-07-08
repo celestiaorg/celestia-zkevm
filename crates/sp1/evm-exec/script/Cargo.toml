@@ -52,7 +52,9 @@ tokio = { version = "1.44", features = ["full"] }
 tokio-retry = "0.3"
 tracing = "0.1.40"
 
-rollkit-types = { git = "https://github.com/damiannolan/rollkit", branch = "damian/rust-lib", package = "rollkit-types" }
+rollkit-types = { git = "https://github.com/damiannolan/rollkit", branch = "damian/rust-lib", package = "rollkit-types", features = [
+    "client",
+] }
 
 [build-dependencies]
 sp1-build = { workspace = true }

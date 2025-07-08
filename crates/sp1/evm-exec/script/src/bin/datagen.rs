@@ -174,17 +174,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 Err(_) => continue,
             };
 
+            println!(
+                "Got SignedHeader {} at Celestia height: {}",
+                header.height, block_number
+            );
+
             let client_executor_input =
                 generate_client_executor_input(config::EVM_RPC_URL, header.height, chain_spec.clone(), genesis.clone())
                     .await?;
 
             if header.data_hash != DATA_HASH_FOR_EMPTY_TXS {
-                println!("Fetching tx data for EVM block {}", header.height);
-
                 let data_height = data_inclusion_height(config::ROLLKIT_URL.to_string(), header.height).await?;
-                if data_height != header.height {
-                    println!("Data and Header are at different inclusion heights");
-                }
 
                 let data_blobs = celestia_client.blob_get_all(data_height, &[namespace]).await?.unwrap();
                 for data_blob in data_blobs {
@@ -194,6 +194,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     };
 
                     if tx_data.metadata.unwrap().height == header.height {
+                        println!(
+                            "Got SignedData for Header {} at Celestia height: {}",
+                            header.height, data_height
+                        );
+
                         let extended_header = celestia_client.header_get_by_height(data_height).await?;
                         let share_proof = blob_share_proof(&celestia_client, &extended_header, &data_blob).await?;
 
@@ -206,7 +211,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
-        println!("Successfully generated proof input data for block: {}", block_number);
+        println!("Finished processing blobs for Celestia block: {}", block_number);
     }
 
     Ok(())
