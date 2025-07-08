@@ -27,7 +27,7 @@ pub struct EvmBlockExecOutput {
 impl Display for EvmBlockExecOutput {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         writeln!(f, "EvmBlockExecOutput {{")?;
-        writeln!(f, "  header_hash:                 {}", encode(self.new_header_hash))?;
+        writeln!(f, "  new_header_hash:                 {}", encode(self.new_header_hash))?;
         writeln!(f, "  prev_header_hash:            {}", encode(self.prev_header_hash))?;
         writeln!(
             f,

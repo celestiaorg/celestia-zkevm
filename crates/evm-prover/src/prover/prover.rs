@@ -17,7 +17,6 @@ use prost::Message;
 use reth_chainspec::ChainSpec;
 use rollkit_types::v1::SignedHeader;
 use rollkit_types::v1::{store_service_client::StoreServiceClient, GetMetadataRequest, SignedData};
-use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
@@ -33,12 +32,6 @@ use tendermint_proto::{
 };
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
-
-/// The sentinel data hash for empty transactions in sequencer SignedHeaders
-const DATA_HASH_FOR_EMPTY_TXS: [u8; 32] = [
-    110, 52, 11, 156, 255, 179, 122, 152, 156, 165, 68, 230, 187, 120, 10, 44, 120, 144, 29, 63, 179, 55, 56, 118, 133,
-    17, 163, 6, 23, 175, 160, 29,
-];
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
@@ -175,7 +168,7 @@ impl BlockExecProver {
     }
 
     /// Generates the serialized state transition function (STF) input for a given EVM block number.
-    async fn generate_stf(&self, block_number: u64) -> Result<EthClientExecutorInput> {
+    async fn generate_stf(&self, block_number: u64) -> Result<Vec<u8>> {
         let host_executor = EthHostExecutor::eth(self.app.chain_spec.clone(), None);
         let provider = ProviderBuilder::new().on_http(self.app.evm_rpc.parse()?);
         let rpc_db = RpcDb::new(provider.clone(), block_number - 1);
@@ -184,23 +177,11 @@ impl BlockExecProver {
             .execute(block_number, &rpc_db, &provider, self.app.genesis.clone(), None, false)
             .await?;
 
-        Ok(client_input)
+        Ok(bincode::serialize(&client_input)?)
     }
 
     /// Queries the inclusion height for the given EVM block number from the sequencer rpc.
-    async fn header_inclusion_height(&self, block_number: u64) -> Result<u64> {
-        let mut client = StoreServiceClient::connect(self.app.sequencer_rpc.clone()).await?;
-        let req = GetMetadataRequest {
-            key: format!("rhb/{}/h", block_number),
-        };
-
-        let resp = client.get_metadata(req).await?;
-        let height = u64::from_le_bytes(resp.into_inner().value[..8].try_into()?);
-
-        Ok(height)
-    }
-
-    async fn data_inclusion_height(&self, block_number: u64) -> Result<u64> {
+    async fn inclusion_height(&self, block_number: u64) -> Result<u64> {
         let mut client = StoreServiceClient::connect(self.app.sequencer_rpc.clone()).await?;
         let req = GetMetadataRequest {
             key: format!("rhb/{}/d", block_number),
@@ -230,46 +211,34 @@ impl BlockExecProver {
             .await?
             .ok_or_else(|| anyhow::anyhow!("No blobs found at inclusion height {}", inclusion_height))?;
 
+        println!("num blobs: {}", blobs.len());
+
         for blob in blobs {
-            let signed_header = match SignedHeader::decode(blob.data.as_slice()) {
-                Ok(data) => data.header.unwrap(),
+            let signed_data = match SignedData::decode(blob.data.as_slice()) {
+                Ok(data) => data,
                 Err(e) => {
-                    println!("Error in getting first signed header: {}", e);
+                    println!("Failed to decode SignedData: {:?}", e);
+
+                    let header = match SignedHeader::decode(blob.data.as_slice()) {
+                        Ok(header) => header,
+                        Err(e) => {
+                            println!("Failed to decode SignedHeader: {:?}", e);
+                            continue;
+                        }
+                    };
+
+                    println!("signed header height: {:?}", header.header.unwrap().height);
                     continue;
                 }
             };
 
-            if signed_header.height != block_number {
+            let Some(metadata) = signed_data.data.and_then(|d| d.metadata) else {
                 continue;
-            }
+            };
 
-            if signed_header.data_hash == DATA_HASH_FOR_EMPTY_TXS {
-                bail!("Empty transaction data for block Header: {:?}", signed_header.height);
-            }
-
-            if signed_header.height == block_number {
-                let txs_inclusion_height = self.data_inclusion_height(block_number).await?;
-
-                let blobs = client
-                    .blob_get_all(txs_inclusion_height, &[self.app.namespace])
-                    .await?
-                    .ok_or_else(|| anyhow::anyhow!("No blobs found at inclusion height {}", txs_inclusion_height))?;
-
-                for blob in blobs {
-                    let signed_data = match SignedData::decode(blob.data.as_slice()) {
-                        Ok(data) => data,
-                        Err(_) => continue,
-                    };
-
-                    let Some(metadata) = signed_data.data.and_then(|d| d.metadata) else {
-                        continue;
-                    };
-
-                    if metadata.height == block_number {
-                        println!("Found txs blob for height {}", metadata.height);
-                        return Ok(blob);
-                    }
-                }
+            println!("metadata.height {}", metadata.height);
+            if metadata.height == block_number {
+                return Ok(blob);
             }
         }
 

@@ -2695,7 +2695,6 @@ dependencies = [
  "reqwest",
  "reth-chainspec 1.3.2",
  "rollkit-types",
- "rsp-client-executor",
  "rsp-host-executor",
  "rsp-primitives",
  "rsp-rpc-db",
