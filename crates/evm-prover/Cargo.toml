@@ -24,7 +24,6 @@ nmt-rs = { workspace = true }
 prost = "0.12"
 reqwest = { workspace = true }
 reth-chainspec = { workspace = true }
-rsp-client-executor = { workspace = true }
 rsp-host-executor = { workspace = true }
 rsp-primitives = { workspace = true }
 rsp-rpc-db = { workspace = true }
