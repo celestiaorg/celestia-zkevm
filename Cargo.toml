@@ -30,7 +30,7 @@ reth-primitives = { git = "https://github.com/sp1-patches/reth", tag = "rsp-2024
     "optimism",
     "std",
 ] }
-rollkit-types = { git = "https://github.com/rollkit/rollkit", branch = "main", package = "rollkit-types", default-features = false }
+rollkit-types = { git = "https://github.com/rollkit/rollkit", rev = "9a1dbbbd8362180e95a08c75100c7e5c5bdf9f9a", package = "rollkit-types", default-features = false }
 rsp-client-executor = { git = "https://github.com/succinctlabs/rsp.git", rev = "837a8c04a29deadb576a75fcf56136f26ce5dd4d" }
 rsp-host-executor = { git = "https://github.com/succinctlabs/rsp.git", rev = "837a8c04a29deadb576a75fcf56136f26ce5dd4d" }
 rsp-primitives = { git = "https://github.com/succinctlabs/rsp.git", rev = "837a8c04a29deadb576a75fcf56136f26ce5dd4d" }
