@@ -21,7 +21,7 @@ dirs = "5"
 eq-common = { workspace = true }
 hex = { workspace = true }
 nmt-rs = { workspace = true }
-prost = "0.12"
+prost = { workspace = true }
 reqwest = { workspace = true }
 reth-chainspec = { workspace = true }
 rsp-host-executor = { workspace = true }
@@ -39,4 +39,4 @@ tokio-stream = "0.1"
 tonic = { version = "0.10", features = ["transport"] }
 tonic-reflection = "0.10"
 
-rollkit-types = { git = "https://github.com/damiannolan/rollkit", branch = "damian/rust-lib", package = "rollkit-types" }
+rollkit-types = { workspace = true, features = ["grpc"] }
