@@ -72,7 +72,7 @@ pub fn main() {
         assert_eq!(
             curr.prev_state_root,
             prev.new_state_root,
-            "verify sequential EVM headers failed at index {}: expected {:?}, got {:?}",
+            "verify sequential EVM state roots failed at index {}: expected {:?}, got {:?}",
             i + 1,
             prev.new_state_root,
             curr.prev_state_root

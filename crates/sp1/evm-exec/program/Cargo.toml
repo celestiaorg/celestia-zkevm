@@ -20,3 +20,7 @@ sha3 = { workspace = true }
 sp1-zkvm = { workspace = true }
 tendermint = { workspace = true }
 tendermint-proto = { workspace = true }
+
+bytes = { workspace = true }
+prost = { workspace = true }
+rollkit-types = { workspace = true, default-features = false }
