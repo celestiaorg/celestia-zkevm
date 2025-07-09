@@ -6807,7 +6807,7 @@ dependencies = [
 [[package]]
 name = "rollkit-types"
 version = "0.1.0"
-source = "git+https://github.com/damiannolan/rollkit?branch=damian%2Frust-lib#9b39ad3120ab9d71b994a85f025f7b2758fe6380"
+source = "git+https://github.com/rollkit/rollkit?rev=9a1dbbbd8362180e95a08c75100c7e5c5bdf9f9a#9a1dbbbd8362180e95a08c75100c7e5c5bdf9f9a"
 dependencies = [
  "prost 0.12.6",
  "prost-build 0.12.6",

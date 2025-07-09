@@ -15,12 +15,14 @@ alloy-provider = { version = "0.12.6" }
 alloy-sol-types = { version = "0.8.0", default-features = false }
 base64 = "0.22.1"
 bincode = "1.3.3"
+bytes = "1.10.1"
 celestia-rpc = "=0.11.1"
 celestia-types = "=0.11.2"
 eq-common = "0.1.4"
 ethers = { version = "2.0", features = ["ws", "rustls"] }
 hex = "0.4.3"
 nmt-rs = "*"
+prost = "0.12"
 reqwest = "0.12.20"
 reth-chainspec = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.3", default-features = false }
 reth-primitives = { git = "https://github.com/sp1-patches/reth", tag = "rsp-20240830", default-features = false, features = [
@@ -28,6 +30,7 @@ reth-primitives = { git = "https://github.com/sp1-patches/reth", tag = "rsp-2024
     "optimism",
     "std",
 ] }
+rollkit-types = { git = "https://github.com/rollkit/rollkit", rev = "9a1dbbbd8362180e95a08c75100c7e5c5bdf9f9a", package = "rollkit-types", default-features = false }
 rsp-client-executor = { git = "https://github.com/succinctlabs/rsp.git", rev = "837a8c04a29deadb576a75fcf56136f26ce5dd4d" }
 rsp-host-executor = { git = "https://github.com/succinctlabs/rsp.git", rev = "837a8c04a29deadb576a75fcf56136f26ce5dd4d" }
 rsp-primitives = { git = "https://github.com/succinctlabs/rsp.git", rev = "837a8c04a29deadb576a75fcf56136f26ce5dd4d" }
@@ -41,7 +44,3 @@ sp1-sdk = "=4.1.4"
 sp1-zkvm = "=4.1.4"
 tendermint = "0.40.1"
 tendermint-proto = "*"
-
-bytes = "1.10.1"
-prost = "0.12"
-rollkit-types = { git = "https://github.com/damiannolan/rollkit", branch = "damian/rust-lib", package = "rollkit-types", default-features = false }
