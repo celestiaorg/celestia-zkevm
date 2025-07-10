@@ -116,9 +116,9 @@ impl AppContext {
         let namespace = Namespace::new_v0(raw_ns.as_ref()).context("Failed to construct Namespace")?;
 
         Ok(AppContext {
-            chain_spec: chain_spec,
-            genesis: genesis,
-            namespace: namespace,
+            chain_spec,
+            genesis,
+            namespace,
             celestia_rpc: config.celestia_rpc,
             evm_rpc: config.evm_rpc,
             sequencer_rpc: config.sequencer_rpc,

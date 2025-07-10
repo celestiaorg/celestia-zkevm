@@ -92,14 +92,14 @@ fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<(), Box<dyn Error>> {
     let mut paths: Vec<_> = fs::read_dir(proofs_dir)?
         .filter_map(Result::ok)
         .map(|e| e.path())
-        .filter(|p| p.extension().map_or(false, |ext| ext == "bin"))
+        .filter(|p| p.extension().is_some_and(|ext| ext == "bin"))
         .collect();
 
     paths.sort();
 
     let proofs: Vec<SP1ProofWithPublicValues> = paths
         .iter()
-        .map(|path| SP1ProofWithPublicValues::load(path))
+        .map(SP1ProofWithPublicValues::load)
         .collect::<Result<_, _>>()?;
 
     let vk: SP1VerifyingKey = bincode::deserialize(&fs::read("testdata/vkeys/evm-exec-vkey.bin")?)?;

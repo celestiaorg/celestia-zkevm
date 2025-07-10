@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     fs::write("testdata/proof.bin", &proof_bytes)?;
 
     // Save public inputs (the committed values from the circuit)
-    fs::write("testdata/sp1-inputs.bin", &sp1_public_values.as_slice())?;
+    fs::write("testdata/sp1-inputs.bin", sp1_public_values.as_slice())?;
 
     println!("Saved groth16 proof components to testdata directory");
 
