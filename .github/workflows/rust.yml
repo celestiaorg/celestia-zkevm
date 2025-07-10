@@ -1,4 +1,7 @@
-name: Build Rust
+name: Rust Build and Execute
+
+permissions:
+  contents: read
 
 on:
   workflow_dispatch:
