@@ -35,6 +35,11 @@ jobs:
           cache: true
           components: clippy
           toolchain: 1.85.0
+      - name: Install SP1 toolchain
+        run: |
+          curl -L https://sp1.succinct.xyz | bash
+          ~/.sp1/bin/sp1up 
+          ~/.sp1/bin/cargo-prove prove --version
       - run: cargo clippy --workspace --all-targets --release --locked -- -D warnings
 
   build:
@@ -73,6 +78,11 @@ jobs:
         with:
           cache: true
           toolchain: 1.85.0
+      - name: Install SP1 toolchain
+        run: |
+          curl -L https://sp1.succinct.xyz | bash
+          ~/.sp1/bin/sp1up 
+          ~/.sp1/bin/cargo-prove prove --version
       
       - name: Execute SP1 Block execution
         run: |
