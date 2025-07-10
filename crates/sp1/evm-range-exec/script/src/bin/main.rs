@@ -15,7 +15,7 @@ use std::path::Path;
 
 use clap::Parser;
 use evm_exec_types::EvmRangeExecOutput;
-use sp1_sdk::{include_elf, HashableKey, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1Stdin};
+use sp1_sdk::{include_elf, HashableKey, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
@@ -102,9 +102,7 @@ fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<(), Box<dyn Error>> {
         .map(|path| SP1ProofWithPublicValues::load(path))
         .collect::<Result<_, _>>()?;
 
-    let client = ProverClient::from_env();
-    let (_, vk) = client.setup(EVM_EXEC_ELF);
-
+    let vk: SP1VerifyingKey = bincode::deserialize(&fs::read("testdata/vkeys/evm-exec-vkey.bin")?)?;
     let vkeys = vec![vk.hash_u32(); proofs.len()];
     stdin.write::<Vec<[u32; 8]>>(&vkeys);
 

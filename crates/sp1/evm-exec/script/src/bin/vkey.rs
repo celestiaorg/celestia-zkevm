@@ -8,13 +8,22 @@
 //! ```shell
 //! cargo run -p evm-exec-script --bin vkey --release
 //! ```
+use std::fs;
+
 use sp1_sdk::{include_elf, HashableKey, Prover, ProverClient};
 
 /// ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let prover = ProverClient::builder().cpu().build();
     let (_, vk) = prover.setup(EVM_EXEC_ELF);
     println!("evm-exec-program vkey: {}", vk.bytes32());
+
+    let encoded = bincode::serialize(&vk)?;
+    let path = "testdata/vkeys/evm-exec-vkey.bin";
+    fs::write(path, encoded)?;
+    println!("successfully wrote vkey to: {}", path);
+
+    Ok(())
 }
