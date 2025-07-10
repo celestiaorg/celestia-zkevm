@@ -35,7 +35,7 @@ jobs:
           cache: true
           components: clippy
           toolchain: 1.85.0
-      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo clippy --workspace --all-targets --release --locked -- -D warnings
 
   build:
     name: Build
@@ -67,7 +67,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
+      - uses: arduino/setup-protoc@v3
       - name: Install rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
