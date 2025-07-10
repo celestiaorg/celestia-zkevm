@@ -31,6 +31,44 @@ jobs:
           ~/.sp1/bin/sp1up 
           ~/.sp1/bin/cargo-prove prove --version
 
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache Cargo git
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-git-
+
+      - name: Cache Rust build artifacts
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-target-
+
       - name: Build Rust programs
         run: |
           cargo build --release
+
+      - name: Execute SP1 programs
+        run: |
+          for dir in ./testdata/inputs/block-*; do
+            # Extract block number from directory name (e.g. block-15)
+            name=$(basename "$dir") 
+            block_number=${name#block-}
+            
+            echo "Running SP1 block execution program for $block_number"
+            cargo run -p evm-exec-script --bin evm-exec --release -- --execute --height $block_number
+          done
+
+          echo "Running SP1 block range exection program"
+            cargo run -p evm-range-exec-script --bin evm-range-exec --release -- --execute
