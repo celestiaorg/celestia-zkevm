@@ -13,6 +13,10 @@ name = "evm-exec"
 path = "src/bin/main.rs"
 
 [[bin]]
+name = "proofs"
+path = "src/bin/proofs.rs"
+
+[[bin]]
 name = "vkey"
 path = "src/bin/vkey.rs"
 
