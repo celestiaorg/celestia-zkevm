@@ -38,7 +38,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     modified_header.header.version.app = 3; // Satisfy the rpc error
 
     let namespace_data = client.share_get_namespace_data(&modified_header, namespace).await?;
-    println!("Successfully got namespace data: {}", namespace_data.rows.len());
+    println!(
+        "Successfully got {} proofs for namespace data",
+        namespace_data.rows.len()
+    );
 
     let mut proofs: Vec<NamespaceProof> = Vec::new();
     for row in namespace_data.rows {
@@ -79,6 +82,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     for (proof, root) in proofs.iter().zip(roots) {
         let start_idx = proof.start_idx() as usize;
         let end_idx = proof.end_idx() as usize;
+        println!("Verifying row proof for indices: start {} - end {}", start_idx, end_idx);
+
         let shares = end_idx - start_idx;
 
         let end = cursor + shares;
@@ -88,7 +93,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .verify_range(root, raw_leaves, namespace.try_into()?)
             .expect("Failed to veriy proof");
 
-        println!("Successfully verified proof, incr cursor => {}", end);
+        println!("Successfully verified proof!");
         cursor = end;
     }
 
