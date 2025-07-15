@@ -4,7 +4,7 @@ pub const VERSION: &str = "v0.1.0";
 
 #[derive(Parser)]
 #[command(name = "evm-prover", version = VERSION, about = "EVM Prover CLI", long_about = None)]
-pub struct CLI {
+pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
 }

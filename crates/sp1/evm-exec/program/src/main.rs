@@ -80,8 +80,8 @@ pub fn main() {
     // Filters headers with empty transaction roots
     let filtered_headers: Vec<EvmHeader> = headers
         .iter()
-        .cloned()
         .filter(|header| !header.transaction_root_is_empty())
+        .cloned()
         .collect();
 
     if filtered_headers.len() != blob_proofs.len() {
@@ -89,10 +89,9 @@ pub fn main() {
     }
 
     for (header, blob_proof) in filtered_headers.iter().zip(blob_proofs) {
-        blob_proof.verify(celestia_header.data_hash.unwrap()).expect(&format!(
-            "ShareProof verification failed for block number {}",
-            header.number
-        ));
+        blob_proof
+            .verify(celestia_header.data_hash.unwrap())
+            .unwrap_or_else(|_| panic!("ShareProof verification failed for block number {}", header.number));
 
         let shares: Vec<Share> = blob_proof
             .shares()
@@ -149,12 +148,7 @@ pub fn main() {
         new_height: last.number,
         new_state_root: last.state_root.into(),
         prev_height: first.number - 1,
-        prev_state_root: executor_inputs
-            .first()
-            .unwrap()
-            .state_anchor()
-            .try_into()
-            .expect("prev_state_root must be exactly 32 bytes"),
+        prev_state_root: executor_inputs.first().unwrap().state_anchor().into(),
     };
 
     sp1_zkvm::io::commit(&output);

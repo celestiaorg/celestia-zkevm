@@ -1,0 +1,57 @@
+name: Rust CI
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    name: Rust CI Workflow
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/setup-protoc@v3
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+          components: rustfmt, clippy
+          toolchain: 1.85.0
+
+      - name: Install SP1 toolchain
+        run: |
+          curl -L https://sp1.succinct.xyz | bash
+          ~/.sp1/bin/sp1up 
+          ~/.sp1/bin/cargo-prove prove --version
+
+      - name: Check Formatting (rustfmt)
+        run: cargo fmt --all -- --check
+        
+      - name: Build Rust Programs
+        run: cargo build --release --locked
+
+      - name: Lint with Clippy
+        run: cargo clippy --workspace --all-targets --release --locked -- -D warnings
+
+      - name: Execute SP1 Block Execution
+        run: |
+          for dir in ./testdata/inputs/block-*; do
+            # Extract block number from directory name (e.g. block-15)
+            name=$(basename "$dir") 
+            block_number=${name#block-}
+            
+            echo "Running SP1 block execution program for $block_number"
+            cargo run -p evm-exec-script --bin evm-exec --release --locked -- --execute --height $block_number
+          done
+
+      - name: Execute SP1 Block Range Execution
+        run: |
+          echo "Running SP1 block range execution program"
+          cargo run -p evm-range-exec-script --bin evm-range-exec --release --locked -- --execute
