@@ -22,10 +22,11 @@ use std::sync::Arc;
 
 use alloy_consensus::Header as EvmHeader;
 use bytes::Bytes;
+use celestia_types::nmt::{Namespace, NamespaceProof, NamespacedHash};
 use celestia_types::Blob;
-use celestia_types::Share;
-use celestia_types::ShareProof;
+use celestia_types::DataAvailabilityHeader;
 use evm_exec_types::EvmBlockExecOutput;
+use nmt_rs::NamespacedSha2Hasher;
 use prost::Message;
 use reth_primitives::alloy_primitives::private::alloy_rlp::Decodable;
 use reth_primitives::proofs;
@@ -39,19 +40,71 @@ use tendermint::block::Header;
 
 pub fn main() {
     // -----------------------------
-    // 1. Deserialize inputs
+    // 0. Deserialize inputs
     // -----------------------------
     println!("cycle-tracker-start: deserialize inputs");
-
-    let executor_inputs: Vec<EthClientExecutorInput> = sp1_zkvm::io::read();
 
     let celestia_header_raw: Vec<u8> = sp1_zkvm::io::read_vec();
     let celestia_header: Header =
         serde_cbor::from_slice(&celestia_header_raw).expect("failed to deserialize celestia header");
 
-    let blob_proofs: Vec<ShareProof> = sp1_zkvm::io::read();
+    let dah: DataAvailabilityHeader = sp1_zkvm::io::read();
+    let namespace: Namespace = sp1_zkvm::io::read();
+
+    let executor_inputs: Vec<EthClientExecutorInput> = sp1_zkvm::io::read();
+    let blobs: Vec<Blob> = sp1_zkvm::io::read();
+    let proofs: Vec<NamespaceProof> = sp1_zkvm::io::read();
 
     println!("cycle-tracker-end: deserialize inputs");
+
+    // -----------------------------
+    // 1. Verify namespace inclusion and completeness
+    // -----------------------------
+    println!("cycle-tracker-start: verify namespace");
+
+    assert_eq!(
+        celestia_header.data_hash.unwrap(),
+        dah.hash(),
+        "DataHash mismatch for DataAvailabilityHeader"
+    );
+
+    let mut roots = Vec::<&NamespacedHash>::new();
+    for row_root in dah.row_roots() {
+        if row_root.contains::<NamespacedSha2Hasher<29>>(namespace.into()) {
+            roots.push(row_root);
+        }
+    }
+
+    if roots.len() == 0 {
+        assert!(blobs.is_empty(), "Blobs must be empty if no roots contain namespace");
+        assert!(proofs.is_empty(), "Proofs must be empty if no roots contain namespace");
+    }
+
+    let blob_data: Vec<[u8; 512]> = blobs
+        .iter()
+        .flat_map(|blob| {
+            blob.to_shares()
+                .unwrap()
+                .into_iter()
+                .map(|share| share.as_ref().try_into().unwrap())
+        })
+        .collect();
+
+    let mut cursor = 0;
+    for (proof, root) in proofs.iter().zip(roots) {
+        let share_count = (proof.end_idx() - proof.start_idx()) as usize;
+        let end = cursor + share_count;
+
+        let raw_leaves = &blob_data[cursor..end];
+
+        proof
+            .verify_complete_namespace(root, raw_leaves, namespace.into())
+            .expect("Failed to verify proof");
+
+        cursor = end;
+    }
+
+    println!("cycle-tracker-end: verify namespace");
 
     // -----------------------------
     // 2. Execute the EVM block inputs
@@ -59,21 +112,23 @@ pub fn main() {
 
     println!("cycle-tracker-start: execute EVM blocks");
 
-    let executor = EthClientExecutor::eth(
-        Arc::new((&executor_inputs[0].genesis).try_into().expect("invalid genesis block")),
-        executor_inputs[0].custom_beneficiary,
-    );
-
     let mut headers = Vec::with_capacity(executor_inputs.len());
-    for input in &executor_inputs {
-        let header = executor.execute(input.clone()).expect("EVM block execution failed");
-        headers.push(header);
+    if headers.capacity() != 0 {
+        let executor = EthClientExecutor::eth(
+            Arc::new((&executor_inputs[0].genesis).try_into().expect("invalid genesis block")),
+            executor_inputs[0].custom_beneficiary,
+        );
+
+        for input in &executor_inputs {
+            let header = executor.execute(input.clone()).expect("EVM block execution failed");
+            headers.push(header);
+        }
     }
 
     println!("cycle-tracker-end: execute EVM blocks");
 
     // -----------------------------
-    // 3. Filter headers and verify blob inclusion
+    // 3. Filter headers and verify blob equivalency
     // -----------------------------
     println!("cycle-tracker-start: verify blob inclusion for headers");
 
@@ -84,28 +139,18 @@ pub fn main() {
         .cloned()
         .collect();
 
-    if filtered_headers.len() != blob_proofs.len() {
-        panic!("Number of headers with blob tx data do not match");
-    }
+    let signed_data: Vec<SignedData> = blobs
+        .into_iter()
+        .filter_map(|blob| SignedData::decode(Bytes::from(blob.data)).ok())
+        .collect();
 
-    for (header, blob_proof) in filtered_headers.iter().zip(blob_proofs) {
-        blob_proof
-            .verify(celestia_header.data_hash.unwrap())
-            .unwrap_or_else(|_| panic!("ShareProof verification failed for block number {}", header.number));
+    assert_eq!(
+        filtered_headers.len(),
+        signed_data.len(),
+        "Number of headers with blob tx data do not match"
+    );
 
-        let shares: Vec<Share> = blob_proof
-            .shares()
-            .iter()
-            .map(|b| Share::from_raw(b).expect("Failed to parse raw shares"))
-            .collect();
-
-        let blob = Blob::reconstruct(&shares, celestia_types::AppVersion::V3).expect("Failed to reconstruct blob");
-
-        let signed_data = match SignedData::decode(Bytes::from(blob.data)) {
-            Ok(data) => data,
-            Err(e) => panic!("Failed decoding blob data: {e}"),
-        };
-
+    for (header, signed_data) in filtered_headers.iter().zip(signed_data) {
         let mut txs = Vec::with_capacity(signed_data.data.clone().unwrap().txs.len());
         for tx_bytes in signed_data.data.unwrap().txs {
             let tx = TransactionSigned::decode(&mut tx_bytes.as_slice()).expect("Failed decoding transaction");
