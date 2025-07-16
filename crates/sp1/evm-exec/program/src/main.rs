@@ -65,7 +65,7 @@ pub fn main() {
     // -----------------------------
     // 1. Verify namespace inclusion and completeness
     // -----------------------------
-    println!("cycle-tracker-start: verify namespace");
+    println!("cycle-tracker-start: verify namespace data");
 
     assert_eq!(
         celestia_header.data_hash.unwrap(),
@@ -109,7 +109,7 @@ pub fn main() {
         cursor = end;
     }
 
-    println!("cycle-tracker-end: verify namespace");
+    println!("cycle-tracker-end: verify namespace data");
 
     // -----------------------------
     // 2. Execute the EVM block inputs
@@ -148,14 +148,15 @@ pub fn main() {
     // -----------------------------
     // 3. Verify blob equivalency
     // -----------------------------
-    println!("cycle-tracker-start: verify blob equivalency for headers");
+    println!("cycle-tracker-start: verify blob-header equivalency");
 
     let mut signed_data: Vec<SignedData> = blobs
         .into_iter()
         .filter_map(|blob| SignedData::decode(Bytes::from(blob.data)).ok())
         .collect();
 
-    // Filter duplicates if length is unequal
+    // Equivocation: Filter duplicates if length is unequal
+    // TODO: Make this more readable
     if signed_data.len() != headers.len() {
         let mut seen = HashSet::<u64>::new();
         signed_data.retain(|sd| signed_data_height(sd).map(|h| seen.insert(h)).unwrap_or(false));
@@ -182,7 +183,7 @@ pub fn main() {
         );
     }
 
-    println!("cycle-tracker-end: verify blob inclusion for headers");
+    println!("cycle-tracker-end: verify blob-header equivalency");
 
     // -----------------------------
     // 4. Build and commit outputs
