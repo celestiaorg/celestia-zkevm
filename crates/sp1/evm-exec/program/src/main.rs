@@ -18,9 +18,11 @@
 #![no_main]
 
 sp1_zkvm::entrypoint!(main);
+
+use std::collections::HashSet;
 use std::sync::Arc;
 
-use alloy_consensus::Header as EvmHeader;
+use alloy_consensus::BlockHeader;
 use bytes::Bytes;
 use celestia_types::nmt::{Namespace, NamespaceProof, NamespacedHash};
 use celestia_types::Blob;
@@ -29,8 +31,8 @@ use evm_exec_types::EvmBlockExecOutput;
 use nmt_rs::NamespacedSha2Hasher;
 use prost::Message;
 use reth_primitives::alloy_primitives::private::alloy_rlp::Decodable;
-use reth_primitives::proofs;
 use reth_primitives::TransactionSigned;
+use reth_primitives::{proofs, B256};
 use rollkit_types::v1::SignedData;
 use rsp_client_executor::{
     executor::EthClientExecutor,
@@ -54,6 +56,9 @@ pub fn main() {
     let executor_inputs: Vec<EthClientExecutorInput> = sp1_zkvm::io::read();
     let blobs: Vec<Blob> = sp1_zkvm::io::read();
     let proofs: Vec<NamespaceProof> = sp1_zkvm::io::read();
+
+    let trusted_height: u64 = sp1_zkvm::io::read();
+    let trusted_root: B256 = sp1_zkvm::io::read();
 
     println!("cycle-tracker-end: deserialize inputs");
 
@@ -114,9 +119,22 @@ pub fn main() {
 
     let mut headers = Vec::with_capacity(executor_inputs.len());
     if headers.capacity() != 0 {
+        let first_input = executor_inputs.first().unwrap();
+
+        assert_eq!(
+            trusted_root,
+            first_input.state_anchor(),
+            "State anchor must be equal to trusted root"
+        );
+
+        assert!(
+            trusted_height <= first_input.parent_header().number(),
+            "Trusted height must be less than or equal to parent header height",
+        );
+
         let executor = EthClientExecutor::eth(
-            Arc::new((&executor_inputs[0].genesis).try_into().expect("invalid genesis block")),
-            executor_inputs[0].custom_beneficiary,
+            Arc::new((&first_input.genesis).try_into().expect("invalid genesis block")),
+            first_input.custom_beneficiary,
         );
 
         for input in &executor_inputs {
@@ -128,29 +146,28 @@ pub fn main() {
     println!("cycle-tracker-end: execute EVM blocks");
 
     // -----------------------------
-    // 3. Filter headers and verify blob equivalency
+    // 3. Verify blob equivalency
     // -----------------------------
-    println!("cycle-tracker-start: verify blob inclusion for headers");
+    println!("cycle-tracker-start: verify blob equivalency for headers");
 
-    // Filters headers with empty transaction roots
-    let filtered_headers: Vec<EvmHeader> = headers
-        .iter()
-        .filter(|header| !header.transaction_root_is_empty())
-        .cloned()
-        .collect();
-
-    let signed_data: Vec<SignedData> = blobs
+    let mut signed_data: Vec<SignedData> = blobs
         .into_iter()
         .filter_map(|blob| SignedData::decode(Bytes::from(blob.data)).ok())
         .collect();
 
+    // Filter duplicates if length is unequal
+    if signed_data.len() != headers.len() {
+        let mut seen = HashSet::<u64>::new();
+        signed_data.retain(|sd| signed_data_height(sd).map(|h| seen.insert(h)).unwrap_or(false));
+    }
+
     assert_eq!(
-        filtered_headers.len(),
         signed_data.len(),
-        "Number of headers with blob tx data do not match"
+        headers.len(),
+        "Headers and SignedData must be of equal length"
     );
 
-    for (header, signed_data) in filtered_headers.iter().zip(signed_data) {
+    for (header, signed_data) in headers.iter().zip(signed_data) {
         let mut txs = Vec::with_capacity(signed_data.data.clone().unwrap().txs.len());
         for tx_bytes in signed_data.data.unwrap().txs {
             let tx = TransactionSigned::decode(&mut tx_bytes.as_slice()).expect("Failed decoding transaction");
@@ -172,12 +189,10 @@ pub fn main() {
     // -----------------------------
     println!("cycle-tracker-start: commit public outputs");
 
-    let first = headers.first().unwrap();
-    let last = headers.last().unwrap();
+    let new_height: u64 = headers.last().map(|h| h.number).unwrap_or(trusted_height);
+    let new_state_root: B256 = headers.last().map(|h| h.state_root).unwrap_or(trusted_root);
 
     let output = EvmBlockExecOutput {
-        new_header_hash: last.hash_slow().into(),
-        prev_header_hash: first.parent_hash.into(),
         celestia_header_hash: celestia_header
             .hash()
             .as_bytes()
@@ -190,13 +205,17 @@ pub fn main() {
             .as_bytes()
             .try_into()
             .expect("prev_celestia_header_hash must be exactly 32 bytes"),
-        new_height: last.number,
-        new_state_root: last.state_root.into(),
-        prev_height: first.number - 1,
-        prev_state_root: executor_inputs.first().unwrap().state_anchor().into(),
+        new_height: new_height,
+        new_state_root: new_state_root.into(),
+        prev_height: trusted_height,
+        prev_state_root: trusted_root.into(),
     };
 
     sp1_zkvm::io::commit(&output);
 
     println!("cycle-tracker-end: commit public outputs");
+}
+
+fn signed_data_height(sd: &SignedData) -> Option<u64> {
+    sd.data.as_ref().and_then(|d| d.metadata.as_ref()).map(|m| m.height)
 }
