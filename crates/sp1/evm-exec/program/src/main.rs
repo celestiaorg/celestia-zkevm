@@ -4,7 +4,7 @@
 //! ## Functionality
 //!
 //! The program accepts the following inputs:
-//! - A Celestia block header and associated data availability header (DAH).
+//! - Celestia block header and associated data availability header (DAH).
 //! - Namespace
 //! - Blobs
 //! - NamespaceProofs
