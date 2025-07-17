@@ -51,11 +51,14 @@ pub fn main() {
         serde_cbor::from_slice(&celestia_header_raw).expect("failed to deserialize celestia header");
 
     let dah: DataAvailabilityHeader = sp1_zkvm::io::read();
+
+    let blobs_raw: Vec<u8> = sp1_zkvm::io::read_vec();
+    let blobs: Vec<Blob> = serde_cbor::from_slice(&blobs_raw).expect("failed to deserialize blob data");
+
     let namespace: Namespace = sp1_zkvm::io::read();
+    let proofs: Vec<NamespaceProof> = sp1_zkvm::io::read();
 
     let executor_inputs: Vec<EthClientExecutorInput> = sp1_zkvm::io::read();
-    let blobs: Vec<Blob> = sp1_zkvm::io::read();
-    let proofs: Vec<NamespaceProof> = sp1_zkvm::io::read();
 
     let trusted_height: u64 = sp1_zkvm::io::read();
     let trusted_root: B256 = sp1_zkvm::io::read();

@@ -17,12 +17,12 @@
 use std::error::Error;
 use std::fs;
 
-use anyhow::{Context, Result};
-use celestia_types::ShareProof;
+use anyhow::Result;
+use celestia_types::nmt::{Namespace, NamespaceProof};
+use celestia_types::{Blob, DataAvailabilityHeader};
 use clap::Parser;
 use evm_exec_types::EvmBlockExecOutput;
-use regex::Regex;
-use rsp_client_executor::io::EthClientExecutorInput;
+use rsp_client_executor::io::{EthClientExecutorInput, WitnessInput};
 use sp1_sdk::{include_elf, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
 use tendermint::block::header::Header;
 
@@ -105,69 +105,39 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str) -> Result<(), Box<dyn Error>> {
-    let inputs = read_client_inputs(input_dir)?;
-    stdin.write(&inputs);
-
     let header_json = fs::read_to_string(format!("{input_dir}/header.json"))?;
     let header: Header = serde_json::from_str(&header_json)?;
     let header_raw = serde_cbor::to_vec(&header)?;
     stdin.write_vec(header_raw);
 
-    let share_proofs = read_share_proofs(input_dir)?;
-    stdin.write(&share_proofs);
+    let dah_json = fs::read_to_string(format!("{input_dir}/dah.json"))?;
+    let dah: DataAvailabilityHeader = serde_json::from_str(&dah_json)?;
+    stdin.write(&dah);
+
+    let blobs_json = fs::read_to_string(format!("{input_dir}/blobs.json"))?;
+    let blobs: Vec<Blob> = serde_json::from_str(&blobs_json)?;
+    let blobs_raw = serde_cbor::to_vec(&blobs)?;
+    stdin.write_vec(blobs_raw);
+
+    // TODO: Don't hardcode namespace
+    let namespace = Namespace::new_v0(&hex::decode("b7b24d9321578eb83626")?)?;
+    stdin.write(&namespace);
+
+    let proofs_encoded = fs::read(format!("{input_dir}/namespace_proofs.bin"))?;
+    let proofs: Vec<NamespaceProof> = bincode::deserialize(&proofs_encoded)?;
+    stdin.write(&proofs);
+
+    let executor_inputs_encoded = fs::read(format!("{input_dir}/executor_inputs.bin"))?;
+    let executor_inputs: Vec<EthClientExecutorInput> = bincode::deserialize(&executor_inputs_encoded)?;
+    stdin.write(&executor_inputs);
+
+    // TODO: Maybe don't want to always take these from executor inputs.
+    // There will be cases where executor inputs are empty
+    let trusted_height = executor_inputs.first().unwrap().parent_header().number;
+    stdin.write(&trusted_height);
+
+    let trusted_root = executor_inputs.first().unwrap().state_anchor();
+    stdin.write(&trusted_root);
 
     Ok(())
-}
-
-/// Reads and deserializes ordered `EthClientExecutorInput` files from the given directory.
-fn read_client_inputs(input_dir: &str) -> Result<Vec<EthClientExecutorInput>> {
-    let pattern = Regex::new(r"^client_input-(\d+)\.bin$")?;
-
-    let mut indexed_paths: Vec<_> = fs::read_dir(input_dir)?
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            let file_name = path.file_name()?.to_str()?;
-            let caps = pattern.captures(file_name)?;
-            let index = caps.get(1)?.as_str().parse::<usize>().ok()?;
-            Some((index, path))
-        })
-        .collect();
-
-    indexed_paths.sort_by_key(|(index, _)| *index);
-
-    indexed_paths
-        .into_iter()
-        .map(|(_, path)| {
-            let bytes = fs::read(&path).with_context(|| format!("reading file {:?}", path))?;
-            bincode::deserialize::<EthClientExecutorInput>(&bytes)
-                .with_context(|| format!("deserializing file {:?}", path))
-        })
-        .collect()
-}
-
-/// Reads and deserializes ordered `ShareProof` files from the given directory.
-fn read_share_proofs(input_dir: &str) -> Result<Vec<ShareProof>> {
-    let pattern = Regex::new(r"^share_proof-(\d+)\.bin$")?;
-
-    let mut indexed_paths: Vec<_> = fs::read_dir(input_dir)?
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            let file_name = path.file_name()?.to_str()?;
-            let caps = pattern.captures(file_name)?;
-            let index = caps.get(1)?.as_str().parse::<u32>().ok()?;
-            Some((index, path))
-        })
-        .collect();
-
-    indexed_paths.sort_by_key(|(index, _)| *index);
-
-    indexed_paths
-        .into_iter()
-        .map(|(_, path)| {
-            let bytes = fs::read(&path).with_context(|| format!("reading file {:?}", path))?;
-            bincode::deserialize::<ShareProof>(&bytes).with_context(|| format!("deserializing file {:?}", path))
-        })
-        .collect()
 }
