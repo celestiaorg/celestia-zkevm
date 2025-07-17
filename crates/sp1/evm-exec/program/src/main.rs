@@ -158,8 +158,7 @@ pub fn main() {
         .filter_map(|blob| SignedData::decode(Bytes::from(blob.data)).ok())
         .collect();
 
-    // Equivocation: Filter duplicates if length is unequal
-    // TODO: Make this more readable
+    // Filter out duplicate heights if applicable, accepting FCFS as source of truth.
     if signed_data.len() != headers.len() {
         let mut seen = HashSet::<u64>::new();
         signed_data.retain(|sd| signed_data_height(sd).map(|h| seen.insert(h)).unwrap_or(false));

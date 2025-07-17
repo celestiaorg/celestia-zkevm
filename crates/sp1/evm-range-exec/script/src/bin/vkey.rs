@@ -6,7 +6,7 @@
 //!
 //! You can run this script using the following command from the root of this repository:
 //! ```shell
-//! cargo run -p evm-exec-script --bin vkey --release
+//! cargo run -p evm-range-exec-script --bin vkey --release
 //! ```
 use std::fs;
 
