@@ -4,7 +4,7 @@ use hex::encode;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct EvmBlockExecOutput {
+pub struct BlockExecOutput {
     // celestia_header_hash is the merkle hash of the Celestia block header.
     pub celestia_header_hash: [u8; 32],
     // prev_celestia_header_hash is the merkle hash of the previous Celestia block header.
@@ -20,9 +20,9 @@ pub struct EvmBlockExecOutput {
 }
 
 /// Display trait implementation to format hashes as hex encoded output.
-impl Display for EvmBlockExecOutput {
+impl Display for BlockExecOutput {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        writeln!(f, "EvmBlockExecOutput {{")?;
+        writeln!(f, "BlockExecOutput {{")?;
         writeln!(
             f,
             "  celestia_header_hash:        {}",
@@ -42,7 +42,7 @@ impl Display for EvmBlockExecOutput {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct EvmRangeExecOutput {
+pub struct BlockRangeExecOutput {
     // celestia_header_hash is the hash of the celestia header at which new_height is available.
     pub celestia_header_hash: [u8; 32],
     // trusted_height is the trusted height of the EVM application.
@@ -57,9 +57,9 @@ pub struct EvmRangeExecOutput {
 }
 
 /// Display trait implementation to format hashes as hex encoded output.
-impl Display for EvmRangeExecOutput {
+impl Display for BlockRangeExecOutput {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        writeln!(f, "EvmRangeExecOutput {{")?;
+        writeln!(f, "BlockRangeExecOutput {{")?;
         writeln!(
             f,
             "  celestia_header_hash:        {}",

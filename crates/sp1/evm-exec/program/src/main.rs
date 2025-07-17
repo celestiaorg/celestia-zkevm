@@ -27,7 +27,7 @@ use bytes::Bytes;
 use celestia_types::nmt::{Namespace, NamespaceProof, NamespacedHash};
 use celestia_types::Blob;
 use celestia_types::DataAvailabilityHeader;
-use evm_exec_types::EvmBlockExecOutput;
+use evm_exec_types::BlockExecOutput;
 use nmt_rs::NamespacedSha2Hasher;
 use prost::Message;
 use reth_primitives::alloy_primitives::private::alloy_rlp::Decodable;
@@ -196,7 +196,7 @@ pub fn main() {
     let new_height: u64 = headers.last().map(|h| h.number).unwrap_or(trusted_height);
     let new_state_root: B256 = headers.last().map(|h| h.state_root).unwrap_or(trusted_root);
 
-    let output = EvmBlockExecOutput {
+    let output = BlockExecOutput {
         celestia_header_hash: celestia_header
             .hash()
             .as_bytes()
