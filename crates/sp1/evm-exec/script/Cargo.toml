@@ -35,6 +35,7 @@ prost = { workspace = true }
 regex = "1.11.1"
 reqwest = "0.12.15"
 reth-chainspec = { workspace = true }
+reth-primitives = { workspace = true }
 rollkit-types = { workspace = true, features = ["grpc"] }
 rsp-client-executor = { workspace = true }
 rsp-primitives = { workspace = true }

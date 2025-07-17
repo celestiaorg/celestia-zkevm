@@ -14,6 +14,7 @@
 //! ```shell
 //! RUST_LOG=info cargo run -p evm-exec-script --release -- --prove --height 1010
 //! ```
+use std::env;
 use std::error::Error;
 use std::fs;
 
@@ -22,6 +23,7 @@ use celestia_types::nmt::{Namespace, NamespaceProof};
 use celestia_types::{Blob, DataAvailabilityHeader};
 use clap::Parser;
 use evm_exec_types::EvmBlockExecOutput;
+use reth_primitives::revm_primitives::FixedBytes;
 use rsp_client_executor::io::{EthClientExecutorInput, WitnessInput};
 use sp1_sdk::{include_elf, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
 use tendermint::block::header::Header;
@@ -41,6 +43,12 @@ struct Args {
 
     #[arg(long)]
     height: u64,
+
+    #[arg(long)]
+    trusted_height: Option<u64>,
+
+    #[arg(long)]
+    trusted_root: Option<String>,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -65,7 +73,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let client = ProverClient::from_env();
 
     let mut stdin = SP1Stdin::new();
-    write_proof_inputs(&mut stdin, &input_dir)?;
+    write_proof_inputs(&mut stdin, &input_dir, &args)?;
 
     if args.execute {
         // Execute the program.
@@ -104,7 +112,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str) -> Result<(), Box<dyn Error>> {
+fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str, args: &Args) -> Result<(), Box<dyn Error>> {
     let header_json = fs::read_to_string(format!("{input_dir}/header.json"))?;
     let header: Header = serde_json::from_str(&header_json)?;
     let header_raw = serde_cbor::to_vec(&header)?;
@@ -119,8 +127,8 @@ fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str) -> Result<(), Box<d
     let blobs_raw = serde_cbor::to_vec(&blobs)?;
     stdin.write_vec(blobs_raw);
 
-    // TODO: Don't hardcode namespace
-    let namespace = Namespace::new_v0(&hex::decode("b7b24d9321578eb83626")?)?;
+    let namespace_hex = env::var("CELESTIA_NAMESPACE").expect("CELESTIA_NAMESPACE env variable must be set");
+    let namespace = Namespace::new_v0(&hex::decode(namespace_hex)?)?;
     stdin.write(&namespace);
 
     let proofs_encoded = fs::read(format!("{input_dir}/namespace_proofs.bin"))?;
@@ -131,12 +139,26 @@ fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str) -> Result<(), Box<d
     let executor_inputs: Vec<EthClientExecutorInput> = bincode::deserialize(&executor_inputs_encoded)?;
     stdin.write(&executor_inputs);
 
-    // TODO: Maybe don't want to always take these from executor inputs.
-    // There will be cases where executor inputs are empty
-    let trusted_height = executor_inputs.first().unwrap().parent_header().number;
+    // Determine trusted height
+    let trusted_height = if let Some(h) = args.trusted_height {
+        h
+    } else if let Some(input) = executor_inputs.first() {
+        input.parent_header().number
+    } else {
+        panic!("Trusted height not provided and executor_inputs is empty");
+    };
     stdin.write(&trusted_height);
 
-    let trusted_root = executor_inputs.first().unwrap().state_anchor();
+    // Determine trusted root
+    let trusted_root = if let Some(root_str) = args.trusted_root.as_deref() {
+        let bytes = hex::decode(root_str).expect("Invalid hex");
+        let array: [u8; 32] = bytes.try_into().expect("Trusted root must be 32 bytes");
+        FixedBytes::from(array)
+    } else if let Some(input) = executor_inputs.first() {
+        input.state_anchor()
+    } else {
+        panic!("Trusted root not provided and executor_inputs is empty");
+    };
     stdin.write(&trusted_root);
 
     Ok(())

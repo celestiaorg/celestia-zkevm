@@ -1,7 +1,7 @@
 {
   "version": {
     "block": "11",
-    "app": "3"
+    "app": "4"
   },
   "chain_id": "celestia-zkevm-testnet",
   "height": "12",
