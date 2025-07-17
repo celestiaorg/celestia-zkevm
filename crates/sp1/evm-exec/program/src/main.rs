@@ -3,18 +3,29 @@
 //!
 //! ## Functionality
 //!
-//! This program accepts a batch of EVM execution inputs along with a single Celestia block header
-//! and, if necessary, inclusion proofs for transaction blobs. It performs the following steps:
+//! The program accepts the following inputs:
+//! - A Celestia block header and associated data availability header (DAH).
+//! - Namespace
+//! - Blobs
+//! - NamespaceProofs
+//! - EthClientExecutorInputs (RSP - state transition function)
+//! - Trusted Height
+//! - Trusted State Root
 //!
-//! 1. Deserializes a vector of [`EthClientExecutorInput`] values and a single Celestia block header.
-//! 2. Executes the EVM block state transition function (STF) for each input block.
-//! 3. If the EVM block contains transactions, verifies that the corresponding blob was included in
-//!    the specified Celestia block via a [`ShareProof`].
-//! 4. Commits an [`EvmBlockExecOutput`] structure as the public output of the program, containing:
-//!     - Final EVM block header hash and state root,
-//!     - Previous EVM header hash and state root (from the first input),
-//!     - Celestia header hashes (current and previous).
+//! It performs the following steps:
+//! 1. Deserializes the program inputs.
+//! 2. Verifies completeness of the namespace using the provided blobs.
+//! 3. Executes the EVM blocks via the state transition function.
+//! 4. Verifies equivalency between the EVM block data and blob data via SignedData.
+//! 5. Commits a [`BlockExecOutput`] struct to the program outputs.
 //!
+//! The program commits the following fields to the program output:
+//! - Celestia block header hash
+//! - Previous Celestia block header hash
+//! - New Height
+//! - New State Root
+//! - Trusted Height
+//! - Trusted State Root
 #![no_main]
 
 sp1_zkvm::entrypoint!(main);
@@ -83,7 +94,7 @@ pub fn main() {
         }
     }
 
-    if roots.len() == 0 {
+    if roots.is_empty() {
         assert!(blobs.is_empty(), "Blobs must be empty if no roots contain namespace");
         assert!(proofs.is_empty(), "Proofs must be empty if no roots contain namespace");
     }
@@ -117,7 +128,6 @@ pub fn main() {
     // -----------------------------
     // 2. Execute the EVM block inputs
     // -----------------------------
-
     println!("cycle-tracker-start: execute EVM blocks");
 
     let mut headers = Vec::with_capacity(executor_inputs.len());
@@ -208,7 +218,7 @@ pub fn main() {
             .as_bytes()
             .try_into()
             .expect("prev_celestia_header_hash must be exactly 32 bytes"),
-        new_height: new_height,
+        new_height,
         new_state_root: new_state_root.into(),
         prev_height: trusted_height,
         prev_state_root: trusted_root.into(),
