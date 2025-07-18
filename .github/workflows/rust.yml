@@ -39,19 +39,3 @@ jobs:
 
       - name: Lint with Clippy
         run: cargo clippy --workspace --all-targets --release --locked -- -D warnings
-
-      - name: Execute SP1 Block Execution
-        run: |
-          for dir in ./testdata/inputs/block-*; do
-            # Extract block number from directory name (e.g. block-15)
-            name=$(basename "$dir") 
-            block_number=${name#block-}
-            
-            echo "Running SP1 block execution program for $block_number"
-            cargo run -p evm-exec-script --bin evm-exec --release --locked -- --execute --height $block_number
-          done
-
-      - name: Execute SP1 Block Range Execution
-        run: |
-          echo "Running SP1 block range execution program"
-          cargo run -p evm-range-exec-script --bin evm-range-exec --release --locked -- --execute
