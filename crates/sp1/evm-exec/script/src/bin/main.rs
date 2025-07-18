@@ -22,12 +22,12 @@ use std::env;
 use std::error::Error;
 use std::fs;
 
+use alloy_primitives::FixedBytes;
 use anyhow::Result;
 use celestia_types::nmt::{Namespace, NamespaceProof};
 use celestia_types::{Blob, DataAvailabilityHeader};
 use clap::Parser;
 use evm_exec_types::BlockExecOutput;
-use reth_primitives::revm_primitives::FixedBytes;
 use rsp_client_executor::io::{EthClientExecutorInput, WitnessInput};
 use sp1_sdk::{include_elf, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
 use tendermint::block::header::Header;
@@ -122,26 +122,38 @@ fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str, args: &Args) -> Res
     let header_raw = serde_cbor::to_vec(&header)?;
     stdin.write_vec(header_raw);
 
+    println!("wrote header");
+
     let dah_json = fs::read_to_string(format!("{input_dir}/dah.json"))?;
     let dah: DataAvailabilityHeader = serde_json::from_str(&dah_json)?;
     stdin.write(&dah);
+
+    println!("wrote dah");
 
     let blobs_json = fs::read_to_string(format!("{input_dir}/blobs.json"))?;
     let blobs: Vec<Blob> = serde_json::from_str(&blobs_json)?;
     let blobs_raw = serde_cbor::to_vec(&blobs)?;
     stdin.write_vec(blobs_raw);
 
+    println!("wrote blobs");
+
     let namespace_hex = env::var("CELESTIA_NAMESPACE").expect("CELESTIA_NAMESPACE env variable must be set");
     let namespace = Namespace::new_v0(&hex::decode(namespace_hex)?)?;
     stdin.write(&namespace);
+
+    println!("wrote namespace");
 
     let proofs_encoded = fs::read(format!("{input_dir}/namespace_proofs.bin"))?;
     let proofs: Vec<NamespaceProof> = bincode::deserialize(&proofs_encoded)?;
     stdin.write(&proofs);
 
+    println!("wrote proofs");
+
     let executor_inputs_encoded = fs::read(format!("{input_dir}/executor_inputs.bin"))?;
     let executor_inputs: Vec<EthClientExecutorInput> = bincode::deserialize(&executor_inputs_encoded)?;
     stdin.write(&executor_inputs);
+
+    println!("wrote inputs");
 
     // Determine trusted height
     let trusted_height = if let Some(h) = args.trusted_height {
@@ -152,6 +164,8 @@ fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str, args: &Args) -> Res
         panic!("Trusted height not provided and executor_inputs is empty");
     };
     stdin.write(&trusted_height);
+
+    println!("wrote height");
 
     // Determine trusted root
     let trusted_root = if let Some(root_str) = args.trusted_root.as_deref() {
@@ -164,6 +178,8 @@ fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str, args: &Args) -> Res
         panic!("Trusted root not provided and executor_inputs is empty");
     };
     stdin.write(&trusted_root);
+
+    println!("wrote root");
 
     Ok(())
 }

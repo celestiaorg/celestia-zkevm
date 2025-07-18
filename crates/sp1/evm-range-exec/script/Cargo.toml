@@ -13,7 +13,7 @@ name = "parser"
 path = "src/bin/parser.rs"
 
 [[bin]]
-name = "vkey"
+name = "vkey-evm-range-exec"
 path = "src/bin/vkey.rs"
 
 [dependencies]

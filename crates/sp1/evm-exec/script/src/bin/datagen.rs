@@ -16,6 +16,7 @@
 use std::env;
 use std::error::Error;
 use std::fs;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use alloy_provider::ProviderBuilder;
@@ -53,7 +54,7 @@ struct Args {
 fn load_chain_spec_from_genesis(path: &str) -> Result<(Genesis, Arc<ChainSpec>), Box<dyn Error>> {
     let genesis_json = fs::read_to_string(path).wrap_err_with(|| format!("Failed to read genesis file at {}", path))?;
 
-    let genesis = Genesis::Custom(genesis_json);
+    let genesis = Genesis::from_str(&genesis_json)?;
     let chain_spec = Arc::new((&genesis).try_into()?);
     Ok((genesis, chain_spec))
 }
@@ -67,7 +68,7 @@ async fn generate_client_executor_input(
 ) -> Result<EthClientExecutorInput, Box<dyn Error>> {
     let host_executor = EthHostExecutor::eth(chain_spec.clone(), None);
 
-    let provider = ProviderBuilder::new().on_http(rpc_url.parse().unwrap());
+    let provider = ProviderBuilder::new().connect_http(rpc_url.parse().unwrap());
     let rpc_db = RpcDb::new(provider.clone(), block_number - 1);
 
     let client_input = host_executor

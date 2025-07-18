@@ -10,9 +10,13 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-alloy-consensus = { version = "0.12.6" }
-alloy-provider = { version = "0.12.6" }
-alloy-sol-types = { version = "0.8.0", default-features = false }
+alloy-consensus = { version = "1.0.13" }
+alloy-primitives = { version = "1.2.0", default-features = false }
+alloy-provider = { version = "1.0.13", default-features = false, features = [
+    "reqwest",
+    "reqwest-rustls-tls",
+] }
+alloy-rlp = "0.3.10"
 base64 = "0.22.1"
 bincode = "1.3.3"
 bytes = "1.10.1"
@@ -24,23 +28,20 @@ hex = "0.4.3"
 nmt-rs = "*"
 prost = "0.12"
 reqwest = "0.12.20"
-reth-chainspec = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.3", default-features = false }
-reth-primitives = { git = "https://github.com/sp1-patches/reth", tag = "rsp-20240830", default-features = false, features = [
-    "alloy-compat",
-    "optimism",
-    "std",
-] }
+reth-chainspec = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.0", default-features = false }
+reth-primitives = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.0", default-features = false }
 rollkit-types = { git = "https://github.com/rollkit/rollkit", rev = "9a1dbbbd8362180e95a08c75100c7e5c5bdf9f9a", package = "rollkit-types", default-features = false }
-rsp-client-executor = { git = "https://github.com/succinctlabs/rsp.git", rev = "837a8c04a29deadb576a75fcf56136f26ce5dd4d" }
-rsp-host-executor = { git = "https://github.com/succinctlabs/rsp.git", rev = "837a8c04a29deadb576a75fcf56136f26ce5dd4d" }
-rsp-primitives = { git = "https://github.com/succinctlabs/rsp.git", rev = "837a8c04a29deadb576a75fcf56136f26ce5dd4d" }
-rsp-rpc-db = { git = "https://github.com/succinctlabs/rsp.git", rev = "837a8c04a29deadb576a75fcf56136f26ce5dd4d" }
+rsp-client-executor = { git = "https://github.com/succinctlabs/rsp.git", tag = "reth-1.5.0" }
+rsp-host-executor = { git = "https://github.com/succinctlabs/rsp.git", tag = "reth-1.5.0" }
+rsp-primitives = { git = "https://github.com/succinctlabs/rsp.git", tag = "reth-1.5.0" }
+rsp-rpc-db = { git = "https://github.com/succinctlabs/rsp.git", tag = "reth-1.5.0" }
 serde = "1.0"
 serde_cbor = "0.11.2"
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 sha3 = "0.10"
-sp1-build = "=4.1.4"
-sp1-sdk = "=4.1.4"
-sp1-zkvm = "=4.1.4"
+sp1-build = "=5.0.8"
+sp1-core-executor = { version = "=5.0.8", features = ["bigint-rug"] }
+sp1-sdk = "=5.0.8"
+sp1-zkvm = "=5.0.8"
 tendermint = "0.40.1"
 tendermint-proto = "*"
