@@ -27,10 +27,10 @@ pub const EVM_RANGE_EXEC_ELF: &[u8] = include_elf!("evm-range-exec-program");
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    #[arg(long)]
+    #[arg(long, help = "Run the program in execute mode")]
     execute: bool,
 
-    #[arg(long)]
+    #[arg(long, help = "Run the program in prove mode")]
     prove: bool,
 }
 

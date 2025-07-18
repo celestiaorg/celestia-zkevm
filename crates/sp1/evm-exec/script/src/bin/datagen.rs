@@ -42,10 +42,10 @@ mod config {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    #[arg(long)]
+    #[arg(long, help = "Start height to collect proof input data")]
     start: u64,
 
-    #[arg(long)]
+    #[arg(long, help = "Number of blocks to collect")]
     blocks: u64,
 }
 

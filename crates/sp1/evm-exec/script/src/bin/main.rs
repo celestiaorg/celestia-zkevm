@@ -5,14 +5,18 @@
 //! and writes the resulting proof to `testdata/proofs/proof-with-pis-<height>.bin`.
 //!
 //! You must provide the block number via `--height`, along with either `--execute` or `--prove`.
+//! The `--trusted-height` and `--trusted-root` flags are optional, however they must be set if proving
+//! an empty Celestia block, i.e. where there is no EthClientExecutorInputs.
 //!
 //! You can run this script using the following command from the root of this repository:
 //! ```shell
-//! RUST_LOG=info cargo run -p evm-exec-script --release -- --execute --height 1010
+//! RUST_LOG=info cargo run -p evm-exec-script --release -- --execute --height 12 --trusted-height 18
+//! --trusted-root c02a6bbc8529cbe508a24ce2961776b699eeb6412c99c2e106bbd7ebddd4d385
 //! ```
 //! or
 //! ```shell
-//! RUST_LOG=info cargo run -p evm-exec-script --release -- --prove --height 1010
+//! RUST_LOG=info cargo run -p evm-exec-script --release -- --prove --height 12 --trusted-height 18
+//! --trusted-root c02a6bbc8529cbe508a24ce2961776b699eeb6412c99c2e106bbd7ebddd4d385
 //! ```
 use std::env;
 use std::error::Error;
@@ -33,21 +37,21 @@ pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
 
 /// The arguments for the command.
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version = clap::crate_version!(), about = "A CLI for running the evm-exec SP1 program", long_about = None)]
 struct Args {
-    #[arg(long)]
+    #[arg(long, help = "Run the program in execute mode")]
     execute: bool,
 
-    #[arg(long)]
+    #[arg(long, help = "Run the program in prove mode")]
     prove: bool,
 
-    #[arg(long)]
+    #[arg(long, help = "The Celestia block height")]
     height: u64,
 
-    #[arg(long)]
+    #[arg(long, help = "Trusted EVM height which contains trusted state root")]
     trusted_height: Option<u64>,
 
-    #[arg(long)]
+    #[arg(long, help = "Trusted state root (hex string) for the trusted height")]
     trusted_root: Option<String>,
 }
 

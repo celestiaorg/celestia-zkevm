@@ -25,7 +25,7 @@ base64 = { workspace = true }
 bincode = { workspace = true }
 celestia-types = { workspace = true }
 celestia-rpc = { workspace = true }
-clap = { version = "4.0", features = ["derive", "env"] }
+clap = { version = "4.0", features = ["cargo", "derive", "env"] }
 dotenv = "0.15.0"
 eq-common = { workspace = true }
 eyre = "0.6.12"
