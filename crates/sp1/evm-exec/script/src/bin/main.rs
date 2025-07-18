@@ -22,12 +22,12 @@ use std::env;
 use std::error::Error;
 use std::fs;
 
+use alloy_primitives::FixedBytes;
 use anyhow::Result;
 use celestia_types::nmt::{Namespace, NamespaceProof};
 use celestia_types::{Blob, DataAvailabilityHeader};
 use clap::Parser;
 use evm_exec_types::BlockExecOutput;
-use reth_primitives::revm_primitives::FixedBytes;
 use rsp_client_executor::io::{EthClientExecutorInput, WitnessInput};
 use sp1_sdk::{include_elf, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
 use tendermint::block::header::Header;

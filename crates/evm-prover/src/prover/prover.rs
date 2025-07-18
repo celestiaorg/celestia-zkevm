@@ -3,6 +3,7 @@ use std::fs;
 use std::result::Result::{Err, Ok};
 use std::sync::Arc;
 
+use alloy_genesis::Genesis as AlloyGenesis;
 use alloy_provider::ProviderBuilder;
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
@@ -133,7 +134,9 @@ impl AppContext {
             .join(GENESIS_FILE);
 
         let raw_genesis = fs::read_to_string(path).context("Failed to read genesis file from path")?;
-        let genesis = Genesis::Custom(raw_genesis);
+        let alloy_genesis: AlloyGenesis = serde_json::from_str(&raw_genesis)?;
+
+        let genesis = Genesis::Custom(alloy_genesis.config);
         Ok(genesis)
     }
 }
@@ -170,7 +173,7 @@ impl BlockExecProver {
     /// Generates the serialized state transition function (STF) input for a given EVM block number.
     async fn generate_stf(&self, block_number: u64) -> Result<Vec<u8>> {
         let host_executor = EthHostExecutor::eth(self.app.chain_spec.clone(), None);
-        let provider = ProviderBuilder::new().on_http(self.app.evm_rpc.parse()?);
+        let provider = ProviderBuilder::new().connect_http(self.app.evm_rpc.parse()?);
         let rpc_db = RpcDb::new(provider.clone(), block_number - 1);
 
         let client_input = host_executor

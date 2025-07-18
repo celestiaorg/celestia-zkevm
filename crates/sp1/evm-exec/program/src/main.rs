@@ -33,7 +33,9 @@ sp1_zkvm::entrypoint!(main);
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use alloy_consensus::BlockHeader;
+use alloy_consensus::{proofs, BlockHeader};
+use alloy_primitives::B256;
+use alloy_rlp::Decodable;
 use bytes::Bytes;
 use celestia_types::nmt::{Namespace, NamespaceProof, NamespacedHash};
 use celestia_types::Blob;
@@ -41,9 +43,7 @@ use celestia_types::DataAvailabilityHeader;
 use evm_exec_types::BlockExecOutput;
 use nmt_rs::NamespacedSha2Hasher;
 use prost::Message;
-use reth_primitives::alloy_primitives::private::alloy_rlp::Decodable;
 use reth_primitives::TransactionSigned;
-use reth_primitives::{proofs, B256};
 use rollkit_types::v1::SignedData;
 use rsp_client_executor::{
     executor::EthClientExecutor,

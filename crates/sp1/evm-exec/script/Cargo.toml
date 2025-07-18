@@ -13,12 +13,14 @@ name = "evm-exec"
 path = "src/bin/main.rs"
 
 [[bin]]
-name = "vkey"
+name = "vkey-evm-exec"
 path = "src/bin/vkey.rs"
 
 [dependencies]
 evm-exec-types = { path = "../../evm-exec-types" }
 
+alloy-genesis = { workspace = true }
+alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 anyhow = "1.0"
 base64 = { workspace = true }
