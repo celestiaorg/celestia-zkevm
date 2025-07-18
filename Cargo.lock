@@ -2503,6 +2503,7 @@ dependencies = [
 name = "evm-exec-script"
 version = "0.1.0"
 dependencies = [
+ "alloy-genesis",
  "alloy-primitives",
  "alloy-provider",
  "anyhow",
@@ -2553,6 +2554,7 @@ dependencies = [
 name = "evm-prover"
 version = "0.1.0"
 dependencies = [
+ "alloy-genesis",
  "alloy-provider",
  "anyhow",
  "async-trait",
@@ -2574,6 +2576,7 @@ dependencies = [
  "rsp-rpc-db",
  "serde",
  "serde_cbor",
+ "serde_json",
  "serde_yaml",
  "sha3",
  "sp1-build",

@@ -16,9 +16,9 @@
 use std::env;
 use std::error::Error;
 use std::fs;
-use std::str::FromStr;
 use std::sync::Arc;
 
+use alloy_genesis::Genesis as AlloyGenesis;
 use alloy_provider::ProviderBuilder;
 use anyhow::Result;
 use celestia_rpc::{BlobClient, Client, HeaderClient, ShareClient};
@@ -53,9 +53,11 @@ struct Args {
 /// Loads the genesis file from disk and converts it into a ChainSpec
 fn load_chain_spec_from_genesis(path: &str) -> Result<(Genesis, Arc<ChainSpec>), Box<dyn Error>> {
     let genesis_json = fs::read_to_string(path).wrap_err_with(|| format!("Failed to read genesis file at {}", path))?;
+    let alloy_genesis: AlloyGenesis = serde_json::from_str(&genesis_json)?;
 
-    let genesis = Genesis::from_str(&genesis_json)?;
-    let chain_spec = Arc::new((&genesis).try_into()?);
+    let genesis = Genesis::Custom(alloy_genesis.config);
+    let chain_spec: Arc<ChainSpec> = Arc::new((&genesis).try_into()?);
+
     Ok((genesis, chain_spec))
 }
 

@@ -19,6 +19,7 @@ path = "src/bin/vkey.rs"
 [dependencies]
 evm-exec-types = { path = "../../evm-exec-types" }
 
+alloy-genesis = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 anyhow = "1.0"

@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 use std::fs;
 use std::result::Result::{Err, Ok};
-use std::str::FromStr;
 use std::sync::Arc;
 
+use alloy_genesis::Genesis as AlloyGenesis;
 use alloy_provider::ProviderBuilder;
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
@@ -134,7 +134,9 @@ impl AppContext {
             .join(GENESIS_FILE);
 
         let raw_genesis = fs::read_to_string(path).context("Failed to read genesis file from path")?;
-        let genesis = Genesis::from_str(&raw_genesis)?;
+        let alloy_genesis: AlloyGenesis = serde_json::from_str(&raw_genesis)?;
+
+        let genesis = Genesis::Custom(alloy_genesis.config);
         Ok(genesis)
     }
 }
