@@ -17,7 +17,7 @@
 #![no_main]
 sp1_zkvm::entrypoint!(main);
 
-use evm_exec_types::{Buffer, EvmBlockExecOutput, EvmRangeExecOutput};
+use evm_exec_types::{BlockExecOutput, BlockRangeExecOutput, Buffer};
 use sha2::{Digest, Sha256};
 
 pub fn main() {
@@ -46,11 +46,11 @@ pub fn main() {
     // ------------------------------
     // 3. Parse public values into outputs
     // ------------------------------
-    let outputs: Vec<EvmBlockExecOutput> = public_values
+    let outputs: Vec<BlockExecOutput> = public_values
         .iter()
         .map(|bytes| {
             let mut buffer = Buffer::from(bytes);
-            buffer.read::<EvmBlockExecOutput>()
+            buffer.read::<BlockExecOutput>()
         })
         .collect();
 
@@ -94,7 +94,7 @@ pub fn main() {
     let first = outputs.first().expect("No outputs provided");
     let last = outputs.last().expect("No outputs provided");
 
-    let output = EvmRangeExecOutput {
+    let output = BlockRangeExecOutput {
         celestia_header_hash: last.celestia_header_hash,
         trusted_height: first.prev_height,
         trusted_state_root: first.prev_state_root,

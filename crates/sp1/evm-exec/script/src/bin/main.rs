@@ -5,24 +5,30 @@
 //! and writes the resulting proof to `testdata/proofs/proof-with-pis-<height>.bin`.
 //!
 //! You must provide the block number via `--height`, along with either `--execute` or `--prove`.
+//! The `--trusted-height` and `--trusted-root` flags are optional, however they must be set if proving
+//! an empty Celestia block, i.e. where there is no EthClientExecutorInputs.
 //!
 //! You can run this script using the following command from the root of this repository:
 //! ```shell
-//! RUST_LOG=info cargo run -p evm-exec-script --release -- --execute --height 1010
+//! RUST_LOG=info cargo run -p evm-exec-script --release -- --execute --height 12 --trusted-height 18
+//! --trusted-root c02a6bbc8529cbe508a24ce2961776b699eeb6412c99c2e106bbd7ebddd4d385
 //! ```
 //! or
 //! ```shell
-//! RUST_LOG=info cargo run -p evm-exec-script --release -- --prove --height 1010
+//! RUST_LOG=info cargo run -p evm-exec-script --release -- --prove --height 12 --trusted-height 18
+//! --trusted-root c02a6bbc8529cbe508a24ce2961776b699eeb6412c99c2e106bbd7ebddd4d385
 //! ```
+use std::env;
 use std::error::Error;
 use std::fs;
 
-use anyhow::{Context, Result};
-use celestia_types::ShareProof;
+use anyhow::Result;
+use celestia_types::nmt::{Namespace, NamespaceProof};
+use celestia_types::{Blob, DataAvailabilityHeader};
 use clap::Parser;
-use evm_exec_types::EvmBlockExecOutput;
-use regex::Regex;
-use rsp_client_executor::io::EthClientExecutorInput;
+use evm_exec_types::BlockExecOutput;
+use reth_primitives::revm_primitives::FixedBytes;
+use rsp_client_executor::io::{EthClientExecutorInput, WitnessInput};
 use sp1_sdk::{include_elf, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
 use tendermint::block::header::Header;
 
@@ -31,16 +37,22 @@ pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
 
 /// The arguments for the command.
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version = clap::crate_version!(), about = "A CLI for running the evm-exec SP1 program", long_about = None)]
 struct Args {
-    #[arg(long)]
+    #[arg(long, help = "Run the program in execute mode")]
     execute: bool,
 
-    #[arg(long)]
+    #[arg(long, help = "Run the program in prove mode")]
     prove: bool,
 
-    #[arg(long)]
+    #[arg(long, help = "The Celestia block height")]
     height: u64,
+
+    #[arg(long, help = "Trusted EVM height which contains trusted state root")]
+    trusted_height: Option<u64>,
+
+    #[arg(long, help = "Trusted state root (hex string) for the trusted height")]
+    trusted_root: Option<String>,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -65,7 +77,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let client = ProverClient::from_env();
 
     let mut stdin = SP1Stdin::new();
-    write_proof_inputs(&mut stdin, &input_dir)?;
+    write_proof_inputs(&mut stdin, &input_dir, &args)?;
 
     if args.execute {
         // Execute the program.
@@ -73,7 +85,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("Program executed successfully!");
 
         // Read the output.
-        let block_exec_output: EvmBlockExecOutput = bincode::deserialize(output.as_slice())?;
+        let block_exec_output: BlockExecOutput = bincode::deserialize(output.as_slice())?;
         println!("Outputs: {}", block_exec_output);
 
         // Record the number of cycles executed.
@@ -104,70 +116,54 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str) -> Result<(), Box<dyn Error>> {
-    let inputs = read_client_inputs(input_dir)?;
-    stdin.write(&inputs);
-
+fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str, args: &Args) -> Result<(), Box<dyn Error>> {
     let header_json = fs::read_to_string(format!("{input_dir}/header.json"))?;
     let header: Header = serde_json::from_str(&header_json)?;
     let header_raw = serde_cbor::to_vec(&header)?;
     stdin.write_vec(header_raw);
 
-    let share_proofs = read_share_proofs(input_dir)?;
-    stdin.write(&share_proofs);
+    let dah_json = fs::read_to_string(format!("{input_dir}/dah.json"))?;
+    let dah: DataAvailabilityHeader = serde_json::from_str(&dah_json)?;
+    stdin.write(&dah);
+
+    let blobs_json = fs::read_to_string(format!("{input_dir}/blobs.json"))?;
+    let blobs: Vec<Blob> = serde_json::from_str(&blobs_json)?;
+    let blobs_raw = serde_cbor::to_vec(&blobs)?;
+    stdin.write_vec(blobs_raw);
+
+    let namespace_hex = env::var("CELESTIA_NAMESPACE").expect("CELESTIA_NAMESPACE env variable must be set");
+    let namespace = Namespace::new_v0(&hex::decode(namespace_hex)?)?;
+    stdin.write(&namespace);
+
+    let proofs_encoded = fs::read(format!("{input_dir}/namespace_proofs.bin"))?;
+    let proofs: Vec<NamespaceProof> = bincode::deserialize(&proofs_encoded)?;
+    stdin.write(&proofs);
+
+    let executor_inputs_encoded = fs::read(format!("{input_dir}/executor_inputs.bin"))?;
+    let executor_inputs: Vec<EthClientExecutorInput> = bincode::deserialize(&executor_inputs_encoded)?;
+    stdin.write(&executor_inputs);
+
+    // Determine trusted height
+    let trusted_height = if let Some(h) = args.trusted_height {
+        h
+    } else if let Some(input) = executor_inputs.first() {
+        input.parent_header().number
+    } else {
+        panic!("Trusted height not provided and executor_inputs is empty");
+    };
+    stdin.write(&trusted_height);
+
+    // Determine trusted root
+    let trusted_root = if let Some(root_str) = args.trusted_root.as_deref() {
+        let bytes = hex::decode(root_str).expect("Invalid hex");
+        let array: [u8; 32] = bytes.try_into().expect("Trusted root must be 32 bytes");
+        FixedBytes::from(array)
+    } else if let Some(input) = executor_inputs.first() {
+        input.state_anchor()
+    } else {
+        panic!("Trusted root not provided and executor_inputs is empty");
+    };
+    stdin.write(&trusted_root);
 
     Ok(())
-}
-
-/// Reads and deserializes ordered `EthClientExecutorInput` files from the given directory.
-fn read_client_inputs(input_dir: &str) -> Result<Vec<EthClientExecutorInput>> {
-    let pattern = Regex::new(r"^client_input-(\d+)\.bin$")?;
-
-    let mut indexed_paths: Vec<_> = fs::read_dir(input_dir)?
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            let file_name = path.file_name()?.to_str()?;
-            let caps = pattern.captures(file_name)?;
-            let index = caps.get(1)?.as_str().parse::<usize>().ok()?;
-            Some((index, path))
-        })
-        .collect();
-
-    indexed_paths.sort_by_key(|(index, _)| *index);
-
-    indexed_paths
-        .into_iter()
-        .map(|(_, path)| {
-            let bytes = fs::read(&path).with_context(|| format!("reading file {:?}", path))?;
-            bincode::deserialize::<EthClientExecutorInput>(&bytes)
-                .with_context(|| format!("deserializing file {:?}", path))
-        })
-        .collect()
-}
-
-/// Reads and deserializes ordered `ShareProof` files from the given directory.
-fn read_share_proofs(input_dir: &str) -> Result<Vec<ShareProof>> {
-    let pattern = Regex::new(r"^share_proof-(\d+)\.bin$")?;
-
-    let mut indexed_paths: Vec<_> = fs::read_dir(input_dir)?
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            let file_name = path.file_name()?.to_str()?;
-            let caps = pattern.captures(file_name)?;
-            let index = caps.get(1)?.as_str().parse::<u32>().ok()?;
-            Some((index, path))
-        })
-        .collect();
-
-    indexed_paths.sort_by_key(|(index, _)| *index);
-
-    indexed_paths
-        .into_iter()
-        .map(|(_, path)| {
-            let bytes = fs::read(&path).with_context(|| format!("reading file {:?}", path))?;
-            bincode::deserialize::<ShareProof>(&bytes).with_context(|| format!("deserializing file {:?}", path))
-        })
-        .collect()
 }

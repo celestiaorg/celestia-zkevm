@@ -32,7 +32,7 @@ The `script` crate contains three binaries and depends on the `testdata` directo
 Note, this assumes the `docker-compose` services maintained at the root of the repository are running.
 
     ```shell
-    cargo run -p evm-exec-script --bin data-gen --release -- --start <START_BLOCK> --end <END_BLOCK>
+    cargo run -p evm-exec-script --bin data-gen --release -- --start <START_BLOCK> --blocks <END_BLOCK>
     ```
 
 2. Run the `vkey` binary to output the verifier key for the `evm-exec` program.
@@ -43,20 +43,23 @@ Note, this assumes the `docker-compose` services maintained at the root of the r
 
 3. The `evm-exec` binary can be run in both `--execute` and `--prove` mode. Execution mode will run the program without generating a proof.
 Proving mode will attempt to generate a proof for the program which can be verified using the programs verification key and public inputs.
+The binary accepts a number of flags, `--height` the Celestia block height, `--trusted-height` the trusted EVM height and `--trusted-root` 
+the trusted state root for the trusted height. Please note, the `--trusted-height` and `--trusted-root` flags are required when proving an 
+empty Celestia block (i.e. a Celestia block containing no tx data for the EVM application).
 
-Note, running the program in proving mode requires the `SP1_PROVER` and optionally the `NETWORK_PRIVATE_KEY` env variables to be set.
+Running the program in proving mode requires the `SP1_PROVER` and optionally the `NETWORK_PRIVATE_KEY` env variables to be set.
 See `.env.example` at the root of the repository.
 
 Run the `evm-exec` binary in execution mode.
 
     ```shell
-    RUST_LOG=info cargo run -p evm-exec-script --release -- --execute --height 1011
+    RUST_LOG=info cargo run -p evm-exec-script --release -- --execute --height 12 --trusted-height 18 --trusted-root c02a6bbc8529cbe508a24ce2961776b699eeb6412c99c2e106bbd7ebddd4d385
     ```
 
 Run the `evm-exec` binary in proving mode.
 
     ```shell
-    RUST_LOG=info cargo run -p evm-exec-script --release -- --prove --height 1011
+    RUST_LOG=info cargo run -p evm-exec-script --release -- --prove --height 12 --trusted-height 18 --trusted-root c02a6bbc8529cbe508a24ce2961776b699eeb6412c99c2e106bbd7ebddd4d385
     ```
 
 Please refer to https://docs.succinct.xyz/docs/sp1/introduction for more comprehensive documentation on Succinct SP1.

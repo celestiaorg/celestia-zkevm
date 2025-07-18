@@ -14,7 +14,7 @@ use std::fs;
 use std::path::Path;
 
 use clap::Parser;
-use evm_exec_types::EvmRangeExecOutput;
+use evm_exec_types::BlockRangeExecOutput;
 use sp1_sdk::{include_elf, HashableKey, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
@@ -27,10 +27,10 @@ pub const EVM_RANGE_EXEC_ELF: &[u8] = include_elf!("evm-range-exec-program");
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    #[arg(long)]
+    #[arg(long, help = "Run the program in execute mode")]
     execute: bool,
 
-    #[arg(long)]
+    #[arg(long, help = "Run the program in prove mode")]
     prove: bool,
 }
 
@@ -56,7 +56,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("Program executed successfully.");
 
         // Read the output.
-        let range_exec_output: EvmRangeExecOutput = bincode::deserialize(output.as_slice())?;
+        let range_exec_output: BlockRangeExecOutput = bincode::deserialize(output.as_slice())?;
         println!("Outputs: {}", range_exec_output);
 
         // Record the number of cycles executed.
