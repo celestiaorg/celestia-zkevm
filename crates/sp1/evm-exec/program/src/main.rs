@@ -222,6 +222,7 @@ pub fn main() {
         new_state_root: new_state_root.into(),
         prev_height: trusted_height,
         prev_state_root: trusted_root.into(),
+        namespace,
     };
 
     sp1_zkvm::io::commit(&output);

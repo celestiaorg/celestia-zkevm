@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter, Result};
 
+use celestia_types::nmt::Namespace;
 use hex::encode;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -17,6 +18,8 @@ pub struct BlockExecOutput {
     pub prev_height: u64,
     // prev_state_root is the EVM application state root before the state transition function has been applied.
     pub prev_state_root: [u8; 32],
+    // namespace is the Celestia namespace that contains the blob data.
+    pub namespace: Namespace,
 }
 
 /// Display trait implementation to format hashes as hex encoded output.

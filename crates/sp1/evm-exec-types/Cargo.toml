@@ -7,3 +7,4 @@ edition = "2021"
 bincode = { workspace = true }
 hex = { workspace = true }
 serde = { workspace = true }
+celestia-types = { workspace = true }

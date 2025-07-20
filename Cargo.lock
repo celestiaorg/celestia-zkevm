@@ -2546,6 +2546,7 @@ name = "evm-exec-types"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "celestia-types",
  "hex",
  "serde",
 ]
