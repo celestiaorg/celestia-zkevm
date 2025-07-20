@@ -40,6 +40,7 @@ use bytes::Bytes;
 use celestia_types::nmt::{Namespace, NamespaceProof, NamespacedHash};
 use celestia_types::Blob;
 use celestia_types::DataAvailabilityHeader;
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use evm_exec_types::BlockExecOutput;
 use nmt_rs::NamespacedSha2Hasher;
 use prost::Message;
@@ -73,6 +74,7 @@ pub fn main() {
 
     let trusted_height: u64 = sp1_zkvm::io::read();
     let trusted_root: B256 = sp1_zkvm::io::read();
+    let public_key: Vec<u8> = sp1_zkvm::io::read_vec();
 
     println!("cycle-tracker-end: deserialize inputs");
 
@@ -180,6 +182,27 @@ pub fn main() {
         "Headers and SignedData must be of equal length"
     );
 
+    for signed_data_item in &signed_data {
+        let signer = signed_data_item
+            .signer
+            .as_ref()
+            .expect("SignedData must contain signer");
+
+        assert_eq!(
+            signer.pub_key, public_key,
+            "Signer public key must match expected sequencer public key"
+        );
+
+        let data_bytes = signed_data_item
+            .data
+            .as_ref()
+            .expect("SignedData must contain data")
+            .encode_to_vec();
+
+        verify_signature(&public_key, &data_bytes, &signed_data_item.signature)
+            .expect("Sequencer signature verification failed");
+    }
+
     for (header, signed_data) in headers.iter().zip(signed_data) {
         let mut txs = Vec::with_capacity(signed_data.data.clone().unwrap().txs.len());
         for tx_bytes in signed_data.data.unwrap().txs {
@@ -223,6 +246,7 @@ pub fn main() {
         prev_height: trusted_height,
         prev_state_root: trusted_root.into(),
         namespace,
+        public_key,
     };
 
     sp1_zkvm::io::commit(&output);
@@ -232,4 +256,17 @@ pub fn main() {
 
 fn signed_data_height(sd: &SignedData) -> Option<u64> {
     sd.data.as_ref().and_then(|d| d.metadata.as_ref()).map(|m| m.height)
+}
+
+fn verify_signature(public_key: &[u8], message: &[u8], signature: &[u8]) -> Result<(), &'static str> {
+    let public_key: [u8; 32] = public_key
+        .try_into()
+        .map_err(|_| "Public key must be 32 bytes for Ed25519")?;
+    let verifying_key = VerifyingKey::from_bytes(&public_key).map_err(|_| "Invalid Ed25519 public key")?;
+    let signature = Signature::from_slice(signature).map_err(|_| "Invalid Ed25519 signature")?;
+    verifying_key
+        .verify(message, &signature)
+        .map_err(|_| "Signature verification failed")?;
+
+    Ok(())
 }

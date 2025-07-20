@@ -20,6 +20,8 @@ pub struct BlockExecOutput {
     pub prev_state_root: [u8; 32],
     // namespace is the Celestia namespace that contains the blob data.
     pub namespace: Namespace,
+    // public_key is the sequencer's public key used to verify the signatures of the signed data.
+    pub public_key: Vec<u8>,
 }
 
 /// Display trait implementation to format hashes as hex encoded output.
