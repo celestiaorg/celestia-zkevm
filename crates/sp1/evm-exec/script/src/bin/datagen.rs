@@ -28,7 +28,9 @@ use clap::Parser;
 use eyre::Context;
 use prost::Message;
 use reth_chainspec::ChainSpec;
-use rollkit_types::v1::SignedData;
+use rollkit_types::v1::get_block_request::Identifier;
+use rollkit_types::v1::store_service_client::StoreServiceClient;
+use rollkit_types::v1::{GetBlockRequest, SignedData};
 use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
@@ -37,6 +39,7 @@ use rsp_rpc_db::RpcDb;
 mod config {
     pub const CELESTIA_RPC_URL: &str = "http://localhost:26658";
     pub const EVM_RPC_URL: &str = "http://localhost:8545";
+    pub const SEQUENCER_URL: &str = "http://localhost:7331";
 }
 
 /// The arguments for the command.
@@ -81,6 +84,18 @@ async fn generate_client_executor_input(
     Ok(client_input)
 }
 
+async fn get_sequencer_pubkey() -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut sequencer_client = StoreServiceClient::connect(config::SEQUENCER_URL).await?;
+    let block_req = GetBlockRequest {
+        identifier: Some(Identifier::Height(1)),
+    };
+
+    let resp = sequencer_client.get_block(block_req).await?;
+    let pub_key = resp.into_inner().block.unwrap().header.unwrap().signer.unwrap().pub_key;
+
+    Ok(pub_key)
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
@@ -96,6 +111,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let celestia_client = Client::new(config::CELESTIA_RPC_URL, None)
         .await
         .context("Failed creating Celestia RPC client")?;
+
+    let pub_key = get_sequencer_pubkey().await?;
 
     for block_number in start_height..(start_height + num_blocks) {
         println!("\nProcessing block: {}", block_number);
@@ -152,6 +169,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         let blobs_encoded = serde_json::to_string_pretty(&blobs)?;
         fs::write(format!("{}/blobs.json", block_dir), blobs_encoded)?;
+
+        let pk_encoded = bincode::serialize(&pub_key)?;
+        fs::write(format!("{}/pub_key.bin", block_dir), pk_encoded)?;
 
         let proofs_encoded = bincode::serialize(&proofs)?;
         fs::write(format!("{}/namespace_proofs.bin", block_dir), proofs_encoded)?;

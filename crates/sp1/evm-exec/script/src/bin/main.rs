@@ -131,6 +131,10 @@ fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str, args: &Args) -> Res
     let blobs_raw = serde_cbor::to_vec(&blobs)?;
     stdin.write_vec(blobs_raw);
 
+    let pub_key_encoded = fs::read(format!("{input_dir}/pub_key.bin"))?;
+    let pub_key = bincode::deserialize(&pub_key_encoded)?;
+    stdin.write_vec(pub_key);
+
     let namespace_hex = env::var("CELESTIA_NAMESPACE").expect("CELESTIA_NAMESPACE env variable must be set");
     let namespace = Namespace::new_v0(&hex::decode(namespace_hex)?)?;
     stdin.write(&namespace);
