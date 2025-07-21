@@ -53,15 +53,15 @@ See `.env.example` at the root of the repository.
 
 Run the `evm-range-exec` binary in execution mode.
 
-    ```shell
-    RUST_LOG=info cargo run -p evm-range-exec-script --release -- --execute
-    ```
+```shell
+RUST_LOG=info cargo run -p evm-range-exec-script --release -- --execute
+```
 
 Run the `evm-range-exec` binary in proving mode.
 
-    ```shell
-    RUST_LOG=info cargo run -p evm-range-exec-script --release -- --prove
-    ```
+```shell
+RUST_LOG=info cargo run -p evm-range-exec-script --release -- --prove
+```
 
 3. The `parser` binary can be used to read an existing `SP1ProofWithPublicValues` from `testdata/groth16-proof.bin` and split it into its constituent components:
 the Groth16 proof and the associated public inputs.
@@ -74,8 +74,8 @@ The script expects an existing file at `testdata/groth16-proof.bin` and will out
 
 Run the `parser` binary to split the proof into the raw Groth16 proof and associated public values.
 
-    ```shell
-    RUST_LOG=info cargo run -p evm-range-exec-script --bin parser --release
-    ```
+```shell
+RUST_LOG=info cargo run -p evm-range-exec-script --bin parser --release
+```
 
 Please refer to https://docs.succinct.xyz/docs/sp1/introduction for more comprehensive documentation on Succinct SP1.

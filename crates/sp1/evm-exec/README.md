@@ -50,9 +50,9 @@ The `script` crate contains three binaries and depends on the `testdata` directo
 
 Note, this assumes the `docker-compose` services maintained at the root of the repository are running.
 
-    ```shell
-    cargo run -p evm-exec-script --bin data-gen --release -- --start <START_BLOCK> --blocks <END_BLOCK>
-    ```
+```shell
+cargo run -p evm-exec-script --bin data-gen --release -- --start <START_BLOCK> --blocks <END_BLOCK>
+```
 
 2. Run the `vkey` binary to output the verifier key for the `evm-exec` program.
 
@@ -71,14 +71,14 @@ See `.env.example` at the root of the repository.
 
 Run the `evm-exec` binary in execution mode.
 
-    ```shell
-    RUST_LOG=info cargo run -p evm-exec-script --release -- --execute --height 12 --trusted-height 18 --trusted-root c02a6bbc8529cbe508a24ce2961776b699eeb6412c99c2e106bbd7ebddd4d385
-    ```
+```shell
+RUST_LOG=info cargo run -p evm-exec-script --release -- --execute --height 12 --trusted-height 18 --trusted-root c02a6bbc8529cbe508a24ce2961776b699eeb6412c99c2e106bbd7ebddd4d385
+```
 
 Run the `evm-exec` binary in proving mode.
 
-    ```shell
-    RUST_LOG=info cargo run -p evm-exec-script --release -- --prove --height 12 --trusted-height 18 --trusted-root c02a6bbc8529cbe508a24ce2961776b699eeb6412c99c2e106bbd7ebddd4d385
-    ```
+```shell
+RUST_LOG=info cargo run -p evm-exec-script --release -- --prove --height 12 --trusted-height 18 --trusted-root c02a6bbc8529cbe508a24ce2961776b699eeb6412c99c2e106bbd7ebddd4d385
+```
 
 Please refer to https://docs.succinct.xyz/docs/sp1/introduction for more comprehensive documentation on Succinct SP1.
