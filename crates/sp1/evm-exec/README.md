@@ -1,11 +1,30 @@
 ## Overview
 
-An SP1 program that verifies inclusion of an EVM reth block in the Celestia data availability network and executes its state transition function (STF).
+An SP1 program that verifies inclusion of EVM reth blocks in the Celestia data availability network 
+and executes their state transition functions.
 
-1. Accepts an EVM block STF and associated Celestia proofs.
-2. Verifies that the EVM block was included in the Celestia block.
-3. Executes the EVM block STF.
-4. Commits the resulting EVM and Celestia block metadata as public outputs.
+### Program Inputs
+
+- `CelestiaHeader`: A celestia block header at height H.
+- `DAH`: The associated data availability header at height H.
+- `Namespace`: The namespace containing blob data.
+- `PublicKey`: The public key of the sequencer signing blob data.
+- `Blobs`: All blobs in the namespace for the current block.
+- `NamespaceProofs`: Namespaced Merkle Tree proofs for the complete namespace.
+- `EthClientExecutorInputs`: List of RSP based EVM state transition functions for N blocks included at height H.
+- `TrustedHeight`: A trusted height containing the trusted state root.
+- `TrustedStateRoot`: A trusted state root for the trusted height.
+
+### Program Outputs
+
+- `CelestiaHeaderHash`: A hash of the celestia block header at height H.
+- `PreviousCelestiaHeaderHash`: A hash of the previous celestia block header at height H-1.
+- `NewHeight`: The height of the EVM application after applying N blocks.
+- `NewStateRoot`: The state root of the EVM application after applying N blocks.
+- `TrustedHeight`: The trusted height of the EVM application before applying N blocks.
+- `TrustedStateRoot`: The trusted state root of the EVM application before applying N blocks.
+- `Namespace`: The namespace containing blob data.
+- `PublicKey`: The public key of the sequencer signing blob data.
 
 ## Usage
 
