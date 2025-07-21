@@ -7,6 +7,7 @@
 //! - Celestia block header and associated data availability header (DAH).
 //! - Namespace
 //! - Blobs
+//! - Sequencer Public Key
 //! - NamespaceProofs
 //! - EthClientExecutorInputs (RSP - state transition function)
 //! - Trusted Height
@@ -16,8 +17,9 @@
 //! 1. Deserializes the program inputs.
 //! 2. Verifies completeness of the namespace using the provided blobs.
 //! 3. Executes the EVM blocks via the state transition function.
-//! 4. Verifies equivalency between the EVM block data and blob data via SignedData.
-//! 5. Commits a [`BlockExecOutput`] struct to the program outputs.
+//! 4. Filters blobs to SignedData and verifies the sequencer signature.
+//! 5. Verifies equivalency between the EVM block data and blob data via SignedData.
+//! 6. Commits a [`BlockExecOutput`] struct to the program outputs.
 //!
 //! The program commits the following fields to the program output:
 //! - Celestia block header hash
@@ -26,11 +28,14 @@
 //! - New State Root
 //! - Trusted Height
 //! - Trusted State Root
+//! - Namespace
+//! - Public Key
 #![no_main]
 
 sp1_zkvm::entrypoint!(main);
 
 use std::collections::HashSet;
+use std::error::Error;
 use std::sync::Arc;
 
 use alloy_consensus::{proofs, BlockHeader};
@@ -40,11 +45,12 @@ use bytes::Bytes;
 use celestia_types::nmt::{Namespace, NamespaceProof, NamespacedHash};
 use celestia_types::Blob;
 use celestia_types::DataAvailabilityHeader;
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use evm_exec_types::BlockExecOutput;
 use nmt_rs::NamespacedSha2Hasher;
 use prost::Message;
 use reth_primitives::TransactionSigned;
-use rollkit_types::v1::SignedData;
+use rollkit_types::v1::{Data, SignedData};
 use rsp_client_executor::{
     executor::EthClientExecutor,
     io::{EthClientExecutorInput, WitnessInput},
@@ -66,6 +72,7 @@ pub fn main() {
     let blobs_raw: Vec<u8> = sp1_zkvm::io::read_vec();
     let blobs: Vec<Blob> = serde_cbor::from_slice(&blobs_raw).expect("failed to deserialize blob data");
 
+    let pub_key: Vec<u8> = sp1_zkvm::io::read_vec();
     let namespace: Namespace = sp1_zkvm::io::read();
     let proofs: Vec<NamespaceProof> = sp1_zkvm::io::read();
 
@@ -159,30 +166,54 @@ pub fn main() {
     println!("cycle-tracker-end: execute EVM blocks");
 
     // -----------------------------
-    // 3. Verify blob equivalency
+    // 3. Filter SignedData blobs and verify signatures
     // -----------------------------
-    println!("cycle-tracker-start: verify blob-header equivalency");
+    println!("cycle-tracker-start: filter signed data blobs and verify signatures");
 
-    let mut signed_data: Vec<SignedData> = blobs
+    let signed_data: Vec<SignedData> = blobs
         .into_iter()
         .filter_map(|blob| SignedData::decode(Bytes::from(blob.data)).ok())
         .collect();
 
-    // Filter out duplicate heights if applicable, accepting FCFS as source of truth.
-    if signed_data.len() != headers.len() {
-        let mut seen = HashSet::<u64>::new();
-        signed_data.retain(|sd| signed_data_height(sd).map(|h| seen.insert(h)).unwrap_or(false));
+    let mut tx_data: Vec<Data> = Vec::new();
+    for sd in signed_data {
+        let signer = sd.signer.as_ref().expect("SignedData must contain signer");
+
+        if signer.pub_key != pub_key {
+            continue;
+        }
+
+        let data_bytes = sd.data.as_ref().expect("SignedData must contain data").encode_to_vec();
+
+        verify_signature(&pub_key[4..], &data_bytes, &sd.signature).expect("Sequencer signature verification failed");
+
+        tx_data.push(sd.data.unwrap());
     }
 
+    // Equivocation tolerance: Filter out duplicate heights if applicable, accepting FCFS as the source of truth.
+    if tx_data.len() != headers.len() {
+        let mut seen = HashSet::<u64>::new();
+        tx_data.retain(|data| get_height(data).map(|h| seen.insert(h)).unwrap_or(false));
+    }
+
+    tx_data.sort_by_key(|data| get_height(data).expect("Data must contain a height"));
+
     assert_eq!(
-        signed_data.len(),
+        tx_data.len(),
         headers.len(),
         "Headers and SignedData must be of equal length"
     );
 
-    for (header, signed_data) in headers.iter().zip(signed_data) {
-        let mut txs = Vec::with_capacity(signed_data.data.clone().unwrap().txs.len());
-        for tx_bytes in signed_data.data.unwrap().txs {
+    println!("cycle-tracker-end: filter signed data blobs and verify signatures");
+
+    // -----------------------------
+    // 4. Verify blob equivalency
+    // -----------------------------
+    println!("cycle-tracker-start: verify blob-header equivalency");
+
+    for (header, data) in headers.iter().zip(tx_data) {
+        let mut txs = Vec::with_capacity(data.txs.len());
+        for tx_bytes in data.txs {
             let tx = TransactionSigned::decode(&mut tx_bytes.as_slice()).expect("Failed decoding transaction");
             txs.push(tx);
         }
@@ -198,7 +229,7 @@ pub fn main() {
     println!("cycle-tracker-end: verify blob-header equivalency");
 
     // -----------------------------
-    // 4. Build and commit outputs
+    // 5. Build and commit outputs
     // -----------------------------
     println!("cycle-tracker-start: commit public outputs");
 
@@ -222,6 +253,8 @@ pub fn main() {
         new_state_root: new_state_root.into(),
         prev_height: trusted_height,
         prev_state_root: trusted_root.into(),
+        namespace,
+        public_key: pub_key,
     };
 
     sp1_zkvm::io::commit(&output);
@@ -229,6 +262,22 @@ pub fn main() {
     println!("cycle-tracker-end: commit public outputs");
 }
 
-fn signed_data_height(sd: &SignedData) -> Option<u64> {
-    sd.data.as_ref().and_then(|d| d.metadata.as_ref()).map(|m| m.height)
+fn get_height(data: &Data) -> Option<u64> {
+    data.metadata.as_ref().map(|m| m.height)
+}
+
+fn verify_signature(public_key: &[u8], message: &[u8], signature: &[u8]) -> Result<(), Box<dyn Error>> {
+    let pub_key: [u8; 32] = public_key
+        .try_into()
+        .map_err(|e| format!("Public key must be 32 bytes for Ed25519: {e}"))?;
+
+    let verifying_key = VerifyingKey::from_bytes(&pub_key).map_err(|e| format!("Invalid Ed25519 public key: {e}"))?;
+
+    let signature = Signature::from_slice(signature).map_err(|e| format!("Invalid Ed25519 signature: {e}"))?;
+
+    verifying_key
+        .verify(message, &signature)
+        .map_err(|e| format!("Signature verification failed: {e}"))?;
+
+    Ok(())
 }
