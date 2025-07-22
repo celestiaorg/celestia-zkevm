@@ -86,6 +86,18 @@ pub fn main() {
             prev.celestia_header_hash,
             curr.prev_celestia_header_hash
         );
+
+        assert_eq!(
+            curr.namespace, prev.namespace,
+            "unexpected namespace: expected {:?}, got {:?}",
+            prev.namespace, curr.namespace
+        );
+
+        assert_eq!(
+            curr.public_key, prev.public_key,
+            "unexpected public key: expected {:?}, got {:?}",
+            prev.public_key, curr.public_key
+        );
     }
 
     // ------------------------------
@@ -100,6 +112,8 @@ pub fn main() {
         trusted_state_root: first.prev_state_root,
         new_state_root: last.new_state_root,
         new_height: last.new_height,
+        namespace: last.namespace,
+        public_key: last.public_key.clone(),
     };
 
     sp1_zkvm::io::commit(&output);
