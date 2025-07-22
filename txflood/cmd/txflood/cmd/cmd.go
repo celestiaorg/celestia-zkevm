@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"log"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 
@@ -28,6 +30,7 @@ It can create new accounts, fund them given a faucet account and spam transactio
 	rootCmd.AddCommand(CreateAccountsCmd())
 	rootCmd.AddCommand(FundAccountsCmd())
 	rootCmd.AddCommand(SendTxsCmd())
+	rootCmd.AddCommand(SendTxsLoopCmd())
 
 	return rootCmd
 }
@@ -106,4 +109,27 @@ func SendTxsCmd() *cobra.Command {
 	}
 
 	return sendTxsCmd
+}
+
+func SendTxsLoopCmd() *cobra.Command {
+	sendTxsLoopCmd := &cobra.Command{
+		Use:   "send-loop",
+		Short: "Load accounts from JSON and send transactions between them in a round-robin format",
+		Args:  cobra.NoArgs,
+		Run: func(cmd *cobra.Command, args []string) {
+			accounts, err := loadAccounts(walletsFile)
+			if err != nil {
+				log.Fatalf("failed to load accounts: %v", err)
+			}
+
+			ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt)
+			defer cancel()
+
+			if err := sendTxLoop(ctx, accounts); err != nil {
+				log.Fatalf("failed to fund accounts: %v", err)
+			}
+		},
+	}
+
+	return sendTxsLoopCmd
 }
