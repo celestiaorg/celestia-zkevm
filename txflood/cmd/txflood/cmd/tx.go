@@ -17,50 +17,72 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-func sendTxs(ctx context.Context, accounts []Wallet, totalTxs uint64) error {
+type txClient struct {
+	*ethclient.Client
+
+	keys     []*ecdsa.PrivateKey
+	nonceMap map[common.Address]uint64
+	chainID  *big.Int
+}
+
+func newTxClient(ctx context.Context, accounts []Wallet) (*txClient, error) {
 	client, err := ethclient.Dial(rpcURL)
 	if err != nil {
-		return fmt.Errorf("failed to connect to Ethereum client: %w", err)
+		return nil, fmt.Errorf("failed to connect to Ethereum client: %w", err)
 	}
-	defer client.Close()
 
-	// Convert Wallets to ECDSA keys and build address -> key mapping
 	keys := make([]*ecdsa.PrivateKey, 0, len(accounts))
-	addrToKey := make(map[common.Address]*ecdsa.PrivateKey)
 	nonceMap := make(map[common.Address]uint64)
 
 	for _, acc := range accounts {
 		key, err := crypto.HexToECDSA(strings.TrimPrefix(acc.PrivateKey, "0x"))
 		if err != nil {
-			return fmt.Errorf("failed to decode private key: %w", err)
+			client.Close()
+			return nil, fmt.Errorf("failed to decode private key: %w", err)
 		}
-		addr := crypto.PubkeyToAddress(key.PublicKey)
 
+		addr := crypto.PubkeyToAddress(key.PublicKey)
 		nonce, err := client.PendingNonceAt(ctx, addr)
 		if err != nil {
-			return fmt.Errorf("failed to get nonce for %s: %w", addr.Hex(), err)
+			client.Close()
+			return nil, fmt.Errorf("failed to get nonce for %s: %w", addr.Hex(), err)
 		}
 
 		keys = append(keys, key)
-		addrToKey[addr] = key
 		nonceMap[addr] = nonce
 	}
 
 	chainID, err := client.NetworkID(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get chain ID: %w", err)
+		client.Close()
+		return nil, fmt.Errorf("failed to get chain ID: %w", err)
 	}
+
+	return &txClient{
+		Client:   client,
+		keys:     keys,
+		nonceMap: nonceMap,
+		chainID:  chainID,
+	}, nil
+}
+
+func sendTxs(ctx context.Context, accounts []Wallet, totalTxs uint64) error {
+	txClient, err := newTxClient(ctx, accounts)
+	if err != nil {
+		return err
+	}
+	defer txClient.Close()
 
 	var wg sync.WaitGroup
 	for i := range totalTxs {
-		fromKey := keys[i%uint64(len(keys))]
-		toKey := keys[(i+1)%uint64(len(keys))]
+		fromKey := txClient.keys[i%uint64(len(txClient.keys))]
+		toKey := txClient.keys[(i+1)%uint64(len(txClient.keys))]
 
 		fromAddr := crypto.PubkeyToAddress(fromKey.PublicKey)
 		toAddr := crypto.PubkeyToAddress(toKey.PublicKey)
 
-		nonce := nonceMap[fromAddr]
-		nonceMap[fromAddr]++
+		nonce := txClient.nonceMap[fromAddr]
+		txClient.nonceMap[fromAddr]++
 
 		wg.Add(1)
 		go func(fromKey *ecdsa.PrivateKey, to common.Address, nonce uint64) {
@@ -68,13 +90,13 @@ func sendTxs(ctx context.Context, accounts []Wallet, totalTxs uint64) error {
 
 			tx := types.NewTransaction(nonce, to, big.NewInt(1e6), 21000, big.NewInt(1e9), nil)
 
-			signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), fromKey)
+			signedTx, err := types.SignTx(tx, types.NewEIP155Signer(txClient.chainID), fromKey)
 			if err != nil {
 				log.Printf("failed to sign tx: %v", err)
 				return
 			}
 
-			if err := client.SendTransaction(ctx, signedTx); err != nil {
+			if err := txClient.SendTransaction(ctx, signedTx); err != nil {
 				log.Printf("failed to send tx with nonce %d: %v", nonce, err)
 				return
 			}
@@ -88,38 +110,11 @@ func sendTxs(ctx context.Context, accounts []Wallet, totalTxs uint64) error {
 }
 
 func sendTxFlood(ctx context.Context, accounts []Wallet, interval time.Duration, maxTxs int) error {
-	client, err := ethclient.Dial(rpcURL)
+	txClient, err := newTxClient(ctx, accounts)
 	if err != nil {
-		return fmt.Errorf("failed to connect to Ethereum client: %w", err)
+		return err
 	}
-	defer client.Close()
-
-	// Convert Wallets to ECDSA keys and build address -> key mapping
-	keys := make([]*ecdsa.PrivateKey, 0, len(accounts))
-	addrToKey := make(map[common.Address]*ecdsa.PrivateKey)
-	nonceMap := make(map[common.Address]uint64)
-
-	for _, acc := range accounts {
-		key, err := crypto.HexToECDSA(strings.TrimPrefix(acc.PrivateKey, "0x"))
-		if err != nil {
-			return fmt.Errorf("failed to decode private key: %w", err)
-		}
-		addr := crypto.PubkeyToAddress(key.PublicKey)
-
-		nonce, err := client.PendingNonceAt(ctx, addr)
-		if err != nil {
-			return fmt.Errorf("failed to get nonce for %s: %w", addr.Hex(), err)
-		}
-
-		keys = append(keys, key)
-		addrToKey[addr] = key
-		nonceMap[addr] = nonce
-	}
-
-	chainID, err := client.NetworkID(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get chain ID: %w", err)
-	}
+	defer txClient.Close()
 
 	ticker := time.NewTicker(interval)
 	for {
@@ -128,19 +123,19 @@ func sendTxFlood(ctx context.Context, accounts []Wallet, interval time.Duration,
 			fmt.Printf("\nExiting transactions send loop...\n")
 			return nil
 		case <-ticker.C:
-			numTxs := rand.Intn(maxTxs) + 1 // Intn returns 0 <= n < maxTxs, so add 1 to get 1–maxTxs
+			numTxs := rand.Intn(maxTxs) + 1
 			fmt.Printf("\nSending %d txs...\n", numTxs)
 
 			var wg sync.WaitGroup
 			for i := range numTxs {
-				fromKey := keys[i%len(keys)]
-				toKey := keys[(i+1)%len(keys)]
+				fromKey := txClient.keys[i%len(txClient.keys)]
+				toKey := txClient.keys[(i+1)%len(txClient.keys)]
 
 				fromAddr := crypto.PubkeyToAddress(fromKey.PublicKey)
 				toAddr := crypto.PubkeyToAddress(toKey.PublicKey)
 
-				nonce := nonceMap[fromAddr]
-				nonceMap[fromAddr]++
+				nonce := txClient.nonceMap[fromAddr]
+				txClient.nonceMap[fromAddr]++
 
 				wg.Add(1)
 				go func(fromKey *ecdsa.PrivateKey, to common.Address, nonce uint64) {
@@ -148,13 +143,13 @@ func sendTxFlood(ctx context.Context, accounts []Wallet, interval time.Duration,
 
 					tx := types.NewTransaction(nonce, to, big.NewInt(1e6), 21000, big.NewInt(1e9), nil)
 
-					signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), fromKey)
+					signedTx, err := types.SignTx(tx, types.NewEIP155Signer(txClient.chainID), fromKey)
 					if err != nil {
 						log.Printf("failed to sign tx: %v", err)
 						return
 					}
 
-					if err := client.SendTransaction(ctx, signedTx); err != nil {
+					if err := txClient.SendTransaction(ctx, signedTx); err != nil {
 						log.Printf("failed to send tx with nonce %d: %v", nonce, err)
 						return
 					}
