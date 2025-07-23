@@ -87,7 +87,7 @@ func sendTxs(ctx context.Context, accounts []Wallet, totalTxs uint64) error {
 	return nil
 }
 
-func sendTxLoop(ctx context.Context, accounts []Wallet) error {
+func sendTxFlood(ctx context.Context, accounts []Wallet, interval time.Duration, maxTxs int) error {
 	client, err := ethclient.Dial(rpcURL)
 	if err != nil {
 		return fmt.Errorf("failed to connect to Ethereum client: %w", err)
@@ -121,16 +121,15 @@ func sendTxLoop(ctx context.Context, accounts []Wallet) error {
 		return fmt.Errorf("failed to get chain ID: %w", err)
 	}
 
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(interval)
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Printf("Exiting...\n")
+			fmt.Printf("\nExiting transactions send loop...\n")
 			return nil
 		case <-ticker.C:
-			// Generate a random number between 1 and 100
-			numTxs := rand.Intn(100) + 1 // Intn returns 0 <= n < 100, so add 1 to get 1–100
-			fmt.Printf("Sending %d txs...\n", numTxs)
+			numTxs := rand.Intn(maxTxs) + 1 // Intn returns 0 <= n < maxTxs, so add 1 to get 1–maxTxs
+			fmt.Printf("\nSending %d txs...\n", numTxs)
 
 			var wg sync.WaitGroup
 			for i := range numTxs {

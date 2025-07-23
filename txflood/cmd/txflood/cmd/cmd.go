@@ -1,11 +1,12 @@
 package cmd
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/spf13/cobra"
@@ -30,7 +31,7 @@ It can create new accounts, fund them given a faucet account and spam transactio
 	rootCmd.AddCommand(CreateAccountsCmd())
 	rootCmd.AddCommand(FundAccountsCmd())
 	rootCmd.AddCommand(SendTxsCmd())
-	rootCmd.AddCommand(SendTxsLoopCmd())
+	rootCmd.AddCommand(SendTxFloodCmd())
 
 	return rootCmd
 }
@@ -40,17 +41,18 @@ func CreateAccountsCmd() *cobra.Command {
 		Use:   "create-accounts [num-accounts]",
 		Short: "Create new EVM accounts and write the address and private key to file",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			numAccs, err := strconv.ParseUint(args[0], 10, 64)
 			if err != nil {
-				log.Fatalf("failed to parse number of accounts: %v", err)
+				return fmt.Errorf("failed to parse number of accounts: %v", err)
 			}
 
 			if err := createAccounts(numAccs, walletsFile); err != nil {
-				log.Fatalf("failed to create accounts: %v", err)
+				return fmt.Errorf("failed to create accounts: %v", err)
 			}
 
 			cmd.Printf("Successfully created %d accounts\n", numAccs)
+			return nil
 		},
 	}
 
@@ -62,22 +64,23 @@ func FundAccountsCmd() *cobra.Command {
 		Use:   "fund-accounts [faucet-key]",
 		Short: "Load accounts from JSON and fund them using a faucet account",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			accounts, err := loadAccounts(walletsFile)
 			if err != nil {
-				log.Fatalf("failed to load accounts: %v", err)
+				return fmt.Errorf("failed to load accounts: %v", err)
 			}
 
 			faucetKey, err := crypto.HexToECDSA(strings.TrimPrefix(args[0], "0x"))
 			if err != nil {
-				log.Fatalf("failed to get faucet private key: %v", err)
+				return fmt.Errorf("failed to get faucet private key: %v", err)
 			}
 
 			if err := fundAccounts(cmd.Context(), faucetKey, accounts); err != nil {
-				log.Fatalf("failed to fund accounts: %v", err)
+				return fmt.Errorf("failed to fund accounts: %v", err)
 			}
 
 			cmd.Printf("Successfully funded %d accounts\n", len(accounts))
+			return nil
 		},
 	}
 
@@ -87,49 +90,68 @@ func FundAccountsCmd() *cobra.Command {
 func SendTxsCmd() *cobra.Command {
 	sendTxsCmd := &cobra.Command{
 		Use:   "send-txs [num-txs]",
-		Short: "Load accounts from JSON and send transactions between them in a round-robin format",
+		Short: "Load accounts from JSON and send N transactions between them in a round-robin format",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			accounts, err := loadAccounts(walletsFile)
 			if err != nil {
-				log.Fatalf("failed to load accounts: %v", err)
+				return fmt.Errorf("failed to load accounts: %v", err)
 			}
 
 			numTxs, err := strconv.ParseUint(args[0], 10, 64)
 			if err != nil {
-				log.Fatalf("failed to parse number of txs: %v", err)
+				return fmt.Errorf("failed to parse number of txs: %v", err)
 			}
 
 			if err := sendTxs(cmd.Context(), accounts, numTxs); err != nil {
-				log.Fatalf("failed to fund accounts: %v", err)
+				return fmt.Errorf("failed to fund accounts: %v", err)
 			}
 
 			cmd.Printf("Successfully sent %d transactions\n", numTxs)
+			return nil
 		},
 	}
 
 	return sendTxsCmd
 }
 
-func SendTxsLoopCmd() *cobra.Command {
+func SendTxFloodCmd() *cobra.Command {
 	sendTxsLoopCmd := &cobra.Command{
-		Use:   "send-loop",
-		Short: "Load accounts from JSON and send transactions between them in a round-robin format",
-		Args:  cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
+		Use:   "flood",
+		Short: "Load accounts from JSON and send transactions continuously between them in a round-robin format",
+		Long: `Load accounts from JSON and send transactions continuously between them in a round-robin format.
+This cmd sends a random number of transactions capped at an upper bound and at a configurable interval. 
+Use the --interval and --max-txs flags to configure the frequency and upper bound of transactions to be sent.`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
 			accounts, err := loadAccounts(walletsFile)
 			if err != nil {
-				log.Fatalf("failed to load accounts: %v", err)
+				return fmt.Errorf("failed to load accounts: %v", err)
+			}
+
+			interval, err := cmd.Flags().GetDuration("interval")
+			if err != nil {
+				return fmt.Errorf("failed to parse interval duration from flags")
+			}
+
+			maxTxs, err := cmd.Flags().GetUint64("max-txs")
+			if err != nil {
+				return fmt.Errorf("failed to parse max transactions from flags")
 			}
 
 			ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt)
 			defer cancel()
 
-			if err := sendTxLoop(ctx, accounts); err != nil {
-				log.Fatalf("failed to fund accounts: %v", err)
+			if err := sendTxFlood(ctx, accounts, interval, int(maxTxs)); err != nil {
+				return fmt.Errorf("failed to fund accounts: %v", err)
 			}
+
+			return nil
 		},
 	}
+
+	sendTxsLoopCmd.Flags().Duration("interval", 3*time.Second, "Frequency at which transactions are sent to the node.")
+	sendTxsLoopCmd.Flags().Uint64("max-txs", 100, "Frequency at which transactions are sent to the node.")
 
 	return sendTxsLoopCmd
 }
