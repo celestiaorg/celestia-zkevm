@@ -179,13 +179,14 @@ pub fn main() {
     for sd in signed_data {
         let signer = sd.signer.as_ref().expect("SignedData must contain signer");
 
-        if signer.pub_key != pub_key {
+        // NOTE: Trim 4 byte Protobuf encoding prefix
+        if signer.pub_key[4..] != pub_key {
             continue;
         }
 
         let data_bytes = sd.data.as_ref().expect("SignedData must contain data").encode_to_vec();
 
-        verify_signature(&pub_key[4..], &data_bytes, &sd.signature).expect("Sequencer signature verification failed");
+        verify_signature(&pub_key, &data_bytes, &sd.signature).expect("Sequencer signature verification failed");
 
         tx_data.push(sd.data.unwrap());
     }
@@ -254,7 +255,7 @@ pub fn main() {
         prev_height: trusted_height,
         prev_state_root: trusted_root.into(),
         namespace,
-        public_key: pub_key,
+        public_key: pub_key.try_into().expect("public key must be exactly 32 bytes"),
     };
 
     sp1_zkvm::io::commit(&output);

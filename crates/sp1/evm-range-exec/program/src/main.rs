@@ -113,7 +113,7 @@ pub fn main() {
         new_state_root: last.new_state_root,
         new_height: last.new_height,
         namespace: last.namespace,
-        public_key: last.public_key.clone(),
+        public_key: last.public_key,
     };
 
     sp1_zkvm::io::commit(&output);

@@ -93,7 +93,7 @@ async fn get_sequencer_pubkey() -> Result<Vec<u8>, Box<dyn Error>> {
     let resp = sequencer_client.get_block(block_req).await?;
     let pub_key = resp.into_inner().block.unwrap().header.unwrap().signer.unwrap().pub_key;
 
-    Ok(pub_key)
+    Ok(pub_key[4..].to_vec())
 }
 
 #[tokio::main]
@@ -117,7 +117,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     for block_number in start_height..(start_height + num_blocks) {
         println!("\nProcessing block: {}", block_number);
 
-        let blobs: Vec<Blob> = celestia_client.blob_get_all(block_number, &[namespace]).await?.unwrap();
+        let blobs: Vec<Blob> = celestia_client
+            .blob_get_all(block_number, &[namespace])
+            .await?
+            .unwrap_or_default();
+
         println!("Got {} blobs for block: {}", blobs.len(), block_number);
 
         let extended_header = celestia_client.header_get_by_height(block_number).await?;
