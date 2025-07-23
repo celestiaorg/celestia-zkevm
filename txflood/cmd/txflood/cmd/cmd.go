@@ -151,7 +151,7 @@ Use the --interval and --max-txs flags to configure the frequency and upper boun
 	}
 
 	sendTxsLoopCmd.Flags().Duration("interval", 3*time.Second, "Frequency at which transactions are sent to the node.")
-	sendTxsLoopCmd.Flags().Uint64("max-txs", 100, "Frequency at which transactions are sent to the node.")
+	sendTxsLoopCmd.Flags().Uint64("max-txs", 50, "Frequency at which transactions are sent to the node.")
 
 	return sendTxsLoopCmd
 }

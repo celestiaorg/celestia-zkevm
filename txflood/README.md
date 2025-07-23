@@ -27,8 +27,14 @@ txflood create-accounts [num-accounts]
 txflood fund-accounts [faucet-key]
 ```
 
-3. Send transactions between accounts using a round-robin format.
+3. Send `num-txs` transactions between accounts using a round-robin format.
 
 ```shell
 txflood send-txs [num-txs]
+```
+
+4. Start a transactions send-loop with a configurable interval and max transactions upper bound.
+
+```shell
+txflood flood --interval 5s --max-txs 100
 ```
