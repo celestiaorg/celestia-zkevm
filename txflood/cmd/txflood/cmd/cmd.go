@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	walletsFile = "wallets.json"
-	rpcURL      = "http://localhost:8545"
+	accountsFile = "accounts.json"
+	rpcURL       = "http://localhost:8545"
 )
 
 func NewRootCmd() *cobra.Command {
@@ -47,11 +47,11 @@ func CreateAccountsCmd() *cobra.Command {
 				return fmt.Errorf("failed to parse number of accounts: %v", err)
 			}
 
-			if err := createAccounts(numAccs, walletsFile); err != nil {
+			if err := createAccounts(numAccs, accountsFile); err != nil {
 				return fmt.Errorf("failed to create accounts: %v", err)
 			}
 
-			cmd.Printf("Successfully created %d accounts\n", numAccs)
+			cmd.Printf("Successfully created %d accounts to %s\n", numAccs, accountsFile)
 			return nil
 		},
 	}
@@ -65,7 +65,8 @@ func FundAccountsCmd() *cobra.Command {
 		Short: "Load accounts from JSON and fund them using a faucet account",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			accounts, err := loadAccounts(walletsFile)
+			cmd.Printf("Loading accounts from %s\n", accountsFile)
+			accounts, err := loadAccounts(accountsFile)
 			if err != nil {
 				return fmt.Errorf("failed to load accounts: %v", err)
 			}
@@ -93,7 +94,8 @@ func SendTxsCmd() *cobra.Command {
 		Short: "Load accounts from JSON and send N transactions between them in a round-robin format",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			accounts, err := loadAccounts(walletsFile)
+			cmd.Printf("Loading accounts from %s\n", accountsFile)
+			accounts, err := loadAccounts(accountsFile)
 			if err != nil {
 				return fmt.Errorf("failed to load accounts: %v", err)
 			}
@@ -124,7 +126,8 @@ This cmd sends a random number of transactions capped at an upper bound and at a
 Use the --interval and --max-txs flags to configure the frequency and upper bound of transactions to be sent.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			accounts, err := loadAccounts(walletsFile)
+			cmd.Printf("Loading accounts from %s\n", accountsFile)
+			accounts, err := loadAccounts(accountsFile)
 			if err != nil {
 				return fmt.Errorf("failed to load accounts: %v", err)
 			}
