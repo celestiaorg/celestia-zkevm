@@ -21,7 +21,7 @@ pub struct BlockExecOutput {
     // namespace is the Celestia namespace that contains the blob data.
     pub namespace: Namespace,
     // public_key is the sequencer's public key used to verify the signatures of the signed data.
-    pub public_key: Vec<u8>,
+    pub public_key: [u8; 32],
 }
 
 /// Display trait implementation to format hashes as hex encoded output.
@@ -39,7 +39,7 @@ impl Display for BlockExecOutput {
         writeln!(f, "  prev_height: {}", self.prev_height)?;
         writeln!(f, "  prev_state_root: {}", encode(self.prev_state_root))?;
         writeln!(f, "  namespace: {}", encode(self.namespace.0))?;
-        writeln!(f, "  public_key: {}", encode(self.public_key.as_slice()))?;
+        writeln!(f, "  public_key: {}", encode(self.public_key))?;
         writeln!(f, "}}")
     }
 }
@@ -60,7 +60,7 @@ pub struct BlockRangeExecOutput {
     // namespace is the Celestia namespace that contains the blob data.
     pub namespace: Namespace,
     // public_key is the sequencer's public key used to verify the signatures of the signed data.
-    pub public_key: Vec<u8>,
+    pub public_key: [u8; 32],
 }
 
 /// Display trait implementation to format hashes as hex encoded output.
@@ -73,7 +73,7 @@ impl Display for BlockRangeExecOutput {
         writeln!(f, "  new_height: {}", self.new_height)?;
         writeln!(f, "  new_state_root: {}", encode(self.new_state_root))?;
         writeln!(f, "  namespace: {}", encode(self.namespace.0))?;
-        writeln!(f, "  public_key: {}", encode(self.public_key.clone()))?;
+        writeln!(f, "  public_key: {}", encode(self.public_key))?;
         writeln!(f, "}}")
     }
 }
