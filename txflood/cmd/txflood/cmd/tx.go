@@ -22,6 +22,7 @@ type txClient struct {
 	nonceMap map[common.Address]uint64
 }
 
+// newTxClient creates a new EVM transaction client with the provided accounts.
 func newTxClient(ctx context.Context, accounts []Account) (*txClient, error) {
 	client, err := ethclient.Dial(rpcURL)
 	if err != nil {
@@ -53,6 +54,7 @@ func newTxClient(ctx context.Context, accounts []Account) (*txClient, error) {
 	}, nil
 }
 
+// sendTxs creates a new tx client and sends totalTxs to the configured EVM node in a round-robin format.
 func sendTxs(ctx context.Context, accounts []Account, totalTxs uint64) error {
 	txClient, err := newTxClient(ctx, accounts)
 	if err != nil {
@@ -92,6 +94,8 @@ func sendTxs(ctx context.Context, accounts []Account, totalTxs uint64) error {
 	return nil
 }
 
+// sendTxFlood creates a new ticker at the provided interval and on each tick sends a random number of transactions
+// to the configured EVM node capped by the maxTxs upper bound.
 func sendTxFlood(ctx context.Context, accounts []Account, interval time.Duration, maxTxs int) error {
 	txClient, err := newTxClient(ctx, accounts)
 	if err != nil {

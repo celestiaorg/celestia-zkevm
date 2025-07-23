@@ -17,6 +17,7 @@ var (
 	rpcURL       = "http://localhost:8545"
 )
 
+// NewRootCmd creates a new txflood root command and wires up its subcommands.
 func NewRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "txflood",
@@ -36,6 +37,7 @@ It can create new accounts, fund them given a faucet account and spam transactio
 	return rootCmd
 }
 
+// CreateAccountsCmd returns the cmd used for account creation.
 func CreateAccountsCmd() *cobra.Command {
 	createAccCmd := &cobra.Command{
 		Use:   "create-accounts [num-accounts]",
@@ -59,6 +61,7 @@ func CreateAccountsCmd() *cobra.Command {
 	return createAccCmd
 }
 
+// FundAccountsCmd returns the cmd used for funding accounts.
 func FundAccountsCmd() *cobra.Command {
 	fundAccCmd := &cobra.Command{
 		Use:   "fund-accounts [faucet-key]",
@@ -88,6 +91,7 @@ func FundAccountsCmd() *cobra.Command {
 	return fundAccCmd
 }
 
+// SendTxsCmd returns the cmd used for sending a batch of transactions.
 func SendTxsCmd() *cobra.Command {
 	sendTxsCmd := &cobra.Command{
 		Use:   "send-txs [num-txs]",
@@ -117,6 +121,7 @@ func SendTxsCmd() *cobra.Command {
 	return sendTxsCmd
 }
 
+// SendTxFloodCmd returns the cmd used for repeatedly sending batches of transactions at an interval.
 func SendTxFloodCmd() *cobra.Command {
 	sendTxsLoopCmd := &cobra.Command{
 		Use:   "flood",
