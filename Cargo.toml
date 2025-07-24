@@ -12,7 +12,10 @@ resolver = "2"
 [workspace.dependencies]
 alloy-consensus = { version = "1.0.13" }
 alloy-genesis = { version = "1.0.13", default-features = false }
-alloy-primitives = { version = "1.2.0", default-features = false }
+alloy-primitives = { version = "1.2.0", default-features = false, features = [
+    "sha3-keccak",
+    "map-foldhash",
+] }
 alloy-provider = { version = "1.0.13", default-features = false, features = [
     "reqwest",
     "reqwest-rustls-tls",
@@ -47,3 +50,11 @@ sp1-zkvm = "=5.0.8"
 tendermint = "0.40.1"
 tendermint-proto = "*"
 ed25519-dalek = "2"
+
+[patch.crates-io]
+# Precompile patches
+sha2 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", tag = "patch-sha2-0.10.9-sp1-4.0.0", package = "sha2" }
+bn = { git = "https://github.com/sp1-patches/bn", tag = "patch-0.6.0-sp1-5.0.0", package = "substrate-bn" }
+sha3 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", tag = "patch-sha3-0.10.8-sp1-4.0.0" }
+k256 = { git = "https://github.com/sp1-patches/elliptic-curves", tag = "patch-k256-13.4-sp1-5.0.0" }
+p256 = { git = "https://github.com/sp1-patches/elliptic-curves", tag = "patch-p256-13.2-sp1-5.0.0" }
