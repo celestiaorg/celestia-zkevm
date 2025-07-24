@@ -42,7 +42,7 @@ The `script` crate contains three binaries and depends on proofs generated from 
 1. Run the `vkey` binary to output the verifier key for the `evm-range-exec` program.
 
     ```shell
-    cargo run -p evm-range-exec-script --bin vkey --release
+    cargo run -p evm-range-exec-script --bin vkey-evm-range-exec --release
     ```
 
 2. The `evm-range-exec` binary can be run in both `--execute` and `--prove` mode. Execution mode will run the program without generating a proof.

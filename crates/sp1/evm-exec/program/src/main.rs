@@ -61,7 +61,7 @@ pub fn main() {
     // -----------------------------
     // 0. Deserialize inputs
     // -----------------------------
-    println!("cycle-tracker-start: deserialize inputs");
+    println!("cycle-tracker-report-start: deserialize inputs");
 
     let celestia_header_raw: Vec<u8> = sp1_zkvm::io::read_vec();
     let celestia_header: Header =
@@ -81,12 +81,12 @@ pub fn main() {
     let trusted_height: u64 = sp1_zkvm::io::read();
     let trusted_root: B256 = sp1_zkvm::io::read();
 
-    println!("cycle-tracker-end: deserialize inputs");
+    println!("cycle-tracker-report-end: deserialize inputs");
 
     // -----------------------------
     // 1. Verify namespace inclusion and completeness
     // -----------------------------
-    println!("cycle-tracker-start: verify namespace data");
+    println!("cycle-tracker-report-start: verify namespace data");
 
     assert_eq!(
         celestia_header.data_hash.unwrap(),
@@ -130,12 +130,12 @@ pub fn main() {
         cursor = end;
     }
 
-    println!("cycle-tracker-end: verify namespace data");
+    println!("cycle-tracker-report-end: verify namespace data");
 
     // -----------------------------
     // 2. Execute the EVM block inputs
     // -----------------------------
-    println!("cycle-tracker-start: execute EVM blocks");
+    println!("cycle-tracker-report-start: execute EVM blocks");
 
     let mut headers = Vec::with_capacity(executor_inputs.len());
     if headers.capacity() != 0 {
@@ -163,12 +163,12 @@ pub fn main() {
         }
     }
 
-    println!("cycle-tracker-end: execute EVM blocks");
+    println!("cycle-tracker-report-end: execute EVM blocks");
 
     // -----------------------------
     // 3. Filter SignedData blobs and verify signatures
     // -----------------------------
-    println!("cycle-tracker-start: filter signed data blobs and verify signatures");
+    println!("cycle-tracker-report-start: filter signed data blobs and verify signatures");
 
     let signed_data: Vec<SignedData> = blobs
         .into_iter()
@@ -205,12 +205,12 @@ pub fn main() {
         "Headers and SignedData must be of equal length"
     );
 
-    println!("cycle-tracker-end: filter signed data blobs and verify signatures");
+    println!("cycle-tracker-report-end: filter signed data blobs and verify signatures");
 
     // -----------------------------
     // 4. Verify blob equivalency
     // -----------------------------
-    println!("cycle-tracker-start: verify blob-header equivalency");
+    println!("cycle-tracker-report-start: verify blob-header equivalency");
 
     for (header, data) in headers.iter().zip(tx_data) {
         let mut txs = Vec::with_capacity(data.txs.len());
@@ -227,12 +227,12 @@ pub fn main() {
         );
     }
 
-    println!("cycle-tracker-end: verify blob-header equivalency");
+    println!("cycle-tracker-report-end: verify blob-header equivalency");
 
     // -----------------------------
     // 5. Build and commit outputs
     // -----------------------------
-    println!("cycle-tracker-start: commit public outputs");
+    println!("cycle-tracker-report-start: commit public outputs");
 
     let new_height: u64 = headers.last().map(|h| h.number).unwrap_or(trusted_height);
     let new_state_root: B256 = headers.last().map(|h| h.state_root).unwrap_or(trusted_root);
@@ -260,7 +260,7 @@ pub fn main() {
 
     sp1_zkvm::io::commit(&output);
 
-    println!("cycle-tracker-end: commit public outputs");
+    println!("cycle-tracker-report-end: commit public outputs");
 }
 
 fn get_height(data: &Data) -> Option<u64> {

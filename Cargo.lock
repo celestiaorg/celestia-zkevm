@@ -2558,6 +2558,7 @@ dependencies = [
  "eq-common",
  "evm-exec-types",
  "eyre",
+ "hashbrown 0.14.5",
  "hex",
  "nmt-rs",
  "prost 0.12.6",
