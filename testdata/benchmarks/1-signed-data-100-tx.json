@@ -1,14 +1,14 @@
 {
   "total_gas": 37023740,
-  "total_instruction_count": 19094167,
+  "total_instruction_count": 19094218,
   "total_syscall_count": 79697,
   "cycle_tracker_results": {
     "block execution": 3646394,
-    "compute state root": 137049,
-    "execute EVM blocks": 10813177,
+    "compute state root": 137075,
+    "execute EVM blocks": 10813203,
     "commit public outputs": 67646,
     "validate header": 551069,
-    "deserialize inputs": 2386276,
+    "deserialize inputs": 2386301,
     "verify namespace data": 650515,
     "initialize witness db": 108133,
     "verify blob-header equivalency": 887620,
