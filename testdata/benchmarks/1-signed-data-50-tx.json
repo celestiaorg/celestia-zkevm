@@ -1,0 +1,19 @@
+{
+  "total_gas": 637607943,
+  "total_instruction_count": 598103529,
+  "total_syscall_count": 224,
+  "cycle_tracker_results": {
+    "block execution": 2326916,
+    "compute state root": 767391,
+    "execute EVM blocks": 588568728,
+    "commit public outputs": 236823,
+    "validate header": 1337471,
+    "deserialize inputs": 2340979,
+    "verify namespace data": 1798348,
+    "initialize witness db": 625423,
+    "verify blob-header equivalency": 1497946,
+    "validate block post-execution": 3111352,
+    "filter signed data blobs and verify signatures": 3649474,
+    "recover senders": 579985898
+  }
+}
