@@ -127,8 +127,9 @@ func SendTxFloodCmd() *cobra.Command {
 		Use:   "flood",
 		Short: "Load accounts from JSON and send transactions continuously between them in a round-robin format",
 		Long: `Load accounts from JSON and send transactions continuously between them in a round-robin format.
-This cmd sends a random number of transactions capped at an upper bound and at a configurable interval. 
-Use the --interval and --max-txs flags to configure the frequency and upper bound of transactions to be sent.`,
+This cmd sends a fixed or random number of transactions at a configurable interval. 
+Use the --interval and --num-txs flags to configure the frequency and number of transactions to be sent.
+If the --randomise flag is used then the num-txs will be used as the upper bound for the number of transactions sent.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.Printf("Loading accounts from %s\n", accountsFile)
@@ -142,15 +143,20 @@ Use the --interval and --max-txs flags to configure the frequency and upper boun
 				return fmt.Errorf("failed to parse interval duration from flags")
 			}
 
-			maxTxs, err := cmd.Flags().GetUint64("max-txs")
+			numTxs, err := cmd.Flags().GetUint64("num-txs")
 			if err != nil {
-				return fmt.Errorf("failed to parse max transactions from flags")
+				return fmt.Errorf("failed to parse number of transactions from flags")
+			}
+
+			useRand, err := cmd.Flags().GetBool("randomise")
+			if err != nil {
+				return fmt.Errorf("failed to parse randomised bool from flags")
 			}
 
 			ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt)
 			defer cancel()
 
-			if err := sendTxFlood(ctx, accounts, interval, int(maxTxs)); err != nil {
+			if err := sendTxFlood(ctx, accounts, interval, int(numTxs), useRand); err != nil {
 				return fmt.Errorf("failed to fund accounts: %v", err)
 			}
 
@@ -159,7 +165,8 @@ Use the --interval and --max-txs flags to configure the frequency and upper boun
 	}
 
 	sendTxsLoopCmd.Flags().Duration("interval", 3*time.Second, "Frequency at which transactions are sent to the node.")
-	sendTxsLoopCmd.Flags().Uint64("max-txs", 50, "Frequency at which transactions are sent to the node.")
+	sendTxsLoopCmd.Flags().Uint64("num-txs", 50, "Number of transactions which are sent to the node.")
+	sendTxsLoopCmd.Flags().Bool("randomise", false, "If number of transactions should be randomised using num-txs as the upper bound.")
 
 	return sendTxsLoopCmd
 }
