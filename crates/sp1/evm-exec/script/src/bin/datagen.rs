@@ -159,6 +159,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             executor_inputs.push(client_executor_input);
         }
 
+        println!("Got EthClientExecutorInputs, total: {}", executor_inputs.len());
+
         // Create output dir: testdata/inputs/block-{celestia_block_number}/
         let block_dir = format!("testdata/inputs/block-{}", block_number);
         fs::create_dir_all(&block_dir)?;
