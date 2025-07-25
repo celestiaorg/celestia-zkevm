@@ -1,19 +1,22 @@
 {
-  "total_gas": 10608411,
-  "total_instruction_count": 6141867,
-  "total_syscall_count": 8598,
+  "total_blobs": 7,
+  "total_blockexec_inputs": 1,
+  "total_gas": 8827128,
+  "total_instruction_count": 3433401,
+  "total_syscall_count": 9361,
   "cycle_tracker_results": {
-    "block execution": 805257,
-    "compute state root": 137328,
-    "execute EVM blocks": 1901664,
+    "block execution": 804476,
+    "compute state root": 137288,
+    "execute EVM blocks": 1900904,
+    "verify ed25519 signature": 381852,
     "commit public outputs": 67699,
     "validate header": 71065,
-    "deserialize inputs": 715931,
-    "verify namespace data": 241283,
-    "initialize witness db": 108412,
+    "deserialize inputs": 715833,
+    "verify namespace data": 241282,
+    "initialize witness db": 108430,
     "verify blob-header equivalency": 93491,
     "validate block post-execution": 97190,
-    "filter signed data blobs and verify signatures": 3115228,
+    "filter signed data blobs and verify signatures": 407600,
     "recover senders": 530256
   }
 }
