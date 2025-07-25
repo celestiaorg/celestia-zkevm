@@ -57,7 +57,7 @@ cargo run -p evm-exec-script --bin data-gen --release -- --start <START_BLOCK> -
 2. Run the `vkey` binary to output the verifier key for the `evm-exec` program.
 
     ```shell
-    cargo run -p evm-exec-script --bin vkey --release
+    cargo run -p evm-exec-script --bin vkey-evm-exec --release
     ```
 
 3. The `evm-exec` binary can be run in both `--execute` and `--prove` mode. Execution mode will run the program without generating a proof.
@@ -80,5 +80,14 @@ Run the `evm-exec` binary in proving mode.
 ```shell
 RUST_LOG=info cargo run -p evm-exec-script --release -- --prove --height 12 --trusted-height 18 --trusted-root c02a6bbc8529cbe508a24ce2961776b699eeb6412c99c2e106bbd7ebddd4d385
 ```
+
+4. When running the program in `--execute` mode, the user can also optionally provide the `--output-file` flag.
+For example:
+```shell
+RUST_LOG=info cargo run -p evm-exec-script --release -- --execute --height 10 --output-file output.json
+```
+
+This will write a `BenchmarkReport` JSON object containing the results of the program execution to: `testdata/benchmarks/output.json`.
+This includes total gas, total instruction count, total syscall count as well as a breakdown of cycle trackers used within the program.
 
 Please refer to https://docs.succinct.xyz/docs/sp1/introduction for more comprehensive documentation on Succinct SP1.

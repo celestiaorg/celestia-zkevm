@@ -28,12 +28,14 @@ use celestia_types::nmt::{Namespace, NamespaceProof};
 use celestia_types::{Blob, DataAvailabilityHeader};
 use clap::Parser;
 use evm_exec_types::BlockExecOutput;
+use hashbrown::HashMap;
 use rsp_client_executor::io::{EthClientExecutorInput, WitnessInput};
+use serde::{Deserialize, Serialize};
 use sp1_sdk::{include_elf, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
 use tendermint::block::header::Header;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
-pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
+pub const ELF: &[u8] = include_elf!("evm-exec-program");
 
 /// The arguments for the command.
 #[derive(Parser, Debug)]
@@ -48,11 +50,24 @@ struct Args {
     #[arg(long, help = "The Celestia block height")]
     height: u64,
 
+    #[arg(long, help = "Output file for benchmark report in JSON format")]
+    output_file: Option<String>,
+
     #[arg(long, help = "Trusted EVM height which contains trusted state root")]
     trusted_height: Option<u64>,
 
     #[arg(long, help = "Trusted state root (hex string) for the trusted height")]
     trusted_root: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BenchmarkReport {
+    pub total_blobs: u64,
+    pub total_blockexec_inputs: u64,
+    pub total_gas: u64,
+    pub total_instruction_count: u64,
+    pub total_syscall_count: u64,
+    pub cycle_tracker_results: HashMap<String, u64>,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -77,22 +92,39 @@ fn main() -> Result<(), Box<dyn Error>> {
     let client = ProverClient::from_env();
 
     let mut stdin = SP1Stdin::new();
-    write_proof_inputs(&mut stdin, &input_dir, &args)?;
+    let (num_blobs, num_executor_inputs) = write_proof_inputs(&mut stdin, &input_dir, &args)?;
 
     if args.execute {
         // Execute the program.
-        let (output, report) = client.execute(EVM_EXEC_ELF, &stdin).run().unwrap();
+        let (output, report) = client.execute(ELF, &stdin).run().unwrap();
         println!("Program executed successfully!");
 
         // Read the output.
         let block_exec_output: BlockExecOutput = bincode::deserialize(output.as_slice())?;
         println!("Outputs: {}", block_exec_output);
 
-        // Record the number of cycles executed.
-        println!("Number of cycles: {}", report.total_instruction_count());
+        // Record the total gas and number of cycles executed.
+        println!("Total gas: {}", report.gas.unwrap());
+        println!("Total instruction count: {}", report.total_instruction_count());
+        println!("Total syscall count: {}", report.total_syscall_count());
+
+        // If an output opt is provided then write the results to JSON.
+        if let Some(output_file) = args.output_file {
+            let benchmark_report = BenchmarkReport {
+                total_blobs: num_blobs as u64,
+                total_blockexec_inputs: num_executor_inputs as u64,
+                total_gas: report.gas.unwrap(),
+                total_instruction_count: report.total_instruction_count(),
+                total_syscall_count: report.total_syscall_count(),
+                cycle_tracker_results: report.cycle_tracker,
+            };
+
+            let json = serde_json::to_string_pretty(&benchmark_report).unwrap();
+            fs::write(format!("testdata/benchmarks/{}", output_file), json)?;
+        }
     } else {
         // Setup the program for proving.
-        let (pk, vk) = client.setup(EVM_EXEC_ELF);
+        let (pk, vk) = client.setup(ELF);
 
         // Generate the proof.
         let proof = client
@@ -116,7 +148,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str, args: &Args) -> Result<(), Box<dyn Error>> {
+fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str, args: &Args) -> Result<(usize, usize), Box<dyn Error>> {
     let header_json = fs::read_to_string(format!("{input_dir}/header.json"))?;
     let header: Header = serde_json::from_str(&header_json)?;
     let header_raw = serde_cbor::to_vec(&header)?;
@@ -169,5 +201,5 @@ fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str, args: &Args) -> Res
     };
     stdin.write(&trusted_root);
 
-    Ok(())
+    Ok((blobs.len(), executor_inputs.len()))
 }

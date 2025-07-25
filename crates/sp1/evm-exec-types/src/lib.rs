@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{Display, Formatter, Result as FmtResult};
 
 use celestia_types::nmt::Namespace;
 use hex::encode;
@@ -26,7 +26,7 @@ pub struct BlockExecOutput {
 
 /// Display trait implementation to format hashes as hex encoded output.
 impl Display for BlockExecOutput {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         writeln!(f, "BlockExecOutput {{")?;
         writeln!(f, "  celestia_header_hash: {}", encode(self.celestia_header_hash))?;
         writeln!(
@@ -65,7 +65,7 @@ pub struct BlockRangeExecOutput {
 
 /// Display trait implementation to format hashes as hex encoded output.
 impl Display for BlockRangeExecOutput {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         writeln!(f, "BlockRangeExecOutput {{")?;
         writeln!(f, "  celestia_header_hash: {}", encode(self.celestia_header_hash))?;
         writeln!(f, "  trusted_height: {}", self.trusted_height)?;
