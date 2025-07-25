@@ -15,6 +15,8 @@ use std::path::Path;
 
 use clap::Parser;
 use evm_exec_types::BlockRangeExecOutput;
+use hashbrown::HashMap;
+use serde::{Deserialize, Serialize};
 use sp1_sdk::{include_elf, HashableKey, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
@@ -32,6 +34,18 @@ struct Args {
 
     #[arg(long, help = "Run the program in prove mode")]
     prove: bool,
+
+    #[arg(long, help = "Output file for benchmark report in JSON format")]
+    output_file: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BenchmarkReport {
+    pub total_proofs: u64,
+    pub total_gas: u64,
+    pub total_instruction_count: u64,
+    pub total_syscall_count: u64,
+    pub cycle_tracker_results: HashMap<String, u64>,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -48,7 +62,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let client = ProverClient::from_env();
 
     let mut stdin = SP1Stdin::new();
-    write_proof_inputs(&mut stdin)?;
+    let num_proofs = write_proof_inputs(&mut stdin)?;
 
     if args.execute {
         // Execute the program.
@@ -59,8 +73,24 @@ fn main() -> Result<(), Box<dyn Error>> {
         let range_exec_output: BlockRangeExecOutput = bincode::deserialize(output.as_slice())?;
         println!("Outputs: {}", range_exec_output);
 
-        // Record the number of cycles executed.
-        println!("Number of cycles: {}", report.total_instruction_count());
+        // Record the total gas and number of cycles executed.
+        println!("Total gas: {}", report.gas.unwrap());
+        println!("Total instruction count: {}", report.total_instruction_count());
+        println!("Total syscall count: {}", report.total_syscall_count());
+
+        // If an output opt is provided then write the results to JSON.
+        if let Some(output_file) = args.output_file {
+            let benchmark_report = BenchmarkReport {
+                total_proofs: num_proofs as u64,
+                total_gas: report.gas.unwrap(),
+                total_instruction_count: report.total_instruction_count(),
+                total_syscall_count: report.total_syscall_count(),
+                cycle_tracker_results: report.cycle_tracker,
+            };
+
+            let json = serde_json::to_string_pretty(&benchmark_report).unwrap();
+            fs::write(format!("testdata/benchmarks/{}", output_file), json)?;
+        }
     } else {
         // Setup the program for proving.
         let (pk, vk) = client.setup(EVM_RANGE_EXEC_ELF);
@@ -87,7 +117,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// write_proof_inputs writes the program inputs to provided SP1Stdin
-fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<(), Box<dyn Error>> {
+fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<usize, Box<dyn Error>> {
     let proofs_dir = Path::new("testdata/proofs");
     let mut paths: Vec<_> = fs::read_dir(proofs_dir)?
         .filter_map(Result::ok)
@@ -121,5 +151,5 @@ fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<(), Box<dyn Error>> {
         stdin.write_proof(*proof.clone(), vk.vk.clone());
     }
 
-    Ok(())
+    Ok(proofs.len())
 }

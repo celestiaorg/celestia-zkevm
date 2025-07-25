@@ -24,6 +24,8 @@ pub fn main() {
     // ------------------------------
     // 1. Deserialize inputs
     // ------------------------------
+    println!("cycle-tracker-report-start: deserialize inputs");
+
     let vkeys = sp1_zkvm::io::read::<Vec<[u32; 8]>>();
     let public_values = sp1_zkvm::io::read::<Vec<Vec<u8>>>();
 
@@ -35,17 +37,25 @@ pub fn main() {
 
     let proof_count = vkeys.len();
 
+    println!("cycle-tracker-report-end: deserialize inputs");
+
     // ------------------------------
     // 2. Verify proofs
     // ------------------------------
+    println!("cycle-tracker-report-start: verify sp1 proofs");
+
     for i in 0..proof_count {
         let digest = Sha256::digest(&public_values[i]);
         sp1_zkvm::lib::verify::verify_sp1_proof(&vkeys[i], &digest.into());
     }
 
+    println!("cycle-tracker-report-end: verify sp1 proofs");
+
     // ------------------------------
     // 3. Parse public values into outputs
     // ------------------------------
+    println!("cycle-tracker-report-start: decode public values from proofs");
+
     let outputs: Vec<BlockExecOutput> = public_values
         .iter()
         .map(|bytes| {
@@ -54,9 +64,12 @@ pub fn main() {
         })
         .collect();
 
+    println!("cycle-tracker-report-end: decode public values from proofs");
+
     // ------------------------------
     // 4. Verify sequential headers (EVM and Celestia)
     // ------------------------------
+    println!("cycle-tracker-report-start: verify sequential headers");
     for window in outputs.windows(2).enumerate() {
         let (i, pair) = window;
         let (prev, curr) = (&pair[0], &pair[1]);
@@ -100,9 +113,13 @@ pub fn main() {
         );
     }
 
+    println!("cycle-tracker-report-end: verify sequential headers");
+
     // ------------------------------
     // 5. Build and commit outputs
     // ------------------------------
+    println!("cycle-tracker-report-start: build and commit outputs");
+
     let first = outputs.first().expect("No outputs provided");
     let last = outputs.last().expect("No outputs provided");
 
@@ -115,6 +132,8 @@ pub fn main() {
         namespace: last.namespace,
         public_key: last.public_key,
     };
+
+    println!("cycle-tracker-report-end: build and commit outputs");
 
     sp1_zkvm::io::commit(&output);
 }

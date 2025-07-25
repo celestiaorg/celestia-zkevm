@@ -22,6 +22,7 @@ evm-exec-types = { path = "../../evm-exec-types" }
 bincode = { workspace = true }
 clap = { version = "4.0", features = ["derive", "env"] }
 dotenv = "0.15.0"
+hashbrown = "0.14.5"
 hex = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, features = ["alloc"] }
