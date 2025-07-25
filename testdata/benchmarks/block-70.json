@@ -1,0 +1,16 @@
+{
+  "total_blobs": 9,
+  "total_blockexec_inputs": 0,
+  "total_tx_count": 0,
+  "total_gas": 5291828,
+  "total_instruction_count": 846388,
+  "total_syscall_count": 654,
+  "cycle_tracker_results": {
+    "deserialize inputs": 519283,
+    "execute EVM blocks": 373,
+    "commit public outputs": 67639,
+    "verify blob-header equivalency": 419,
+    "filter signed data blobs and verify signatures": 15407,
+    "verify namespace data": 239891
+  }
+}
