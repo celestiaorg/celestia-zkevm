@@ -62,6 +62,8 @@ struct Args {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BenchmarkReport {
+    pub total_blobs: u64,
+    pub total_blockexec_inputs: u64,
     pub total_gas: u64,
     pub total_instruction_count: u64,
     pub total_syscall_count: u64,
@@ -90,7 +92,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let client = ProverClient::from_env();
 
     let mut stdin = SP1Stdin::new();
-    write_proof_inputs(&mut stdin, &input_dir, &args)?;
+    let (num_blobs, num_executor_inputs) = write_proof_inputs(&mut stdin, &input_dir, &args)?;
 
     if args.execute {
         // Execute the program.
@@ -109,6 +111,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         // If an output opt is provided then write the results to JSON.
         if let Some(output_file) = args.output_file {
             let benchmark_report = BenchmarkReport {
+                total_blobs: num_blobs as u64,
+                total_blockexec_inputs: num_executor_inputs as u64,
                 total_gas: report.gas.unwrap(),
                 total_instruction_count: report.total_instruction_count(),
                 total_syscall_count: report.total_syscall_count(),
@@ -144,7 +148,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str, args: &Args) -> Result<(), Box<dyn Error>> {
+fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str, args: &Args) -> Result<(usize, usize), Box<dyn Error>> {
     let header_json = fs::read_to_string(format!("{input_dir}/header.json"))?;
     let header: Header = serde_json::from_str(&header_json)?;
     let header_raw = serde_cbor::to_vec(&header)?;
@@ -197,5 +201,5 @@ fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str, args: &Args) -> Res
     };
     stdin.write(&trusted_root);
 
-    Ok(())
+    Ok((blobs.len(), executor_inputs.len()))
 }

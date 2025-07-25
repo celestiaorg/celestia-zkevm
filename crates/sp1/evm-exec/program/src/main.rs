@@ -268,6 +268,8 @@ fn get_height(data: &Data) -> Option<u64> {
 }
 
 fn verify_signature(public_key: &[u8], message: &[u8], signature: &[u8]) -> Result<(), Box<dyn Error>> {
+    println!("cycle-tracker-report-start: verify ed25519 signature");
+
     let pub_key: [u8; 32] = public_key
         .try_into()
         .map_err(|e| format!("Public key must be 32 bytes for Ed25519: {e}"))?;
@@ -280,5 +282,6 @@ fn verify_signature(public_key: &[u8], message: &[u8], signature: &[u8]) -> Resu
         .verify(message, &signature)
         .map_err(|e| format!("Signature verification failed: {e}"))?;
 
+    println!("cycle-tracker-report-end: verify ed25519 signature");
     Ok(())
 }
