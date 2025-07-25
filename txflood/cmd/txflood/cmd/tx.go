@@ -113,7 +113,11 @@ func sendTxFlood(ctx context.Context, accounts []Account, interval time.Duration
 			fmt.Printf("\nExiting transactions send loop...\n")
 			return nil
 		case <-ticker.C:
-			numTxs := rand.Intn(maxTxs) + 1
+			numTxs := maxTxs
+			if randomise {
+				numTxs = rand.Intn(maxTxs) + 1
+			}
+
 			fmt.Printf("\nSending %d txs...\n", numTxs)
 
 			var wg sync.WaitGroup
