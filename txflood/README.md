@@ -33,8 +33,14 @@ txflood fund-accounts [faucet-key]
 txflood send-txs [num-txs]
 ```
 
-4. Start a transactions send-loop with a configurable interval and max transactions upper bound.
+4. Start a transactions send-loop with a configurable interval and fixed number of transactions.
 
 ```shell
-txflood flood --interval 5s --max-txs 100
+txflood flood --interval 5s --num-txs 10
+```
+
+5. Start a transactions send-loop with a configurable interval and randomised number of transactions with `num-txs` as the upper bound.
+
+```shell
+txflood flood --interval 5s --num-txs 50 --randomise
 ```

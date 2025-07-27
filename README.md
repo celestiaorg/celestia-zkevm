@@ -84,6 +84,10 @@ NETWORK_PRIVATE_KEY="PRIVATE_KEY" to the SP1 prover network private key from Cel
 
 See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for more information.
 
+## Benchmarking
+
+See [Benchmarks](./testdata/benchmarks/README.md) for more information.
+
 ## Contributing
 
 See [CONTRIBUTING.md](./docs/CONTRIBUTING.md) for more information.

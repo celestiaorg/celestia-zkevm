@@ -1,6 +1,7 @@
 {
   "total_blobs": 7,
   "total_blockexec_inputs": 1,
+  "total_tx_count": 1,
   "total_gas": 8284922,
   "total_instruction_count": 1884667,
   "total_syscall_count": 2247,

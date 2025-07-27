@@ -21,7 +21,9 @@ def main():
     for file_name in json_files:
         file_path = os.path.join(input_dir, file_name)
         save_name = os.path.splitext(file_name)[0] + ".png"
-        save_path = os.path.join(input_dir, save_name)
+
+        charts_dir = os.path.join(input_dir, "charts")
+        save_path = os.path.join(charts_dir, save_name)
 
         print(f"Processing: {file_path} → {save_path}")
 
@@ -33,19 +35,21 @@ def main():
         labels = [label for label, _ in sorted_items]
         values = [count for _, count in sorted_items]
 
-        total_blobs = data["total_blobs"]
-        total_blockexec_inputs = data["total_blockexec_inputs"]
-        total_gas = data["total_gas"]
-        total_instr = data["total_instruction_count"]
-        total_syscall_count = data["total_syscall_count"]
+        # Dynamic summary construction
+        summary_lines = []
+        if "total_blobs" in data:
+            summary_lines.append(f"Total Blobs in Namespace: {data['total_blobs']:,}")
+        if "total_blockexec_inputs" in data:
+            summary_lines.append(f"Total EVM block executions: {data['total_blockexec_inputs']:,}")
+        if "total_tx_count" in data:
+            summary_lines.append(f"Total EVM Txs: {data['total_tx_count']:,}")
+        if "total_proofs" in data:
+            summary_lines.append(f"Total Proofs: {data['total_proofs']:,}")
 
-        summary_text = (
-            f"Total Blobs in Namespace: {total_blobs:,}\n"
-            f"Total EVM block executions: {total_blockexec_inputs:,}\n"
-            f"Total Gas: {total_gas:,}\n"
-            f"Total Instructions: {total_instr:,}\n"
-            f"Total Syscalls: {total_syscall_count:,}"
-        )
+        summary_lines.append(f"Total Gas: {data['total_gas']:,}")
+        summary_lines.append(f"Total Instructions: {data['total_instruction_count']:,}")
+        summary_lines.append(f"Total Syscalls: {data['total_syscall_count']:,}")
+        summary_text = "\n".join(summary_lines)
 
         fig = plt.figure(figsize=(12, 7))
         gs = GridSpec(2, 1, height_ratios=[4, 1], hspace=0.3)

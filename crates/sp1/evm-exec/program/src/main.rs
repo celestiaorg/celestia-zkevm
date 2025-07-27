@@ -220,7 +220,6 @@ pub fn main() {
         }
 
         let root = proofs::calculate_transaction_root(&txs);
-
         assert_eq!(
             root, header.transactions_root,
             "Calculated root must be equal to header transactions root"

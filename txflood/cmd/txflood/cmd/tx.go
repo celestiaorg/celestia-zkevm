@@ -96,7 +96,7 @@ func sendTxs(ctx context.Context, accounts []Account, totalTxs uint64) error {
 
 // sendTxFlood creates a new ticker at the provided interval and on each tick sends a random number of transactions
 // to the configured EVM node capped by the maxTxs upper bound.
-func sendTxFlood(ctx context.Context, accounts []Account, interval time.Duration, maxTxs int) error {
+func sendTxFlood(ctx context.Context, accounts []Account, interval time.Duration, maxTxs int, randomise bool) error {
 	txClient, err := newTxClient(ctx, accounts)
 	if err != nil {
 		return err
@@ -113,7 +113,11 @@ func sendTxFlood(ctx context.Context, accounts []Account, interval time.Duration
 			fmt.Printf("\nExiting transactions send loop...\n")
 			return nil
 		case <-ticker.C:
-			numTxs := rand.Intn(maxTxs) + 1
+			numTxs := maxTxs
+			if randomise {
+				numTxs = rand.Intn(maxTxs) + 1
+			}
+
 			fmt.Printf("\nSending %d txs...\n", numTxs)
 
 			var wg sync.WaitGroup
