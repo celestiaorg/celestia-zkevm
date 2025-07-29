@@ -57,14 +57,14 @@ services:
     networks:
       - celestia-zkevm-net
 
-  rollkit-evm-single:
-    image: ghcr.io/rollkit/rollkit-evm-single:pr-2394
-    container_name: rollkit-evm-single
+  ev-node-evm-single:
+    image: ghcr.io/evstack/ev-node-evm-single:main
+    container_name: ev-node-evm-single
     entrypoint: /scripts/entrypoint.sh
     ports:
       - "7331:7331"
     volumes:
-      - ./testnet/rollkit/entrypoint.sh:/scripts/entrypoint.sh:ro
+      - ./testnet/ev-node/entrypoint.sh:/scripts/entrypoint.sh:ro
       - evm-single-data:/data
     environment:
       - EVM_ENGINE_URL=http://reth:8551
@@ -86,7 +86,7 @@ services:
   
   reth:
     container_name: reth
-    image: ghcr.io/rollkit/lumen:latest
+    image: ghcr.io/evstack/lumen:latest
     ports:
       - "9001:9001" # metrics
       - "30303:30303" # eth/66 peering
