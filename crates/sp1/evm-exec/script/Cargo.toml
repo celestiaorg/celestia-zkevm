@@ -30,6 +30,7 @@ celestia-rpc = { workspace = true }
 clap = { version = "4.0", features = ["cargo", "derive", "env"] }
 dotenv = "0.15.0"
 eq-common = { workspace = true }
+ev-types = { workspace = true, features = ["grpc"] }
 eyre = "0.6.12"
 hashbrown = "0.14.5"
 hex = { workspace = true }
@@ -39,7 +40,6 @@ regex = "1.11.1"
 reqwest = "0.12.15"
 reth-chainspec = { workspace = true }
 reth-primitives = { workspace = true }
-rollkit-types = { workspace = true, features = ["grpc"] }
 rsp-client-executor = { workspace = true }
 rsp-primitives = { workspace = true }
 rsp-host-executor = { workspace = true }

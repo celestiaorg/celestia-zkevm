@@ -2519,6 +2519,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ev-types"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ddcffafc84a128b9438d95cd7f37dcf0a922d2b95728a3ea290ac72166bc4863"
+dependencies = [
+ "prost 0.12.6",
+ "prost-build 0.12.6",
+ "prost-types 0.12.6",
+ "tonic 0.10.2",
+ "tonic-build 0.10.2",
+ "walkdir",
+]
+
+[[package]]
 name = "eventsource-stream"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2541,12 +2555,12 @@ dependencies = [
  "celestia-types",
  "ed25519-dalek",
  "eq-common",
+ "ev-types",
  "evm-exec-types",
  "hex",
  "nmt-rs",
  "prost 0.12.6",
  "reth-primitives",
- "rollkit-types",
  "rsp-client-executor",
  "serde_cbor",
  "sha3",
@@ -2570,6 +2584,7 @@ dependencies = [
  "clap",
  "dotenv",
  "eq-common",
+ "ev-types",
  "evm-exec-types",
  "eyre",
  "hashbrown 0.14.5",
@@ -2580,7 +2595,6 @@ dependencies = [
  "reqwest",
  "reth-chainspec",
  "reth-primitives",
- "rollkit-types",
  "rsp-client-executor",
  "rsp-host-executor",
  "rsp-primitives",
@@ -2622,13 +2636,13 @@ dependencies = [
  "clap",
  "dirs",
  "eq-common",
+ "ev-types",
  "hex",
  "nmt-rs",
  "prost 0.12.6",
  "prost-build 0.12.6",
  "reqwest",
  "reth-chainspec",
- "rollkit-types",
  "rsp-host-executor",
  "rsp-primitives",
  "rsp-rpc-db",
@@ -6449,19 +6463,6 @@ checksum = "bb919243f34364b6bd2fc10ef797edbfa75f33c252e7998527479c6d6b47e1ec"
 dependencies = [
  "bytes",
  "rustc-hex",
-]
-
-[[package]]
-name = "rollkit-types"
-version = "0.1.0"
-source = "git+https://github.com/rollkit/rollkit?rev=9a1dbbbd8362180e95a08c75100c7e5c5bdf9f9a#9a1dbbbd8362180e95a08c75100c7e5c5bdf9f9a"
-dependencies = [
- "prost 0.12.6",
- "prost-build 0.12.6",
- "prost-types 0.12.6",
- "tonic 0.10.2",
- "tonic-build 0.10.2",
- "walkdir",
 ]
 
 [[package]]

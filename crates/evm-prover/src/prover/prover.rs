@@ -10,14 +10,14 @@ use async_trait::async_trait;
 use celestia_rpc::{client::Client, BlobClient, HeaderClient, ShareClient};
 use celestia_types::{nmt::Namespace, Blob, ExtendedHeader, ShareProof};
 use eq_common::KeccakInclusionToDataRootProofInput;
+use ev_types::v1::SignedHeader;
+use ev_types::v1::{store_service_client::StoreServiceClient, GetMetadataRequest, SignedData};
 use nmt_rs::{
     simple_merkle::{db::MemDb, proof::Proof, tree::MerkleTree},
     TmSha2Hasher,
 };
 use prost::Message;
 use reth_chainspec::ChainSpec;
-use rollkit_types::v1::SignedHeader;
-use rollkit_types::v1::{store_service_client::StoreServiceClient, GetMetadataRequest, SignedData};
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
