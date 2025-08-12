@@ -46,11 +46,11 @@ use celestia_types::nmt::{Namespace, NamespaceProof, NamespacedHash};
 use celestia_types::Blob;
 use celestia_types::DataAvailabilityHeader;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use ev_types::v1::{Data, SignedData};
 use evm_exec_types::BlockExecOutput;
 use nmt_rs::NamespacedSha2Hasher;
 use prost::Message;
 use reth_primitives::TransactionSigned;
-use rollkit_types::v1::{Data, SignedData};
 use rsp_client_executor::{
     executor::EthClientExecutor,
     io::{EthClientExecutorInput, WitnessInput},
