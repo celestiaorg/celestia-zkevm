@@ -43,6 +43,8 @@ def main():
             summary_lines.append(f"Total EVM block executions: {data['total_blockexec_inputs']:,}")
         if "total_tx_count" in data:
             summary_lines.append(f"Total EVM Txs: {data['total_tx_count']:,}")
+        if "total_evm_gas" in data:
+            summary_lines.append(f"Total EVM Gas: {data['total_evm_gas']:,}")
         if "total_proofs" in data:
             summary_lines.append(f"Total Proofs: {data['total_proofs']:,}")
 
