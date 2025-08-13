@@ -25,13 +25,11 @@ fi
 # Conditionally add --rollkit.da.header_namespace and --rollkit.da.data_namespace if set
 da_header_namespace_flag=""
 if [ -n "$DA_HEADER_NAMESPACE" ]; then
-  echo "Using header namespace $DA_HEADER_NAMESPACE"
   da_header_namespace_flag="--rollkit.da.header_namespace $DA_HEADER_NAMESPACE"
 fi
 
 da_data_namespace_flag=""
 if [ -n "$DA_DATA_NAMESPACE" ]; then
-  echo "Using data namespace $DA_DATA_NAMESPACE"
   da_data_namespace_flag="--rollkit.da.data_namespace $DA_DATA_NAMESPACE"
 fi
 
