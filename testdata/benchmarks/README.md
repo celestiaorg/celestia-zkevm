@@ -1,5 +1,7 @@
 ## Benchmarking
 
+See [`BENCHMARKS.md`](./BENCHMARKS.md) for results.
+
 The following benchmarks have been created using the `script` crates included in each of the sp1 programs `evm-exec` and `evm-range-exec`.
 Please refer to the `README.md` files in under [sp1/evm-exec](../../crates/sp1/evm-exec/README.md) and [sp1/evm-range-exec](../../crates/sp1/evm-range-exec/README.md) for instructions on how to invoke the SP1 programs.
 
