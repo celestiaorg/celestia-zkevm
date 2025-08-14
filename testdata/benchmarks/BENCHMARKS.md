@@ -1,4 +1,4 @@
-## Benchmarks #1
+# Benchmarks 1
 
 The following document contains initial benchmarks for various scenarios running both the SP1 block execution and range aggregation programs.
 
