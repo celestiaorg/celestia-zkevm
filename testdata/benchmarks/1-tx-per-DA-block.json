@@ -1,0 +1,24 @@
+{
+  "total_blobs": 1,
+  "total_blockexec_inputs": 1,
+  "total_tx_count": 1,
+  "total_evm_gas": 21000,
+  "total_gas": 8268602,
+  "total_instruction_count": 1867123,
+  "total_syscall_count": 2129,
+  "cycle_tracker_results": {
+    "block execution": 417301,
+    "compute state root": 97341,
+    "execute EVM blocks": 1040636,
+    "verify ed25519 signature": 271646,
+    "commit public outputs": 67699,
+    "validate header": 20011,
+    "deserialize inputs": 391650,
+    "verify namespace data": 62870,
+    "initialize witness db": 214160,
+    "verify blob-header equivalency": 12384,
+    "validate block post-execution": 16729,
+    "filter signed data blobs and verify signatures": 279136,
+    "recover senders": 56920
+  }
+}
