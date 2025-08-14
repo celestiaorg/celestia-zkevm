@@ -5,19 +5,16 @@ use std::sync::Arc;
 
 use alloy_genesis::Genesis as AlloyGenesis;
 use alloy_provider::ProviderBuilder;
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
+use bytes::Bytes;
 use celestia_rpc::{client::Client, BlobClient, HeaderClient, ShareClient};
-use celestia_types::{nmt::Namespace, Blob, ExtendedHeader, ShareProof};
-use eq_common::KeccakInclusionToDataRootProofInput;
-use ev_types::v1::SignedHeader;
-use ev_types::v1::{store_service_client::StoreServiceClient, GetMetadataRequest, SignedData};
-use nmt_rs::{
-    simple_merkle::{db::MemDb, proof::Proof, tree::MerkleTree},
-    TmSha2Hasher,
-};
+use celestia_types::nmt::{Namespace, NamespaceProof};
+use celestia_types::{Blob, DataAvailabilityHeader, ExtendedHeader};
+use ev_types::v1::SignedData;
 use prost::Message;
 use reth_chainspec::ChainSpec;
+use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
@@ -27,10 +24,6 @@ use sp1_sdk::{
     SP1VerifyingKey,
 };
 use tendermint::block::Header;
-use tendermint_proto::{
-    v0_38::{types::BlockId as RawBlockId, version::Consensus as RawConsensusVersion},
-    Protobuf,
-};
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
 
@@ -170,6 +163,47 @@ impl BlockExecProver {
         }
     }
 
+    pub async fn start(&self) -> Result<()> {
+        let client = Client::new(&self.app.celestia_rpc, None).await?;
+        let mut subscription = client.blob_subscribe(self.app.namespace).await?;
+
+        while let Some(result) = subscription.next().await {
+            match result {
+                Ok(event) => {
+                    let blobs = event.blobs.unwrap_or_default();
+
+                    println!(
+                        "Received blob event for height: {}, blobs: {}",
+                        event.height,
+                        blobs.len()
+                    );
+
+                    let mut extended_header = client.header_get_by_height(event.height).await?;
+                    extended_header.header.version.app = 3; // TODO: need rs support for newer celestia app versions
+
+                    let namespace_data = client
+                        .share_get_namespace_data(&extended_header, self.app.namespace)
+                        .await?;
+
+                    let _proofs: Vec<NamespaceProof> =
+                        namespace_data.rows.iter().map(|row| row.proof.clone()).collect();
+
+                    // Determine EthClientExecutorInputs for celestia block
+                    let _signed_data: Vec<SignedData> = blobs
+                        .into_iter()
+                        .filter_map(|blob| SignedData::decode(Bytes::from(blob.data)).ok())
+                        .collect();
+                }
+                Err(e) => {
+                    eprintln!("Subscription error: {e}");
+                    break;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Generates the serialized state transition function (STF) input for a given EVM block number.
     async fn generate_stf(&self, block_number: u64) -> Result<Vec<u8>> {
         let host_executor = EthHostExecutor::eth(self.app.chain_spec.clone(), None);
@@ -182,136 +216,6 @@ impl BlockExecProver {
 
         Ok(bincode::serialize(&client_input)?)
     }
-
-    /// Queries the inclusion height for the given EVM block number from the sequencer rpc.
-    async fn inclusion_height(&self, block_number: u64) -> Result<u64> {
-        let mut client = StoreServiceClient::connect(self.app.sequencer_rpc.clone()).await?;
-        let req = GetMetadataRequest {
-            key: format!("rhb/{}/d", block_number),
-        };
-
-        let resp = client.get_metadata(req).await?;
-        let height = u64::from_le_bytes(resp.into_inner().value[..8].try_into()?);
-
-        Ok(height)
-    }
-
-    /// Queries the extended header from the Celestia data availability rpc.
-    async fn extended_header(&self, height: u64) -> Result<ExtendedHeader> {
-        let client = Client::new(&self.app.celestia_rpc, None).await?;
-        let header = client.header_get_by_height(height).await?;
-
-        Ok(header)
-    }
-
-    /// Queries all blobs from Celestia for the given inclusion height and filters them to find the blob for the
-    /// corresponding EVM block number.
-    async fn blob_for_height(&self, block_number: u64, inclusion_height: u64) -> Result<Blob> {
-        let client = Client::new(&self.app.celestia_rpc, None).await?;
-
-        let blobs = client
-            .blob_get_all(inclusion_height, &[self.app.namespace])
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("No blobs found at inclusion height {}", inclusion_height))?;
-
-        println!("num blobs: {}", blobs.len());
-
-        for blob in blobs {
-            let signed_data = match SignedData::decode(blob.data.as_slice()) {
-                Ok(data) => data,
-                Err(e) => {
-                    println!("Failed to decode SignedData: {:?}", e);
-
-                    let header = match SignedHeader::decode(blob.data.as_slice()) {
-                        Ok(header) => header,
-                        Err(e) => {
-                            println!("Failed to decode SignedHeader: {:?}", e);
-                            continue;
-                        }
-                    };
-
-                    println!("signed header height: {:?}", header.header.unwrap().height);
-                    continue;
-                }
-            };
-
-            let Some(metadata) = signed_data.data.and_then(|d| d.metadata) else {
-                continue;
-            };
-
-            println!("metadata.height {}", metadata.height);
-            if metadata.height == block_number {
-                return Ok(blob);
-            }
-        }
-
-        bail!(
-            "No blob found for block number {} at inclusion height {}",
-            block_number,
-            inclusion_height
-        );
-    }
-
-    /// Queries the Celestia data availability rpc for a ShareProof for the provided blob.
-    async fn blob_inclusion_proof(&self, blob: Blob, header: &ExtendedHeader) -> Result<ShareProof> {
-        let client = Client::new(&self.app.celestia_rpc, None).await?;
-
-        let eds_size = header.dah.row_roots().len() as u64;
-        let ods_size = eds_size / 2;
-        let first_row_index = blob.index.unwrap() / eds_size;
-        let ods_index = blob.index.unwrap() - (first_row_index * ods_size);
-
-        // NOTE: mutated the app version in the header as otherwise we run into v4 unsupported issues
-        let mut modified_header = header.clone();
-        modified_header.header.version.app = 3;
-
-        let range_response = client
-            .share_get_range(&modified_header, ods_index, ods_index + blob.shares_len() as u64)
-            .await?;
-
-        let share_proof = range_response.proof;
-        share_proof.verify(modified_header.dah.hash())?;
-
-        Ok(share_proof)
-    }
-
-    /// Creates an inclusion proof for the data availability root within the provided Header.
-    fn data_root_proof(&self, header: &ExtendedHeader) -> Result<(Vec<u8>, Proof<TmSha2Hasher>)> {
-        let mut tree = MerkleTree::<MemDb<[u8; 32]>, TmSha2Hasher>::with_hasher(TmSha2Hasher::new());
-
-        for field in self.prepare_header_fields(header) {
-            tree.push_raw_leaf(&field);
-        }
-
-        let data_hash_index = 6;
-        let (data_hash, proof) = tree.get_index_with_proof(data_hash_index);
-
-        assert_eq!(header.hash().as_ref(), tree.root());
-
-        Ok((data_hash, proof))
-    }
-
-    /// Prepares leaf data for the provided Header.
-    fn prepare_header_fields(&self, header: &ExtendedHeader) -> Vec<Vec<u8>> {
-        let h = &header.header;
-
-        vec![
-            Protobuf::<RawConsensusVersion>::encode_vec(h.version),
-            h.chain_id.clone().encode_vec(),
-            h.height.encode_vec(),
-            h.time.encode_vec(),
-            Protobuf::<RawBlockId>::encode_vec(h.last_block_id.unwrap_or_default()),
-            h.last_commit_hash.unwrap_or_default().encode_vec(),
-            h.data_hash.unwrap_or_default().encode_vec(),
-            h.validators_hash.encode_vec(),
-            h.next_validators_hash.encode_vec(),
-            h.consensus_hash.encode_vec(),
-            h.app_hash.clone().encode_vec(),
-            h.last_results_hash.unwrap_or_default().encode_vec(),
-            h.evidence_hash.unwrap_or_default().encode_vec(),
-            h.proposer_address.encode_vec(),
-        ]
-    }
 }
 
 /// Input to the EVM block execution proving circuit.
@@ -320,14 +224,20 @@ impl BlockExecProver {
 /// availability of blob data in Celestia.
 #[derive(Serialize, Deserialize)]
 pub struct BlockExecInput {
-    // blob_proof is an inclusion proof of blob data availability in Celestia.
-    pub blob_proof: KeccakInclusionToDataRootProofInput,
-    // data_root_proof is an inclusion proof of the data root within the Celestia header.
-    pub data_root_proof: Proof<TmSha2Hasher>,
     // header is the Celestia block header at which the blob data is available.
     pub header: Header,
-    // state_transition_fn is the application of the blob data applied to the EVM state machine.
-    pub state_transition_fn: Vec<u8>,
+    // dah is the Celestia data availability header.
+    pub dah: DataAvailabilityHeader,
+    // blobs is the collection of blobs included in the namespace for the current block.
+    pub blobs: Vec<Blob>,
+    // pub_key is the ed25519 public key of the sequencer.
+    pub pub_key: Vec<u8>,
+    // namespace is the Celestia namespace to which EVM block data blobs are submitted.
+    pub namespace: Namespace,
+    // proofs is a collection of Namespaced Merkle Tree proofs for the included blob data.
+    pub proofs: Vec<NamespaceProof>,
+    // executor_inputs is the collection of state transition functions for each EVM block included in the Celestia block.
+    pub executor_inputs: Vec<EthClientExecutorInput>,
 }
 
 /// Output of the EVM block execution proving circuit.
@@ -336,12 +246,6 @@ pub struct BlockExecInput {
 /// data availability in Celestia.
 #[derive(Serialize, Deserialize)]
 pub struct BlockExecOutput {
-    // blob_commitment is the blob commitment for the EVM block.
-    pub blob_commitment: [u8; 32],
-    // header_hash is the hash of the EVM block header.
-    pub header_hash: [u8; 32],
-    // prev_header_hash is the hash of the previous EVM block header.
-    pub prev_header_hash: [u8; 32],
     // celestia_header_hash is the merkle hash of the Celestia block header.
     pub celestia_header_hash: [u8; 32],
     // prev_celestia_header_hash is the merkle hash of the previous Celestia block header.
@@ -354,6 +258,10 @@ pub struct BlockExecOutput {
     pub prev_height: u64,
     // prev_state_root is the EVM application state root before the state transition function has been applied.
     pub prev_state_root: [u8; 32],
+    // namespace is the Celestia namespace that contains the blob data.
+    pub namespace: Namespace,
+    // public_key is the sequencer's public key used to verify the signatures of the signed data.
+    pub public_key: [u8; 32],
 }
 
 #[async_trait]
@@ -375,10 +283,7 @@ impl ProgramProver for BlockExecProver {
     /// Returns an error if serialization of any input component fails.
     fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin> {
         let mut stdin = SP1Stdin::new();
-        stdin.write(&input.blob_proof);
-        stdin.write(&input.state_transition_fn);
         stdin.write_vec(serde_cbor::to_vec(&input.header)?);
-        stdin.write(&input.data_root_proof);
 
         Ok(stdin)
     }

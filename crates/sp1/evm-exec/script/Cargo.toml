@@ -29,7 +29,6 @@ celestia-types = { workspace = true }
 celestia-rpc = { workspace = true }
 clap = { version = "4.0", features = ["cargo", "derive", "env"] }
 dotenv = "0.15.0"
-eq-common = { workspace = true }
 ev-types = { workspace = true, features = ["grpc"] }
 eyre = "0.6.12"
 hashbrown = "0.14.5"
