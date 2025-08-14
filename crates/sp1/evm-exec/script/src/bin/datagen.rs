@@ -25,6 +25,7 @@ use celestia_rpc::{BlobClient, Client, HeaderClient, ShareClient};
 use celestia_types::nmt::{Namespace, NamespaceProof};
 use celestia_types::Blob;
 use clap::Parser;
+use ev_client::BlobCompressor;
 use ev_types::v1::get_block_request::Identifier;
 use ev_types::v1::store_service_client::StoreServiceClient;
 use ev_types::v1::{GetBlockRequest, SignedData};
@@ -143,13 +144,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
         println!("Got NamespaceProofs, total: {}", proofs.len());
 
         let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
-        for blob in blobs.as_slice() {
-            let data = match SignedData::decode(blob.data.as_slice()) {
-                Ok(data) => data.data.unwrap(),
-                Err(_) => continue,
-            };
 
-            let height = data.metadata.unwrap().height;
+        let blob_compressor = BlobCompressor::new();
+        let signed_data: Vec<SignedData> = blobs
+            .into_iter()
+            .filter_map(|blob| {
+                let decompressed = blob_compressor.decompress(blob.data.as_slice()).ok()?;
+                SignedData::decode(decompressed).ok()
+            })
+            .collect();
+
+        for data in signed_data {
+            let height = data.data.unwrap().metadata.unwrap().height;
             println!("Got SignedData for EVM block {}", height);
 
             let client_executor_input =
@@ -158,6 +164,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
             executor_inputs.push(client_executor_input);
         }
+
+        // let compressor = ev_client::BlobCompressor::new();
+        // for blob in blobs.as_slice() {
+        //     let decompressed = compressor.decompress(&blob.data[..]).unwrap();
+        //     let data = match SignedData::decode(decompressed) {
+        //         Ok(data) => data.data.unwrap(),
+        //         Err(_) => continue,
+        //     };
+
+        //     let height = data.metadata.unwrap().height;
+        //     println!("Got SignedData for EVM block {}", height);
+
+        //     let client_executor_input =
+        //         generate_client_executor_input(config::EVM_RPC_URL, height, chain_spec.clone(), genesis.clone())
+        //             .await?;
+
+        //     executor_inputs.push(client_executor_input);
+        // }
 
         println!("Got EthClientExecutorInputs, total: {}", executor_inputs.len());
 

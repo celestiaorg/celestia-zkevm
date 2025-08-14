@@ -58,7 +58,7 @@ services:
       - celestia-zkevm-net
 
   ev-node-evm-single:
-    image: ghcr.io/evstack/ev-node-evm-single:main
+    image: ghcr.io/evstack/ev-node-evm-single:pr-2547
     container_name: ev-node-evm-single
     entrypoint: /scripts/entrypoint.sh
     ports:

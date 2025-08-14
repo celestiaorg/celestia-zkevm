@@ -41,11 +41,11 @@ use std::sync::Arc;
 use alloy_consensus::{proofs, BlockHeader};
 use alloy_primitives::B256;
 use alloy_rlp::Decodable;
-use bytes::Bytes;
 use celestia_types::nmt::{Namespace, NamespaceProof, NamespacedHash};
 use celestia_types::Blob;
 use celestia_types::DataAvailabilityHeader;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use ev_client::BlobCompressor;
 use ev_types::v1::{Data, SignedData};
 use evm_exec_types::BlockExecOutput;
 use nmt_rs::NamespacedSha2Hasher;
@@ -170,9 +170,13 @@ pub fn main() {
     // -----------------------------
     println!("cycle-tracker-report-start: filter signed data blobs and verify signatures");
 
+    let blob_compressor = BlobCompressor::new();
     let signed_data: Vec<SignedData> = blobs
         .into_iter()
-        .filter_map(|blob| SignedData::decode(Bytes::from(blob.data)).ok())
+        .filter_map(|blob| {
+            let decompressed = blob_compressor.decompress(blob.data.as_slice()).ok()?;
+            SignedData::decode(decompressed).ok()
+        })
         .collect();
 
     let mut tx_data: Vec<Data> = Vec::new();

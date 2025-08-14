@@ -16,6 +16,7 @@ eq-common = { workspace = true }
 hex = "0.4.3"
 nmt-rs = "*"
 prost = { workspace = true }
+ev-client = { workspace = true, default-features = false }
 ev-types = { workspace = true, default-features = false }
 rsp-client-executor = { workspace = true }
 reth-primitives = { workspace = true }

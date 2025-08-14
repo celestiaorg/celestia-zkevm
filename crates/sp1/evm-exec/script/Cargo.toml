@@ -30,6 +30,7 @@ celestia-rpc = { workspace = true }
 clap = { version = "4.0", features = ["cargo", "derive", "env"] }
 dotenv = "0.15.0"
 eq-common = { workspace = true }
+ev-client = { workspace = true }
 ev-types = { workspace = true, features = ["grpc"] }
 eyre = "0.6.12"
 hashbrown = "0.14.5"
@@ -56,6 +57,7 @@ tendermint-proto = { workspace = true }
 tokio = { version = "1.44", features = ["full"] }
 tokio-retry = "0.3"
 tracing = "0.1.40"
+zstd = "0.13"
 
 [build-dependencies]
 sp1-build = { workspace = true }
