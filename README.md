@@ -90,9 +90,9 @@ See [Benchmarks](./testdata/benchmarks/README.md) for more information.
 
 ## Context
 
-The objective of this project is to establish a ZK bridge from the Celestia base-layer to a Celestia rollup and back. The sequencer of each rollup submits `tx blobs` to the base-layer that are used to build the EVM blocks, which are then verified against a previous, trusted EVM block. In order to facilitate transfers from one Celestia rollup to another, a forwarding module will be introduced to the base-layer.
+The objective of this project is to establish a ZK bridge from the Celestia base-layer to a Celestia rollup and back. The sequencer of each rollup submits `tx blobs` to the base-layer that are used to build the EVM blocks, which are then verified against a previous, trusted EVM block from that same rollup. In order to facilitate transfers from one Celestia rollup to another, a forwarding module will be introduced to the base-layer in the future.
 
-This ZK bridge is internal to the Celestia ecosystem, meaning that generic EVM chains, like Ethereum, which exist outside Celestia, will require a connection to the base-layer. This connection will usually be a ZK light client, such as `SP1-Helios`, that submits proofs and header roots to the baselayer's ISM module.
+This ZK bridge is internal to the Celestia ecosystem, meaning that generic EVM chains, like Ethereum, which exist outside Celestia, will require a connection to the base-layer. This connection will usually be a ZK light client, such as `SP1-Helios`, that submits proofs and header roots to the base-layer's ISM module.
 
 ## Contributing
 
