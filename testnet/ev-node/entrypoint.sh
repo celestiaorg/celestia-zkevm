@@ -22,11 +22,17 @@ if [ -n "$DA_AUTH_TOKEN" ]; then
   da_auth_token_flag="--rollkit.da.auth_token $DA_AUTH_TOKEN"
 fi
 
-# Conditionally add --rollkit.da.namespace if ROLLKIT_DA_NAMESPACE is set
-da_namespace_flag=""
-if [ -n "$DA_NAMESPACE" ]; then
-  da_namespace_flag="--rollkit.da.namespace $DA_NAMESPACE"
+# Conditionally add --rollkit.da.header_namespace and --rollkit.da.data_namespace if set
+da_header_namespace_flag=""
+if [ -n "$DA_HEADER_NAMESPACE" ]; then
+  da_header_namespace_flag="--rollkit.da.header_namespace $DA_HEADER_NAMESPACE"
 fi
+
+da_data_namespace_flag=""
+if [ -n "$DA_DATA_NAMESPACE" ]; then
+  da_data_namespace_flag="--rollkit.da.data_namespace $DA_DATA_NAMESPACE"
+fi
+
 
 exec ./evm-single start \
   --evm.jwt-secret $EVM_JWT_SECRET \
@@ -39,4 +45,5 @@ exec ./evm-single start \
   --rollkit.signer.passphrase $EVM_SIGNER_PASSPHRASE \
   $da_flag \
   $da_auth_token_flag \
-  $da_namespace_flag
+  $da_header_namespace_flag \
+  $da_data_namespace_flag
