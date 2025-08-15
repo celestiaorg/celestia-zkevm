@@ -6,6 +6,7 @@ use tonic_reflection::server::Builder as ReflectionBuilder;
 
 use crate::config::config::Config;
 use crate::proto::celestia::prover::v1::prover_server::ProverServer;
+use crate::prover::prover::{AppContext, BlockExecProver};
 use crate::prover::service::ProverService;
 
 pub async fn create_grpc_server(config: Config) -> Result<()> {
@@ -16,6 +17,16 @@ pub async fn create_grpc_server(config: Config) -> Result<()> {
         .register_encoded_file_descriptor_set(descriptor_bytes)
         .build()
         .unwrap();
+
+    // Spawn it as a background task
+    tokio::spawn({
+        let block_prover = BlockExecProver::new(AppContext::from_config(config.clone())?);
+        async move {
+            if let Err(e) = block_prover.start().await {
+                eprintln!("Block prover task failed: {e:?}");
+            }
+        }
+    });
 
     let prover_serivce = ProverService::new(config)?;
 

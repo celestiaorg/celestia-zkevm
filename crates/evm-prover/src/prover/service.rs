@@ -8,16 +8,14 @@ use crate::proto::celestia::prover::v1::{
     InfoRequest, InfoResponse, ProveStateMembershipRequest, ProveStateMembershipResponse, ProveStateTransitionRequest,
     ProveStateTransitionResponse,
 };
-use crate::prover::prover::{AppContext, BlockExecProver, BlockRangeExecProver};
+use crate::prover::prover::BlockRangeExecProver;
 
 pub struct ProverService {
-    block_prover: BlockExecProver,
     block_range_prover: BlockRangeExecProver,
 }
 
 impl ProverService {
-    pub fn new(config: Config) -> Result<Self> {
-        let block_prover = BlockExecProver::new(AppContext::from_config(config)?);
+    pub fn new(_config: Config) -> Result<Self> {
         let block_range_prover = BlockRangeExecProver::new();
 
         // Clone anything needed inside the async task
@@ -28,10 +26,7 @@ impl ProverService {
         //     }
         // });
 
-        Ok(ProverService {
-            block_prover,
-            block_range_prover,
-        })
+        Ok(ProverService { block_range_prover })
     }
 }
 

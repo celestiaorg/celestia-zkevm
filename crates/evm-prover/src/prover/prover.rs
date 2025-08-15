@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use celestia_rpc::{client::Client, BlobClient, HeaderClient, ShareClient};
 use celestia_types::nmt::{Namespace, NamespaceProof};
-use celestia_types::{Blob, DataAvailabilityHeader, ExtendedHeader};
+use celestia_types::{Blob, DataAvailabilityHeader};
 use ev_types::v1::SignedData;
 use prost::Message;
 use reth_chainspec::ChainSpec;
@@ -164,7 +164,8 @@ impl BlockExecProver {
     }
 
     pub async fn start(&self) -> Result<()> {
-        let client = Client::new(&self.app.celestia_rpc, None).await?;
+        let addr = format!("ws://{}", self.app.celestia_rpc);
+        let client = Client::new(&addr, None).await?;
         let mut subscription = client.blob_subscribe(self.app.namespace).await?;
 
         while let Some(result) = subscription.next().await {
@@ -178,21 +179,42 @@ impl BlockExecProver {
                         blobs.len()
                     );
 
-                    let mut extended_header = client.header_get_by_height(event.height).await?;
-                    extended_header.header.version.app = 3; // TODO: need rs support for newer celestia app versions
+                    let extended_header = client.header_get_by_height(event.height).await?;
+
+                    // TODO: need rs support for newer celestia app versions.
+                    // Here we clone and mutate the app version in the header to avoid versioning errors when working with the rs libs.
+                    let mut header_clone = extended_header.clone();
+                    header_clone.header.version.app = 3;
 
                     let namespace_data = client
-                        .share_get_namespace_data(&extended_header, self.app.namespace)
+                        .share_get_namespace_data(&header_clone, self.app.namespace)
                         .await?;
 
-                    let _proofs: Vec<NamespaceProof> =
-                        namespace_data.rows.iter().map(|row| row.proof.clone()).collect();
+                    let proofs: Vec<NamespaceProof> = namespace_data.rows.iter().map(|row| row.proof.clone()).collect();
 
-                    // Determine EthClientExecutorInputs for celestia block
-                    let _signed_data: Vec<SignedData> = blobs
+                    println!(
+                        "Got {} Proofs for namespace data at height {}",
+                        proofs.len(),
+                        event.height
+                    );
+
+                    let signed_data: Vec<SignedData> = blobs
                         .into_iter()
                         .filter_map(|blob| SignedData::decode(Bytes::from(blob.data)).ok())
                         .collect();
+
+                    println!("Got {} SignedData blobs at height {}", signed_data.len(), event.height);
+
+                    let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::with_capacity(signed_data.len());
+                    for data in signed_data {
+                        let executor_input = self
+                            .eth_client_executor_input(data.data.unwrap().metadata.unwrap().height)
+                            .await?;
+
+                        executor_inputs.push(executor_input);
+                    }
+
+                    println!("Got {} EthClientExecutorInputs", executor_inputs.len());
                 }
                 Err(e) => {
                     eprintln!("Subscription error: {e}");
@@ -204,17 +226,17 @@ impl BlockExecProver {
         Ok(())
     }
 
-    /// Generates the serialized state transition function (STF) input for a given EVM block number.
-    async fn generate_stf(&self, block_number: u64) -> Result<Vec<u8>> {
+    /// Generates the state transition function (STF) input for a given EVM block number.
+    async fn eth_client_executor_input(&self, block_number: u64) -> Result<EthClientExecutorInput> {
         let host_executor = EthHostExecutor::eth(self.app.chain_spec.clone(), None);
         let provider = ProviderBuilder::new().connect_http(self.app.evm_rpc.parse()?);
         let rpc_db = RpcDb::new(provider.clone(), block_number - 1);
 
-        let client_input = host_executor
+        let executor_input = host_executor
             .execute(block_number, &rpc_db, &provider, self.app.genesis.clone(), None, false)
             .await?;
 
-        Ok(bincode::serialize(&client_input)?)
+        Ok(executor_input)
     }
 }
 
