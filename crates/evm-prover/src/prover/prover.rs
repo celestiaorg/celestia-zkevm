@@ -166,18 +166,15 @@ impl BlockExecProver {
     pub async fn start(&self) -> Result<()> {
         let addr = format!("ws://{}", self.app.celestia_rpc);
         let client = Client::new(&addr, None).await?;
-        let mut subscription = client.blob_subscribe(self.app.namespace).await?;
 
+        // TODO: Turn the websocket subscription into a job/worker queue, dispatch each event to a new worker,
+        // collect proofs inputs and generate proof.
+        let mut subscription = client.blob_subscribe(self.app.namespace).await?;
         while let Some(result) = subscription.next().await {
             match result {
                 Ok(event) => {
                     let blobs = event.blobs.unwrap_or_default();
-
-                    println!(
-                        "Received blob event for height: {}, blobs: {}",
-                        event.height,
-                        blobs.len()
-                    );
+                    println!("New event for height: {}, blobs: {}", event.height, blobs.len());
 
                     let extended_header = client.header_get_by_height(event.height).await?;
 
@@ -190,15 +187,11 @@ impl BlockExecProver {
                         .share_get_namespace_data(&header_clone, self.app.namespace)
                         .await?;
 
-                    let proofs: Vec<NamespaceProof> = namespace_data.rows.iter().map(|row| row.proof.clone()).collect();
-
-                    println!(
-                        "Got {} Proofs for namespace data at height {}",
-                        proofs.len(),
-                        event.height
-                    );
+                    let _proofs: Vec<NamespaceProof> =
+                        namespace_data.rows.iter().map(|row| row.proof.clone()).collect();
 
                     let signed_data: Vec<SignedData> = blobs
+                        .clone()
                         .into_iter()
                         .filter_map(|blob| SignedData::decode(Bytes::from(blob.data)).ok())
                         .collect();
@@ -215,6 +208,18 @@ impl BlockExecProver {
                     }
 
                     println!("Got {} EthClientExecutorInputs", executor_inputs.len());
+
+                    // let inputs = BlockExecInput {
+                    //     header: extended_header.header,
+                    //     dah: extended_header.dah,
+                    //     blobs: blobs,
+                    //     pub_key: Vec::new(),
+                    //     namespace: self.app.namespace,
+                    //     proofs: proofs,
+                    //     executor_inputs: executor_inputs,
+                    // };
+
+                    // let (_sp1_proof, _outputs) = self.prove(inputs).await?;
                 }
                 Err(e) => {
                     eprintln!("Subscription error: {e}");
