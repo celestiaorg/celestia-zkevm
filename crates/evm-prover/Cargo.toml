@@ -12,6 +12,7 @@ walkdir = "2.5.0"
 [dependencies]
 anyhow = "1.0"
 alloy-genesis = { workspace = true }
+alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 async-trait = "0.1.88"
 bincode = { workspace = true }

@@ -4,6 +4,7 @@ use std::result::Result::{Err, Ok};
 use std::sync::Arc;
 
 use alloy_genesis::Genesis as AlloyGenesis;
+use alloy_primitives::FixedBytes;
 use alloy_provider::ProviderBuilder;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -265,6 +266,10 @@ pub struct BlockExecInput {
     pub proofs: Vec<NamespaceProof>,
     // executor_inputs is the collection of state transition functions for each EVM block included in the Celestia block.
     pub executor_inputs: Vec<EthClientExecutorInput>,
+    // trusted_height is the latest trusted height of the EVM application.
+    pub trusted_height: u64,
+    // trusted_state_root is the latest trusted state root of the EVM application.
+    pub trusted_state_root: FixedBytes<32>,
 }
 
 /// Output of the EVM block execution proving circuit.

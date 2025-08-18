@@ -2611,6 +2611,7 @@ name = "evm-prover"
 version = "0.1.0"
 dependencies = [
  "alloy-genesis",
+ "alloy-primitives",
  "alloy-provider",
  "anyhow",
  "async-trait",
