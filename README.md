@@ -20,7 +20,7 @@ NETWORK_PRIVATE_KEY="PRIVATE_KEY" to the SP1 prover network private key from Cel
 ### Prerequisites
 
 1. Install [Docker](https://docs.docker.com/get-docker/)
-2. Install [Foundry](https://book.getfoundry.sh/getting-started/installation)
+2. Install [Foundry](https://getfoundry.sh/getting-started/installation)
 3. Install [Rust](https://rustup.rs/)
 4. Install [SP1](https://docs.succinct.xyz/docs/sp1/getting-started/install)
 
