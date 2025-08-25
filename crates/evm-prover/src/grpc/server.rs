@@ -18,11 +18,10 @@ pub async fn create_grpc_server(config: Config) -> Result<()> {
         .build()
         .unwrap();
 
-    // Spawn it as a background task
     tokio::spawn({
         let block_prover = BlockExecProver::new(AppContext::from_config(config.clone())?);
         async move {
-            if let Err(e) = block_prover.start().await {
+            if let Err(e) = block_prover.run().await {
                 eprintln!("Block prover task failed: {e:?}");
             }
         }

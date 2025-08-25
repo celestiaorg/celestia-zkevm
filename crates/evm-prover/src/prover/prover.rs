@@ -9,10 +9,12 @@ use alloy_provider::ProviderBuilder;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use bytes::Bytes;
+use celestia_rpc::blob::BlobsAtHeight;
 use celestia_rpc::{client::Client, BlobClient, HeaderClient, ShareClient};
 use celestia_types::nmt::{Namespace, NamespaceProof};
 use celestia_types::{Blob, DataAvailabilityHeader};
 use ev_types::v1::SignedData;
+use jsonrpsee_core::client::Subscription;
 use prost::Message;
 use reth_chainspec::ChainSpec;
 use rsp_client_executor::io::EthClientExecutorInput;
@@ -25,6 +27,10 @@ use sp1_sdk::{
     SP1VerifyingKey,
 };
 use tendermint::block::Header;
+use tokio::{
+    sync::{mpsc, RwLock, Semaphore},
+    task::JoinSet,
+};
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
 
@@ -94,7 +100,7 @@ pub struct AppContext {
     pub namespace: Namespace,
     pub celestia_rpc: String,
     pub evm_rpc: String,
-    pub sequencer_rpc: String,
+    pub pub_key: Vec<u8>,
 }
 
 impl AppContext {
@@ -109,6 +115,7 @@ impl AppContext {
 
         let raw_ns = hex::decode(config.namespace_hex)?;
         let namespace = Namespace::new_v0(raw_ns.as_ref()).context("Failed to construct Namespace")?;
+        let pub_key = hex::decode(config.pub_key)?;
 
         Ok(AppContext {
             chain_spec,
@@ -116,7 +123,7 @@ impl AppContext {
             namespace,
             celestia_rpc: config.celestia_rpc,
             evm_rpc: config.evm_rpc,
-            sequencer_rpc: config.sequencer_rpc,
+            pub_key,
         })
     }
 
@@ -144,16 +151,48 @@ pub struct BlockExecProver {
     pub app: AppContext,
     pub config: ProverConfig,
     pub prover: EnvProver,
+    pub trusted_state: RwLock<TrustedState>,
 }
+
+/// TrustedState tracks the current height and state root which is provided to the proof system as its trusted inputs.
+pub struct TrustedState {
+    height: u64,
+    root: FixedBytes<32>,
+}
+
+// ProofJob is a basic struct to the track proof generation per block event.
+// TODO: Could be replaced by using the BlobsAtHeight event directly.
+struct ProofJob {
+    height: u64,
+    blobs: Vec<Blob>,
+}
+
+impl ProofJob {
+    fn new(height: u64, blobs: Vec<Blob>) -> Self {
+        Self { height, blobs }
+    }
+}
+
+const QUEUE_CAP: usize = 256;
+const CONCURRENCY: usize = 16;
 
 impl BlockExecProver {
     /// Creates a new instance of [`BlockExecProver`] for the provided [`AppContext`] using default configuration
     /// and prover environment settings.
-    pub fn new(app: AppContext) -> Self {
+    pub fn new(app: AppContext) -> Arc<Self> {
         let config = BlockExecProver::default_config();
         let prover = ProverClient::from_env();
+        let trusted_state = RwLock::new(TrustedState {
+            height: 0,
+            root: app.chain_spec.genesis_header().state_root,
+        });
 
-        Self { app, config, prover }
+        Arc::new(Self {
+            app,
+            config,
+            prover,
+            trusted_state,
+        })
     }
 
     /// Returns the default prover configuration for the block execution program.
@@ -164,70 +203,144 @@ impl BlockExecProver {
         }
     }
 
-    pub async fn start(&self) -> Result<()> {
+    async fn connect_and_subscribe(&self) -> Result<(Arc<Client>, Subscription<BlobsAtHeight>)> {
         let addr = format!("ws://{}", self.app.celestia_rpc);
-        let client = Client::new(&addr, None).await?;
+        let client = Arc::new(Client::new(&addr, None).await.context("celestia ws connect")?);
+        let subscription = client
+            .blob_subscribe(self.app.namespace)
+            .await
+            .context("Blob subscription failed")?;
 
-        // TODO: Turn the websocket subscription into a job/worker queue, dispatch each event to a new worker,
-        // collect proofs inputs and generate proof.
-        let mut subscription = client.blob_subscribe(self.app.namespace).await?;
+        Ok((client, subscription))
+    }
+
+    /// Runs the block prover loop, spawning a new tokio task for each BlobsAtHeight event we receive
+    /// from the celestia websocket subscription.
+    ///
+    /// Celestia produces a new event for each block it produces. An event may or may not contain any blobs
+    /// for the configured namespace at any given height.
+    pub async fn run(self: Arc<Self>) -> Result<()> {
+        let (client, mut subscription) = self.connect_and_subscribe().await?;
+        let (tx, mut rx) = mpsc::channel::<ProofJob>(QUEUE_CAP);
+        let sem = Arc::new(Semaphore::new(CONCURRENCY));
+
+        // Dispatcher: receive jobs and spawn worker tasks with concurrency limit
+        tokio::spawn({
+            let client = client.clone();
+            let prover = self.clone();
+            let sem = sem.clone();
+
+            async move {
+                let mut tasks = JoinSet::new();
+
+                while let Some(job) = rx.recv().await {
+                    let client = client.clone();
+                    let prover = prover.clone();
+
+                    let permit = sem.clone().acquire_owned().await.unwrap();
+
+                    tasks.spawn(async move {
+                        let _permit = permit; // hold the slot
+
+                        println!("Processing height: {}", job.height);
+                        if let Err(e) = prover.process_job(client, &job).await {
+                            println!("proof job failed {e}");
+                        }
+                        println!("Worker task finished for height: {}", job.height);
+                    });
+                }
+
+                while tasks.join_next().await.is_some() {}
+                println!("dispatcher shut down");
+            }
+        });
+
         while let Some(result) = subscription.next().await {
             match result {
                 Ok(event) => {
                     let blobs = event.blobs.unwrap_or_default();
-                    println!("New event for height: {}, blobs: {}", event.height, blobs.len());
+                    println!("\nNew event height={}, blobs={}", event.height, blobs.len());
 
-                    let extended_header = client.header_get_by_height(event.height).await?;
-
-                    // TODO: need rs support for newer celestia app versions.
-                    // Here we clone and mutate the app version in the header to avoid versioning errors when working with the rs libs.
-                    let mut header_clone = extended_header.clone();
-                    header_clone.header.version.app = 3;
-
-                    let namespace_data = client
-                        .share_get_namespace_data(&header_clone, self.app.namespace)
-                        .await?;
-
-                    let _proofs: Vec<NamespaceProof> =
-                        namespace_data.rows.iter().map(|row| row.proof.clone()).collect();
-
-                    let signed_data: Vec<SignedData> = blobs
-                        .clone()
-                        .into_iter()
-                        .filter_map(|blob| SignedData::decode(Bytes::from(blob.data)).ok())
-                        .collect();
-
-                    println!("Got {} SignedData blobs at height {}", signed_data.len(), event.height);
-
-                    let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::with_capacity(signed_data.len());
-                    for data in signed_data {
-                        let executor_input = self
-                            .eth_client_executor_input(data.data.unwrap().metadata.unwrap().height)
-                            .await?;
-
-                        executor_inputs.push(executor_input);
-                    }
-
-                    println!("Got {} EthClientExecutorInputs", executor_inputs.len());
-
-                    // let inputs = BlockExecInput {
-                    //     header: extended_header.header,
-                    //     dah: extended_header.dah,
-                    //     blobs: blobs,
-                    //     pub_key: Vec::new(),
-                    //     namespace: self.app.namespace,
-                    //     proofs: proofs,
-                    //     executor_inputs: executor_inputs,
-                    // };
-
-                    // let (_sp1_proof, _outputs) = self.prove(inputs).await?;
+                    // Backpressure: await if the queue is full,
+                    // using `try_send` here would allow dropping events which we do not want.
+                    tx.send(ProofJob::new(event.height, blobs))
+                        .await
+                        .map_err(|_| anyhow::anyhow!("worker queue closed"))?;
                 }
                 Err(e) => {
-                    eprintln!("Subscription error: {e}");
+                    println!("Subscription error: {e}");
                     break;
                 }
             }
         }
+
+        Ok(())
+    }
+
+    async fn process_job(self: Arc<Self>, client: Arc<Client>, job: &ProofJob) -> Result<()> {
+        let extended_header = client.header_get_by_height(job.height).await?;
+        // TODO: need rs support for newer celestia app versions.
+        // Here we clone and mutate the app version in the header to avoid versioning errors when working with the rs libs.
+        let mut header_clone = extended_header.clone();
+        header_clone.header.version.app = 3;
+
+        let namespace_data = client
+            .share_get_namespace_data(&header_clone, self.app.namespace)
+            .await?;
+
+        let proofs: Vec<NamespaceProof> = namespace_data.rows.iter().map(|row| row.proof.clone()).collect();
+
+        let signed_data: Vec<SignedData> = job
+            .blobs
+            .iter()
+            .filter_map(|blob| SignedData::decode(Bytes::from(blob.data.clone())).ok())
+            .collect();
+
+        let mut executor_inputs = Vec::with_capacity(signed_data.len());
+        for data in signed_data {
+            // NOTE: consider batching/parallelizing if this call is independent & slow
+            let block_number = data
+                .data
+                .as_ref()
+                .and_then(|d| d.metadata.as_ref())
+                .map(|m| m.height)
+                .ok_or_else(|| anyhow::anyhow!("missing height for SignedData"))?;
+
+            executor_inputs.push(self.eth_client_executor_input(block_number).await?);
+        }
+
+        println!("Got {} evm inputs at height {}", executor_inputs.len(), job.height);
+
+        let (trusted_height, trusted_root) = {
+            let s = self.trusted_state.read().await;
+            (s.height, s.root)
+        };
+
+        // NOTE: The following is an optimistic update to the tracked state.
+        // If we fail to produce a proof for the given inputs then we should shutdown the service.
+        if let Some(next) = executor_inputs.last() {
+            let new_height = next.current_block.number;
+            let new_state_root = next.current_block.state_root;
+
+            let mut s = self.trusted_state.write().await;
+            s.height = new_height;
+            s.root = new_state_root;
+        };
+
+        let inputs = BlockExecInput {
+            header: extended_header.header,
+            dah: extended_header.dah,
+            blobs: job.blobs.clone(),
+            pub_key: self.app.pub_key.clone(),
+            namespace: self.app.namespace,
+            proofs,
+            executor_inputs,
+            trusted_height: trusted_height,
+            trusted_state_root: trusted_root,
+        };
+
+        // TODO: evaluate storage options for proofs.
+        let (_proof, _outputs) = self.prove(inputs).await?;
 
         Ok(())
     }
@@ -316,6 +429,14 @@ impl ProgramProver for BlockExecProver {
     fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin> {
         let mut stdin = SP1Stdin::new();
         stdin.write_vec(serde_cbor::to_vec(&input.header)?);
+        stdin.write(&input.dah);
+        stdin.write_vec(serde_cbor::to_vec(&input.blobs)?);
+        stdin.write_vec(input.pub_key);
+        stdin.write(&input.namespace);
+        stdin.write(&input.proofs);
+        stdin.write(&input.executor_inputs);
+        stdin.write(&input.trusted_height);
+        stdin.write(&input.trusted_state_root);
 
         Ok(stdin)
     }

@@ -7,7 +7,7 @@ sleep 5
 
 # Create default rollkit config if missing
 if [ ! -f "$HOME/.evm-single/config/signer.json" ]; then
-  ./evm-single init --rollkit.node.aggregator=true --rollkit.signer.passphrase $EVM_SIGNER_PASSPHRASE
+  ./evm-single init --rollkit.node.aggregator=true --rollkit.signer.path $EVM_SIGNER_PATH --rollkit.signer.passphrase $EVM_SIGNER_PASSPHRASE
 fi
 
 # Conditionally add --rollkit.da.address if ROLLKIT_DA_ADDRESS is set
@@ -42,6 +42,7 @@ exec ./evm-single start \
   --rollkit.node.block_time $EVM_BLOCK_TIME \
   --rollkit.node.aggregator=true \
   --rollkit.rpc.address "0.0.0.0:7331" \
+  --rollkit.signer.path $EVM_SIGNER_PATH \
   --rollkit.signer.passphrase $EVM_SIGNER_PASSPHRASE \
   $da_flag \
   $da_auth_token_flag \

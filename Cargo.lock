@@ -2623,6 +2623,7 @@ dependencies = [
  "dirs",
  "ev-types",
  "hex",
+ "jsonrpsee-core",
  "nmt-rs",
  "prost 0.12.6",
  "prost-build 0.12.6",
