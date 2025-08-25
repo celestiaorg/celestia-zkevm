@@ -14,7 +14,7 @@ use std::fs;
 use std::path::Path;
 
 use clap::Parser;
-use evm_exec_types::BlockRangeExecOutput;
+use evm_exec_types::{BlockRangeExecInput, BlockRangeExecOutput};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use sp1_sdk::{include_elf, HashableKey, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
@@ -134,20 +134,22 @@ fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<usize, Box<dyn Error>> {
 
     let vk: SP1VerifyingKey = bincode::deserialize(&fs::read("testdata/vkeys/evm-exec-vkey.bin")?)?;
     let vkeys = vec![vk.hash_u32(); proofs.len()];
-    stdin.write::<Vec<[u32; 8]>>(&vkeys);
 
     let public_inputs = proofs
         .iter()
         .map(|proof| proof.public_values.to_vec())
         .collect::<Vec<_>>();
 
-    stdin.write::<Vec<Vec<u8>>>(&public_inputs);
+    let input = BlockRangeExecInput {
+        vkeys: vkeys,
+        public_values: public_inputs,
+    };
+    stdin.write_vec(bincode::serialize(&input)?);
 
     for proof in &proofs {
         let SP1Proof::Compressed(ref proof) = proof.proof else {
             panic!()
         };
-
         stdin.write_proof(*proof.clone(), vk.vk.clone());
     }
 

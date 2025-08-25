@@ -27,7 +27,7 @@ use anyhow::Result;
 use celestia_types::nmt::{Namespace, NamespaceProof};
 use celestia_types::{Blob, DataAvailabilityHeader};
 use clap::Parser;
-use evm_exec_types::{BlockExecOutput, CircuitInputs};
+use evm_exec_types::{BlockExecInput, BlockExecOutput};
 use hashbrown::HashMap;
 use rsp_client_executor::io::{EthClientExecutorInput, WitnessInput};
 use serde::{Deserialize, Serialize};
@@ -211,7 +211,7 @@ fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str, args: &Args) -> Res
 
     let total_gas: u64 = executor_inputs.iter().map(|input| input.current_block.gas_used).sum();
 
-    let circuit_inputs = CircuitInputs {
+    let input = BlockExecInput {
         header_raw,
         dah,
         blobs_raw,
@@ -222,7 +222,7 @@ fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str, args: &Args) -> Res
         trusted_height,
         trusted_root,
     };
-    stdin.write_vec(bincode::serialize(&circuit_inputs)?);
+    stdin.write_vec(bincode::serialize(&input)?);
 
     let proof_input_metrics = ProofInputMetrics {
         total_blobs: blobs.len() as u64,
