@@ -23,6 +23,7 @@ def main():
         save_name = os.path.splitext(file_name)[0] + ".png"
 
         charts_dir = os.path.join(input_dir, "charts")
+        os.makedirs(charts_dir, exist_ok=True)
         save_path = os.path.join(charts_dir, save_name)
 
         print(f"Processing: {file_path} → {save_path}")
