@@ -35,5 +35,5 @@ If you encounter bugs or have feature suggestions, please [open an issue](https:
 
 Feel free to reach out via:
 
-- [Celestia community chanels](https://celestia.org/community/)
+- [Celestia community channels](https://celestia.org/community/)
 - Issues and Discussions tabs on GitHub
