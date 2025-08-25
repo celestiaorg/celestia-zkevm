@@ -1,8 +1,26 @@
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
-use celestia_types::nmt::Namespace;
+use alloy_primitives::FixedBytes;
+use celestia_types::{
+    nmt::{Namespace, NamespaceProof},
+    DataAvailabilityHeader,
+};
 use hex::encode;
+use rsp_client_executor::io::EthClientExecutorInput;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CircuitInputs {
+    pub header_raw: Vec<u8>,
+    pub dah: DataAvailabilityHeader,
+    pub blobs_raw: Vec<u8>,
+    pub pub_key: Vec<u8>,
+    pub namespace: Namespace,
+    pub proofs: Vec<NamespaceProof>,
+    pub executor_inputs: Vec<EthClientExecutorInput>,
+    pub trusted_height: u64,
+    pub trusted_root: FixedBytes<32>,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlockExecOutput {

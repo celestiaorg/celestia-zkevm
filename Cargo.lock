@@ -2616,9 +2616,11 @@ dependencies = [
 name = "evm-exec-types"
 version = "0.1.0"
 dependencies = [
+ "alloy-primitives",
  "bincode",
  "celestia-types",
  "hex",
+ "rsp-client-executor",
  "serde",
 ]
 
