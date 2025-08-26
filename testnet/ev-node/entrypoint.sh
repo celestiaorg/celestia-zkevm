@@ -6,6 +6,7 @@ cd /usr/bin
 sleep 5
 
 # Create default evnode config if missing
+# TODO: The --evnode.signer.path flag is not respected: https://github.com/evstack/ev-node/issues/2603
 if [ ! -f "$HOME/.evm-single/config/signer.json" ]; then
   ./evm-single init --evnode.node.aggregator=true --evnode.signer.path $EVM_SIGNER_PATH --evnode.signer.passphrase $EVM_SIGNER_PASSPHRASE
 fi
