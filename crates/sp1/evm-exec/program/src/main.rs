@@ -58,6 +58,7 @@ pub fn main() {
     // 0. Deserialize inputs
     // -----------------------------
     println!("cycle-tracker-report-start: deserialize inputs");
+
     let inputs: BlockExecInput = sp1_zkvm::io::read::<BlockExecInput>();
     let celestia_header: Header =
         serde_cbor::from_slice(&inputs.header_raw).expect("failed to deserialize celestia header");
