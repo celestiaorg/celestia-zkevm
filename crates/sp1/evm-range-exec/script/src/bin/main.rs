@@ -141,7 +141,7 @@ fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<usize, Box<dyn Error>> {
         .collect::<Vec<_>>();
 
     let input = BlockRangeExecInput {
-        vkeys: vkeys,
+        vkeys,
         public_values: public_inputs,
     };
     stdin.write_vec(bincode::serialize(&input)?);
