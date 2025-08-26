@@ -10,7 +10,7 @@ These are estimates, but should serve as a rough guideline. The last two gas poi
 
 ### Results
 
-⚠️ The `execute EVM blocks` metric is inclusive of all the RSP profiles, i.e. `block execution`, `recover senders`, `initialze witness db`, `compute state root`, `validate block post execution`.
+⚠️ The `execute EVM blocks` metric is inclusive of all the RSP profiles, i.e. `block execution`, `recover senders`, `initialize witness db`, `compute state root`, `validate block post execution`.
  
 #### 15M Gas/s, single DA block
 
