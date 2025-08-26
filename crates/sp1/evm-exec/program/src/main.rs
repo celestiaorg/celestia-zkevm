@@ -244,12 +244,7 @@ pub fn main() {
         namespace: inputs.namespace,
         public_key: inputs.pub_key.try_into().expect("public key must be exactly 32 bytes"),
     };
-
-    println!("Trusted Root for Next Block: {:?}", hex::encode(output.new_state_root));
-    println!("Trusted Height for Next Block: {:?}", output.new_height);
-
     sp1_zkvm::io::commit(&output);
-
     println!("cycle-tracker-report-end: commit public outputs");
 }
 
