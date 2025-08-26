@@ -144,7 +144,7 @@ fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<usize, Box<dyn Error>> {
         vkeys,
         public_values: public_inputs,
     };
-    stdin.write_vec(bincode::serialize(&input)?);
+    stdin.write(&input);
 
     for proof in &proofs {
         let SP1Proof::Compressed(ref proof) = proof.proof else {

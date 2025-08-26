@@ -222,7 +222,7 @@ fn write_proof_inputs(stdin: &mut SP1Stdin, input_dir: &str, args: &Args) -> Res
         trusted_height,
         trusted_root,
     };
-    stdin.write_vec(bincode::serialize(&input)?);
+    stdin.write(&input);
 
     let proof_input_metrics = ProofInputMetrics {
         total_blobs: blobs.len() as u64,

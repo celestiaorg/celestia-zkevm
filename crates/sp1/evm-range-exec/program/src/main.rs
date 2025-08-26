@@ -26,8 +26,7 @@ pub fn main() {
     // ------------------------------
     println!("cycle-tracker-report-start: deserialize inputs");
 
-    let inputs: BlockRangeExecInput =
-        bincode::deserialize(&sp1_zkvm::io::read_vec()).expect("failed to deserialize circuit inputs");
+    let inputs: BlockRangeExecInput = sp1_zkvm::io::read::<BlockRangeExecInput>();
 
     assert_eq!(
         inputs.vkeys.len(),

@@ -57,8 +57,8 @@ pub fn main() {
     // -----------------------------
     // 0. Deserialize inputs
     // -----------------------------
-    let inputs: BlockExecInput =
-        bincode::deserialize(&sp1_zkvm::io::read_vec()).expect("failed to deserialize circuit inputs");
+    println!("cycle-tracker-report-start: deserialize inputs");
+    let inputs: BlockExecInput = sp1_zkvm::io::read::<BlockExecInput>();
     let celestia_header: Header =
         serde_cbor::from_slice(&inputs.header_raw).expect("failed to deserialize celestia header");
     let blobs: Vec<Blob> = serde_cbor::from_slice(&inputs.blobs_raw).expect("failed to deserialize blob data");
