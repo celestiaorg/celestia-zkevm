@@ -49,23 +49,19 @@ impl Display for BlockExecOutput {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BlockExecInput {
-    pub header_raw: Vec<u8>,
-    pub dah: DataAvailabilityHeader,
-    pub blobs_raw: Vec<u8>,
-    pub pub_key: Vec<u8>,
-    pub namespace: Namespace,
-    pub proofs: Vec<NamespaceProof>,
-    pub executor_inputs: Vec<EthClientExecutorInput>,
-    pub trusted_height: u64,
-    pub trusted_root: FixedBytes<32>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BlockRangeExecInput {
-    pub vkeys: Vec<[u32; 8]>,
-    pub public_values: Vec<Vec<u8>>,
+/// Display trait implementation to format hashes as hex encoded output.
+impl Display for BlockRangeExecOutput {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        writeln!(f, "BlockRangeExecOutput {{")?;
+        writeln!(f, "  celestia_header_hash: {}", encode(self.celestia_header_hash))?;
+        writeln!(f, "  trusted_height: {}", self.trusted_height)?;
+        writeln!(f, "  trusted_state_root: {}", encode(self.trusted_state_root))?;
+        writeln!(f, "  new_height: {}", self.new_height)?;
+        writeln!(f, "  new_state_root: {}", encode(self.new_state_root))?;
+        writeln!(f, "  namespace: {}", encode(self.namespace.0))?;
+        writeln!(f, "  public_key: {}", encode(self.public_key))?;
+        writeln!(f, "}}")
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -87,19 +83,25 @@ pub struct BlockRangeExecOutput {
     pub public_key: [u8; 32],
 }
 
-/// Display trait implementation to format hashes as hex encoded output.
-impl Display for BlockRangeExecOutput {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "BlockRangeExecOutput {{")?;
-        writeln!(f, "  celestia_header_hash: {}", encode(self.celestia_header_hash))?;
-        writeln!(f, "  trusted_height: {}", self.trusted_height)?;
-        writeln!(f, "  trusted_state_root: {}", encode(self.trusted_state_root))?;
-        writeln!(f, "  new_height: {}", self.new_height)?;
-        writeln!(f, "  new_state_root: {}", encode(self.new_state_root))?;
-        writeln!(f, "  namespace: {}", encode(self.namespace.0))?;
-        writeln!(f, "  public_key: {}", encode(self.public_key))?;
-        writeln!(f, "}}")
-    }
+/// BlockExecInput is the input for the BlockExec circuit.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BlockExecInput {
+    pub header_raw: Vec<u8>,
+    pub dah: DataAvailabilityHeader,
+    pub blobs_raw: Vec<u8>,
+    pub pub_key: Vec<u8>,
+    pub namespace: Namespace,
+    pub proofs: Vec<NamespaceProof>,
+    pub executor_inputs: Vec<EthClientExecutorInput>,
+    pub trusted_height: u64,
+    pub trusted_root: FixedBytes<32>,
+}
+
+/// BlockRangeExecInput is the input for the BlockRangeExec circuit.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BlockRangeExecInput {
+    pub vkeys: Vec<[u32; 8]>,
+    pub public_values: Vec<Vec<u8>>,
 }
 
 /// A buffer of serializable/deserializable objects.
