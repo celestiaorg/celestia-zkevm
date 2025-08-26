@@ -18,14 +18,6 @@ impl ProverService {
     pub fn new(_config: Config) -> Result<Self> {
         let block_range_prover = BlockRangeExecProver::new();
 
-        // Clone anything needed inside the async task
-        // Spawn the async subscription loop
-        // tokio::spawn(async move {
-        //     if let Err(e) = block_prover.start().await {
-        //         println!("namespace subscription error: {:?}", e);
-        //     }
-        // });
-
         Ok(ProverService { block_range_prover })
     }
 }
