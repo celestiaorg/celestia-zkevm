@@ -34,7 +34,9 @@
 
 sp1_zkvm::entrypoint!(main);
 
-use std::collections::HashSet;
+extern crate alloc;
+pub use alloc::collections::BTreeSet as HashSet;
+
 use std::error::Error;
 use std::sync::Arc;
 
