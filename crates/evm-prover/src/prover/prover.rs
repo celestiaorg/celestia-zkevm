@@ -101,13 +101,19 @@ pub struct AppContext {
     pub celestia_rpc: String,
     pub evm_rpc: String,
     pub pub_key: Vec<u8>,
+    pub trusted_state: RwLock<TrustedState>,
+}
+
+/// TrustedState tracks the current height and state root which is provided to the proof system as its trusted inputs.
+pub struct TrustedState {
+    height: u64,
+    root: FixedBytes<32>,
 }
 
 impl AppContext {
     pub fn from_config(config: Config) -> Result<Self> {
         let genesis = AppContext::load_genesis().context("Error loading app genesis")?;
-
-        let chain_spec = Arc::new(
+        let chain_spec: Arc<ChainSpec> = Arc::new(
             (&genesis)
                 .try_into()
                 .map_err(|e| anyhow!("Failed to convert genesis to chain spec: {e}"))?,
@@ -116,6 +122,10 @@ impl AppContext {
         let raw_ns = hex::decode(config.namespace_hex)?;
         let namespace = Namespace::new_v0(raw_ns.as_ref()).context("Failed to construct Namespace")?;
         let pub_key = hex::decode(config.pub_key)?;
+        let trusted_state = RwLock::new(TrustedState {
+            height: 0,
+            root: chain_spec.genesis_hash(),
+        });
 
         Ok(AppContext {
             chain_spec,
@@ -124,6 +134,7 @@ impl AppContext {
             celestia_rpc: config.celestia_rpc,
             evm_rpc: config.evm_rpc,
             pub_key,
+            trusted_state,
         })
     }
 
@@ -151,17 +162,9 @@ pub struct BlockExecProver {
     pub app: AppContext,
     pub config: ProverConfig,
     pub prover: EnvProver,
-    pub trusted_state: RwLock<TrustedState>,
-}
-
-/// TrustedState tracks the current height and state root which is provided to the proof system as its trusted inputs.
-pub struct TrustedState {
-    height: u64,
-    root: FixedBytes<32>,
 }
 
 // ProofJob is a basic struct to the track proof generation per block event.
-// TODO: Could be replaced by using the BlobsAtHeight event directly.
 struct ProofJob {
     height: u64,
     blobs: Vec<Blob>,
@@ -173,6 +176,7 @@ impl ProofJob {
     }
 }
 
+// TODO: make configurable?
 const QUEUE_CAP: usize = 256;
 const CONCURRENCY: usize = 16;
 
@@ -182,17 +186,8 @@ impl BlockExecProver {
     pub fn new(app: AppContext) -> Arc<Self> {
         let config = BlockExecProver::default_config();
         let prover = ProverClient::from_env();
-        let trusted_state = RwLock::new(TrustedState {
-            height: 0,
-            root: app.chain_spec.genesis_header().state_root,
-        });
 
-        Arc::new(Self {
-            app,
-            config,
-            prover,
-            trusted_state,
-        })
+        Arc::new(Self { app, config, prover })
     }
 
     /// Returns the default prover configuration for the block execution program.
@@ -312,7 +307,7 @@ impl BlockExecProver {
         println!("Got {} evm inputs at height {}", executor_inputs.len(), job.height);
 
         let (trusted_height, trusted_root) = {
-            let s = self.trusted_state.read().await;
+            let s = self.app.trusted_state.read().await;
             (s.height, s.root)
         };
 
@@ -322,7 +317,7 @@ impl BlockExecProver {
             let new_height = next.current_block.number;
             let new_state_root = next.current_block.state_root;
 
-            let mut s = self.trusted_state.write().await;
+            let mut s = self.app.trusted_state.write().await;
             s.height = new_height;
             s.root = new_state_root;
         };
