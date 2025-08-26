@@ -219,10 +219,7 @@ pub fn main() {
     println!("cycle-tracker-report-start: commit public outputs");
 
     let new_height: u64 = headers.last().map(|h| h.number).unwrap_or(inputs.trusted_height);
-    let new_state_root: B256 = headers
-        .last()
-        .map(|h| h.state_root)
-        .unwrap_or(inputs.trusted_root.into());
+    let new_state_root: B256 = headers.last().map(|h| h.state_root).unwrap_or(inputs.trusted_root);
 
     let output = BlockExecOutput {
         celestia_header_hash: celestia_header
