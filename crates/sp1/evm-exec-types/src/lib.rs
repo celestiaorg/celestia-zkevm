@@ -49,21 +49,6 @@ impl Display for BlockExecOutput {
     }
 }
 
-/// Display trait implementation to format hashes as hex encoded output.
-impl Display for BlockRangeExecOutput {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "BlockRangeExecOutput {{")?;
-        writeln!(f, "  celestia_header_hash: {}", encode(self.celestia_header_hash))?;
-        writeln!(f, "  trusted_height: {}", self.trusted_height)?;
-        writeln!(f, "  trusted_state_root: {}", encode(self.trusted_state_root))?;
-        writeln!(f, "  new_height: {}", self.new_height)?;
-        writeln!(f, "  new_state_root: {}", encode(self.new_state_root))?;
-        writeln!(f, "  namespace: {}", encode(self.namespace.0))?;
-        writeln!(f, "  public_key: {}", encode(self.public_key))?;
-        writeln!(f, "}}")
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlockRangeExecOutput {
     // celestia_header_hash is the hash of the celestia header at which new_height is available.
@@ -81,6 +66,21 @@ pub struct BlockRangeExecOutput {
     pub namespace: Namespace,
     // public_key is the sequencer's public key used to verify the signatures of the signed data.
     pub public_key: [u8; 32],
+}
+
+/// Display trait implementation to format hashes as hex encoded output.
+impl Display for BlockRangeExecOutput {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        writeln!(f, "BlockRangeExecOutput {{")?;
+        writeln!(f, "  celestia_header_hash: {}", encode(self.celestia_header_hash))?;
+        writeln!(f, "  trusted_height: {}", self.trusted_height)?;
+        writeln!(f, "  trusted_state_root: {}", encode(self.trusted_state_root))?;
+        writeln!(f, "  new_height: {}", self.new_height)?;
+        writeln!(f, "  new_state_root: {}", encode(self.new_state_root))?;
+        writeln!(f, "  namespace: {}", encode(self.namespace.0))?;
+        writeln!(f, "  public_key: {}", encode(self.public_key))?;
+        writeln!(f, "}}")
+    }
 }
 
 /// BlockExecInput is the input for the BlockExec circuit.
