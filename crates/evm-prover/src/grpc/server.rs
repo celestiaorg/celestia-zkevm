@@ -33,7 +33,7 @@ pub async fn create_grpc_server(config: Config) -> Result<()> {
     // For now query the pubkey on startup from evnode.
     // https://github.com/evstack/ev-node/issues/2603
     let mut config_clone = config.clone();
-    config_clone.pub_key = hex::encode(pub_key[4..].to_vec());
+    config_clone.pub_key = hex::encode(&pub_key[4..]);
     println!("Successfully got pubkey from evnode: {}", config_clone.pub_key);
 
     tokio::spawn({

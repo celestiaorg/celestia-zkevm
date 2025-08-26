@@ -306,7 +306,7 @@ impl BlockExecProver {
 
         println!("Got {} evm inputs at height {}", executor_inputs.len(), job.height);
 
-        let (trusted_height, trusted_root) = {
+        let (trusted_height, trusted_state_root) = {
             let s = self.app.trusted_state.read().await;
             (s.height, s.root)
         };
@@ -330,8 +330,8 @@ impl BlockExecProver {
             namespace: self.app.namespace,
             proofs,
             executor_inputs,
-            trusted_height: trusted_height,
-            trusted_state_root: trusted_root,
+            trusted_height,
+            trusted_state_root,
         };
 
         // TODO: evaluate storage options for proofs.
