@@ -1,4 +1,7 @@
 use anyhow::Result;
+use ev_types::v1::get_block_request::Identifier;
+use ev_types::v1::store_service_client::StoreServiceClient;
+use ev_types::v1::GetBlockRequest;
 use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server;
@@ -18,8 +21,23 @@ pub async fn create_grpc_server(config: Config) -> Result<()> {
         .build()
         .unwrap();
 
+    let mut sequencer_client = StoreServiceClient::connect("http://127.0.0.1:7331").await?;
+    let block_req = GetBlockRequest {
+        identifier: Some(Identifier::Height(1)),
+    };
+
+    let resp = sequencer_client.get_block(block_req).await?;
+    let pub_key = resp.into_inner().block.unwrap().header.unwrap().signer.unwrap().pub_key;
+
+    // TODO: Use from config file when we can have a reproducible key in docker-compose.
+    // For now query the pubkey on startup from evnode.
+    // https://github.com/evstack/ev-node/issues/2603
+    let mut config_clone = config.clone();
+    config_clone.pub_key = hex::encode(pub_key[4..].to_vec());
+    println!("Successfully got pubkey from evnode: {}", config_clone.pub_key);
+
     tokio::spawn({
-        let block_prover = BlockExecProver::new(AppContext::from_config(config.clone())?);
+        let block_prover = BlockExecProver::new(AppContext::from_config(config_clone)?);
         async move {
             if let Err(e) = block_prover.run().await {
                 eprintln!("Block prover task failed: {e:?}");
