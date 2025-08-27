@@ -2624,6 +2624,7 @@ dependencies = [
  "clap",
  "dirs",
  "ev-types",
+ "evm-exec-types",
  "hex",
  "jsonrpsee-core",
  "nmt-rs",

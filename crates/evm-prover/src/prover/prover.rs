@@ -12,8 +12,9 @@ use bytes::Bytes;
 use celestia_rpc::blob::BlobsAtHeight;
 use celestia_rpc::{client::Client, BlobClient, HeaderClient, ShareClient};
 use celestia_types::nmt::{Namespace, NamespaceProof};
-use celestia_types::{Blob, DataAvailabilityHeader};
+use celestia_types::Blob;
 use ev_types::v1::SignedData;
+use evm_exec_types::{BlockExecInput, BlockExecOutput, BlockRangeExecInput, BlockRangeExecOutput};
 use jsonrpsee_core::client::Subscription;
 use prost::Message;
 use reth_chainspec::ChainSpec;
@@ -21,12 +22,9 @@ use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
-use serde::{Deserialize, Serialize};
 use sp1_sdk::{
-    include_elf, EnvProver, HashableKey, ProverClient, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin,
-    SP1VerifyingKey,
+    include_elf, EnvProver, ProverClient, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
 };
-use tendermint::block::Header;
 use tokio::{
     sync::{mpsc, RwLock, Semaphore},
     task::JoinSet,
@@ -153,17 +151,6 @@ impl AppContext {
     }
 }
 
-/// A prover for generating SP1 proofs for EVM block execution and data availability in Celestia.
-///
-/// This struct is responsible for preparing the standard input (`SP1Stdin`)
-/// for a zkVM program that takes a blob inclusion proof, data root proof, Celestia Header and
-/// EVM state transition function.
-pub struct BlockExecProver {
-    pub app: AppContext,
-    pub config: ProverConfig,
-    pub prover: EnvProver,
-}
-
 // ProofJob is a basic struct to the track proof generation per block event.
 struct ProofJob {
     height: u64,
@@ -179,6 +166,17 @@ impl ProofJob {
 // TODO: make configurable?
 const QUEUE_CAP: usize = 256;
 const CONCURRENCY: usize = 16;
+
+/// A prover for generating SP1 proofs for EVM block execution and data availability in Celestia.
+///
+/// This struct is responsible for preparing the standard input (`SP1Stdin`)
+/// for a zkVM program that takes a blob inclusion proof, data root proof, Celestia Header and
+/// EVM state transition function.
+pub struct BlockExecProver {
+    pub app: AppContext,
+    pub config: ProverConfig,
+    pub prover: EnvProver,
+}
 
 impl BlockExecProver {
     /// Creates a new instance of [`BlockExecProver`] for the provided [`AppContext`] using default configuration
@@ -293,7 +291,8 @@ impl BlockExecProver {
 
         let mut executor_inputs = Vec::with_capacity(signed_data.len());
         for data in signed_data {
-            // NOTE: consider batching/parallelizing if this call is independent & slow
+            // NOTE: this step is IO bound and may potentially be slow dependending on EVM block size
+            // consider revisiting this if this causes synchronization issues.
             let block_number = data
                 .data
                 .as_ref()
@@ -306,13 +305,13 @@ impl BlockExecProver {
 
         println!("Got {} evm inputs at height {}", executor_inputs.len(), job.height);
 
-        let (trusted_height, trusted_state_root) = {
+        let (trusted_height, trusted_root) = {
             let s = self.app.trusted_state.read().await;
             (s.height, s.root)
         };
 
-        // NOTE: The following is an optimistic update to the tracked state.
-        // If we fail to produce a proof for the given inputs then we should shutdown the service.
+        // NOTE: The following is an optimistic update to the tracked state. If we fail to produce a proof for
+        // the given inputs then we should shutdown the service, as developer intervention is likely required.
         if let Some(next) = executor_inputs.last() {
             let new_height = next.current_block.number;
             let new_state_root = next.current_block.state_root;
@@ -323,19 +322,23 @@ impl BlockExecProver {
         };
 
         let inputs = BlockExecInput {
-            header: extended_header.header,
+            header_raw: serde_cbor::to_vec(&extended_header.header)?,
             dah: extended_header.dah,
-            blobs: job.blobs.clone(),
+            blobs_raw: serde_cbor::to_vec(&job.blobs.clone())?,
             pub_key: self.app.pub_key.clone(),
             namespace: self.app.namespace,
             proofs,
             executor_inputs,
             trusted_height,
-            trusted_state_root,
+            trusted_root,
         };
 
-        // TODO: evaluate storage options for proofs.
-        let (_proof, _outputs) = self.prove(inputs).await?;
+        // TODO: store proofs for later use by aggregation circuit.
+        let (_proof, outputs) = self.prove(inputs).await?;
+        println!(
+            "Successfully created proof for block {}. Outputs: {}",
+            job.height, outputs
+        );
 
         Ok(())
     }
@@ -352,56 +355,6 @@ impl BlockExecProver {
 
         Ok(executor_input)
     }
-}
-
-/// Input to the EVM block execution proving circuit.
-///
-/// This input contains all necessary data to verify block execution and data
-/// availability of blob data in Celestia.
-#[derive(Serialize, Deserialize)]
-pub struct BlockExecInput {
-    // header is the Celestia block header at which the blob data is available.
-    pub header: Header,
-    // dah is the Celestia data availability header.
-    pub dah: DataAvailabilityHeader,
-    // blobs is the collection of blobs included in the namespace for the current block.
-    pub blobs: Vec<Blob>,
-    // pub_key is the ed25519 public key of the sequencer.
-    pub pub_key: Vec<u8>,
-    // namespace is the Celestia namespace to which EVM block data blobs are submitted.
-    pub namespace: Namespace,
-    // proofs is a collection of Namespaced Merkle Tree proofs for the included blob data.
-    pub proofs: Vec<NamespaceProof>,
-    // executor_inputs is the collection of state transition functions for each EVM block included in the Celestia block.
-    pub executor_inputs: Vec<EthClientExecutorInput>,
-    // trusted_height is the latest trusted height of the EVM application.
-    pub trusted_height: u64,
-    // trusted_state_root is the latest trusted state root of the EVM application.
-    pub trusted_state_root: FixedBytes<32>,
-}
-
-/// Output of the EVM block execution proving circuit.
-///
-/// This contains the resulting commitments after applying the state transition function and verifying
-/// data availability in Celestia.
-#[derive(Serialize, Deserialize)]
-pub struct BlockExecOutput {
-    // celestia_header_hash is the merkle hash of the Celestia block header.
-    pub celestia_header_hash: [u8; 32],
-    // prev_celestia_header_hash is the merkle hash of the previous Celestia block header.
-    pub prev_celestia_header_hash: [u8; 32],
-    // new_height is the block number after the state transition function has been applied.
-    pub new_height: u64,
-    // new_state_root is the EVM application state root after the state transition function has been applied.
-    pub new_state_root: [u8; 32],
-    // prev_height is the block number before the state transition function has been applied.
-    pub prev_height: u64,
-    // prev_state_root is the EVM application state root before the state transition function has been applied.
-    pub prev_state_root: [u8; 32],
-    // namespace is the Celestia namespace that contains the blob data.
-    pub namespace: Namespace,
-    // public_key is the sequencer's public key used to verify the signatures of the signed data.
-    pub public_key: [u8; 32],
 }
 
 #[async_trait]
@@ -423,16 +376,7 @@ impl ProgramProver for BlockExecProver {
     /// Returns an error if serialization of any input component fails.
     fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin> {
         let mut stdin = SP1Stdin::new();
-        stdin.write_vec(serde_cbor::to_vec(&input.header)?);
-        stdin.write(&input.dah);
-        stdin.write_vec(serde_cbor::to_vec(&input.blobs)?);
-        stdin.write_vec(input.pub_key);
-        stdin.write(&input.namespace);
-        stdin.write(&input.proofs);
-        stdin.write(&input.executor_inputs);
-        stdin.write(&input.trusted_height);
-        stdin.write(&input.trusted_state_root);
-
+        stdin.write(&input);
         Ok(stdin)
     }
 
@@ -466,6 +410,12 @@ pub struct BlockRangeExecProver {
     prover: EnvProver,
 }
 
+/// ProofInput is a convienience type used for proof aggregation inputs within the BlockRangeExecProver program.
+pub struct ProofInput {
+    proof: SP1Proof,
+    vkey: SP1VerifyingKey,
+}
+
 impl BlockRangeExecProver {
     /// Creates a new instance of [`BlockRangeExecProver`] using default configuration
     /// and prover environment settings.
@@ -485,42 +435,9 @@ impl BlockRangeExecProver {
     }
 }
 
-/// Input to a batch execution proving system that verifies multiple SP1 proofs
-/// for a range of EVM blocks.
-///
-/// This is used to verify that N state transitions have occurred using a single
-/// verifying key, producing a new application state root.
-#[derive(Serialize, Deserialize)]
-pub struct BlockRangeExecInput {
-    // proofs is a vector of SP1 proofs with their associated public values
-    pub proofs: Vec<SP1ProofWithPublicValues>,
-    // vkey is the SP1 verifier key for verifying proofs
-    pub vkey: SP1VerifyingKey,
-}
-
-/// Output of a batch execution proof that validates N state transitions
-/// from a trusted starting point.
-///
-/// This contains the resulting commitments after applying a sequence of verified SP1 proofs,
-/// advancing the EVM application state from `trusted_height` to `new_height`.
-#[derive(Serialize, Deserialize)]
-pub struct BlockRangeExecOutput {
-    // celestia_header_hash is the hash of the celestia header at which new_height is available.
-    pub celestia_header_hash: [u8; 32],
-    // trusted_height is the trusted height of the EVM application.
-    pub trusted_height: u64,
-    // trusted_state_root is the state commitment root of the EVM application at trusted_height.
-    pub trusted_state_root: [u8; 32],
-    // new_height is the EVM application block number after N state transitions.
-    pub new_height: u64,
-    // new_state_root is the computed state root of the EVM application after
-    // executing N blocks from trusted_height to new_height.
-    pub new_state_root: [u8; 32],
-}
-
 #[async_trait]
 impl ProgramProver for BlockRangeExecProver {
-    type Input = BlockRangeExecInput;
+    type Input = (BlockRangeExecInput, Vec<ProofInput>);
     type Output = BlockRangeExecOutput;
 
     /// Returns the program configuration containing the ELF and proof mode.
@@ -528,10 +445,10 @@ impl ProgramProver for BlockRangeExecProver {
         &self.config
     }
 
-    /// Constructs the SP1Stdin by serializing:
+    /// Constructs the SP1Stdin by serializing the program inputs:
     /// - Verifier key digests (`vkeys`)
     /// - Public inputs for each proof
-    /// - The compressed proofs themselves
+    /// - The compressed SP1 proofs and their associated verifying keys.
     ///
     /// # Errors
     /// - Returns an error if any proof is not in compressed format.
@@ -539,20 +456,20 @@ impl ProgramProver for BlockRangeExecProver {
     fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin> {
         let mut stdin = SP1Stdin::new();
 
-        let (proofs, public_values): (Vec<_>, Vec<_>) = input
-            .proofs
-            .into_iter()
-            .map(|p| (p.proof, p.public_values.to_vec()))
-            .unzip();
+        let (inputs, proof_inputs) = input;
+        if inputs.vkeys.len() != proof_inputs.len() {
+            return Err(anyhow!(
+                "mismatched lengths: {} vkeys vs {} proof_inputs",
+                inputs.vkeys.len(),
+                proof_inputs.len()
+            ));
+        }
 
-        let vkeys = vec![input.vkey.hash_u32(); proofs.len()];
-        stdin.write(&vkeys);
-        stdin.write(&public_values);
-
-        for proof in proofs.iter() {
-            match proof {
+        stdin.write(&inputs);
+        for proof_input in proof_inputs.iter() {
+            match &proof_input.proof {
                 SP1Proof::Compressed(inner) => {
-                    stdin.write_proof(*inner.clone(), input.vkey.vk.clone());
+                    stdin.write_proof(*inner.clone(), proof_input.vkey.vk.clone());
                 }
                 _ => {
                     return Err(anyhow::anyhow!("Expected compressed SP1 proof"));
