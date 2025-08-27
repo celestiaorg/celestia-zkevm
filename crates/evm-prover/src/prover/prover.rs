@@ -31,61 +31,13 @@ use tokio::{
 };
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
+use crate::prover::{ProgramProver, ProverConfig};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_RANGE_EXEC_ELF: &[u8] = include_elf!("evm-range-exec-program");
-
-/// ProverConfig defines metadata about the program binary (ELF), proof mode and any static keys.
-pub struct ProverConfig {
-    pub elf: &'static [u8],
-    pub proof_mode: SP1ProofMode,
-}
-
-/// ProgramProver is a trait implemented per SP1 program*.
-///
-/// Associated types let each program pick its own Input and Output context.
-#[async_trait]
-pub trait ProgramProver {
-    /// Context needed to build the stdin for this program.
-    type Input: Send + 'static;
-    /// Output data to return alongside the proof.
-    type Output: Send + 'static;
-
-    /// Returns the program configuration containing the ELF and proof mode.
-    fn cfg(&self) -> &ProverConfig;
-
-    /// Build the program stdin from the prover inputs.
-    fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin>;
-
-    /// Prove produces a proof and parsed outputs.
-    /// The default implementation matches the configured proof mode and program elf from the prover config.
-    async fn prove(&self, input: Self::Input) -> Result<(SP1ProofWithPublicValues, Self::Output)> {
-        let cfg = self.cfg();
-        let stdin = self.build_stdin(input)?;
-
-        let (pk, _vk) = self.prover().setup(cfg.elf);
-
-        let proof: SP1ProofWithPublicValues = match cfg.proof_mode {
-            SP1ProofMode::Core => self.prover().prove(&pk, &stdin).core().run()?,
-            SP1ProofMode::Compressed => self.prover().prove(&pk, &stdin).compressed().run()?,
-            SP1ProofMode::Groth16 => self.prover().prove(&pk, &stdin).groth16().run()?,
-            SP1ProofMode::Plonk => self.prover().prove(&pk, &stdin).plonk().run()?,
-        };
-
-        let output = self.post_process(proof.clone())?;
-
-        Ok((proof, output))
-    }
-
-    /// Returns the SP1 Prover.
-    fn prover(&self) -> &EnvProver;
-
-    /// Parse or convert program outputs.
-    fn post_process(&self, proof: SP1ProofWithPublicValues) -> Result<Self::Output>;
-}
 
 /// AppContext encapsulates the full set of RPC endpoints and configuration
 /// needed to fetch input data for execution and data availability proofs.
@@ -163,7 +115,7 @@ impl ProofJob {
     }
 }
 
-// TODO: make configurable?
+// TODO: Add these as fields to the BlockExecProver to make configurable?
 const QUEUE_CAP: usize = 256;
 const CONCURRENCY: usize = 16;
 
@@ -176,6 +128,44 @@ pub struct BlockExecProver {
     pub app: AppContext,
     pub config: ProverConfig,
     pub prover: EnvProver,
+}
+
+#[async_trait]
+impl ProgramProver for BlockExecProver {
+    type Input = BlockExecInput;
+    type Output = BlockExecOutput;
+
+    /// Returns the program configuration containing the ELF and proof mode.
+    fn cfg(&self) -> &ProverConfig {
+        &self.config
+    }
+
+    /// Constructs the `SP1Stdin` input required for proving.
+    ///
+    /// This function serializes and writes structured input data into the
+    /// stdin buffer in the expected format for the SP1 program.
+    ///
+    /// # Errors
+    /// Returns an error if serialization of any input component fails.
+    fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin> {
+        let mut stdin = SP1Stdin::new();
+        stdin.write(&input);
+        Ok(stdin)
+    }
+
+    /// Parses the `SP1PublicValues` from the proof and converts it into the
+    /// program's custom output type.
+    ///
+    /// # Errors
+    /// - Returns an error if deserialization fails.
+    fn post_process(&self, proof: SP1ProofWithPublicValues) -> Result<Self::Output> {
+        Ok(bincode::deserialize::<BlockExecOutput>(proof.public_values.as_slice())?)
+    }
+
+    /// Returns the SP1 Prover.
+    fn prover(&self) -> &EnvProver {
+        &self.prover
+    }
 }
 
 impl BlockExecProver {
@@ -205,6 +195,19 @@ impl BlockExecProver {
             .context("Blob subscription failed")?;
 
         Ok((client, subscription))
+    }
+
+    /// Generates the state transition function (STF) input for a given EVM block number.
+    async fn eth_client_executor_input(&self, block_number: u64) -> Result<EthClientExecutorInput> {
+        let host_executor = EthHostExecutor::eth(self.app.chain_spec.clone(), None);
+        let provider = ProviderBuilder::new().connect_http(self.app.evm_rpc.parse()?);
+        let rpc_db = RpcDb::new(provider.clone(), block_number - 1);
+
+        let executor_input = host_executor
+            .execute(block_number, &rpc_db, &provider, self.app.genesis.clone(), None, false)
+            .await?;
+
+        Ok(executor_input)
     }
 
     /// Runs the block prover loop, spawning a new tokio task for each BlobsAtHeight event we receive
@@ -342,57 +345,6 @@ impl BlockExecProver {
 
         Ok(())
     }
-
-    /// Generates the state transition function (STF) input for a given EVM block number.
-    async fn eth_client_executor_input(&self, block_number: u64) -> Result<EthClientExecutorInput> {
-        let host_executor = EthHostExecutor::eth(self.app.chain_spec.clone(), None);
-        let provider = ProviderBuilder::new().connect_http(self.app.evm_rpc.parse()?);
-        let rpc_db = RpcDb::new(provider.clone(), block_number - 1);
-
-        let executor_input = host_executor
-            .execute(block_number, &rpc_db, &provider, self.app.genesis.clone(), None, false)
-            .await?;
-
-        Ok(executor_input)
-    }
-}
-
-#[async_trait]
-impl ProgramProver for BlockExecProver {
-    type Input = BlockExecInput;
-    type Output = BlockExecOutput;
-
-    /// Returns the program configuration containing the ELF and proof mode.
-    fn cfg(&self) -> &ProverConfig {
-        &self.config
-    }
-
-    /// Constructs the `SP1Stdin` input required for proving.
-    ///
-    /// This function serializes and writes structured input data into the
-    /// stdin buffer in the expected format for the SP1 program.
-    ///
-    /// # Errors
-    /// Returns an error if serialization of any input component fails.
-    fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin> {
-        let mut stdin = SP1Stdin::new();
-        stdin.write(&input);
-        Ok(stdin)
-    }
-
-    /// Parses the `SP1PublicValues` from the proof and converts it into the
-    /// program's custom output type.
-    ///
-    /// # Errors
-    /// - Returns an error if deserialization fails.
-    fn post_process(&self, proof: SP1ProofWithPublicValues) -> Result<Self::Output> {
-        Ok(bincode::deserialize::<BlockExecOutput>(proof.public_values.as_slice())?)
-    }
-
-    /// Returns the SP1 Prover.
-    fn prover(&self) -> &EnvProver {
-        &self.prover
-    }
 }
 
 /// A prover for verifying and aggregating SP1 proofs over a range of blocks.
@@ -414,25 +366,6 @@ pub struct BlockRangeExecProver {
 pub struct ProofInput {
     proof: SP1Proof,
     vkey: SP1VerifyingKey,
-}
-
-impl BlockRangeExecProver {
-    /// Creates a new instance of [`BlockRangeExecProver`] using default configuration
-    /// and prover environment settings.
-    pub fn new() -> Self {
-        let config = BlockRangeExecProver::default_config();
-        let prover = ProverClient::from_env();
-
-        Self { config, prover }
-    }
-
-    /// Returns the default prover configuration for the block execution program.
-    pub fn default_config() -> ProverConfig {
-        ProverConfig {
-            elf: EVM_RANGE_EXEC_ELF,
-            proof_mode: SP1ProofMode::Groth16,
-        }
-    }
 }
 
 #[async_trait]
@@ -494,5 +427,24 @@ impl ProgramProver for BlockRangeExecProver {
     /// Returns the SP1 Prover.
     fn prover(&self) -> &EnvProver {
         &self.prover
+    }
+}
+
+impl BlockRangeExecProver {
+    /// Creates a new instance of [`BlockRangeExecProver`] using default configuration
+    /// and prover environment settings.
+    pub fn new() -> Self {
+        let config = BlockRangeExecProver::default_config();
+        let prover = ProverClient::from_env();
+
+        Self { config, prover }
+    }
+
+    /// Returns the default prover configuration for the block execution program.
+    pub fn default_config() -> ProverConfig {
+        ProverConfig {
+            elf: EVM_RANGE_EXEC_ELF,
+            proof_mode: SP1ProofMode::Groth16,
+        }
     }
 }
