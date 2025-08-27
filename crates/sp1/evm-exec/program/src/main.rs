@@ -42,19 +42,15 @@ use alloy_consensus::{proofs, BlockHeader};
 use alloy_primitives::B256;
 use alloy_rlp::Decodable;
 use bytes::Bytes;
-use celestia_types::nmt::{Namespace, NamespaceProof, NamespacedHash};
+use celestia_types::nmt::NamespacedHash;
 use celestia_types::Blob;
-use celestia_types::DataAvailabilityHeader;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use ev_types::v1::{Data, SignedData};
-use evm_exec_types::BlockExecOutput;
+use evm_exec_types::{BlockExecInput, BlockExecOutput};
 use nmt_rs::NamespacedSha2Hasher;
 use prost::Message;
 use reth_primitives::TransactionSigned;
-use rsp_client_executor::{
-    executor::EthClientExecutor,
-    io::{EthClientExecutorInput, WitnessInput},
-};
+use rsp_client_executor::{executor::EthClientExecutor, io::WitnessInput};
 use tendermint::block::Header;
 
 pub fn main() {
@@ -63,23 +59,10 @@ pub fn main() {
     // -----------------------------
     println!("cycle-tracker-report-start: deserialize inputs");
 
-    let celestia_header_raw: Vec<u8> = sp1_zkvm::io::read_vec();
+    let inputs: BlockExecInput = sp1_zkvm::io::read::<BlockExecInput>();
     let celestia_header: Header =
-        serde_cbor::from_slice(&celestia_header_raw).expect("failed to deserialize celestia header");
-
-    let dah: DataAvailabilityHeader = sp1_zkvm::io::read();
-
-    let blobs_raw: Vec<u8> = sp1_zkvm::io::read_vec();
-    let blobs: Vec<Blob> = serde_cbor::from_slice(&blobs_raw).expect("failed to deserialize blob data");
-
-    let pub_key: Vec<u8> = sp1_zkvm::io::read_vec();
-    let namespace: Namespace = sp1_zkvm::io::read();
-    let proofs: Vec<NamespaceProof> = sp1_zkvm::io::read();
-
-    let executor_inputs: Vec<EthClientExecutorInput> = sp1_zkvm::io::read();
-
-    let trusted_height: u64 = sp1_zkvm::io::read();
-    let trusted_root: B256 = sp1_zkvm::io::read();
+        serde_cbor::from_slice(&inputs.header_raw).expect("failed to deserialize celestia header");
+    let blobs: Vec<Blob> = serde_cbor::from_slice(&inputs.blobs_raw).expect("failed to deserialize blob data");
 
     println!("cycle-tracker-report-end: deserialize inputs");
 
@@ -90,20 +73,23 @@ pub fn main() {
 
     assert_eq!(
         celestia_header.data_hash.unwrap(),
-        dah.hash(),
+        inputs.dah.hash(),
         "DataHash mismatch for DataAvailabilityHeader"
     );
 
     let mut roots = Vec::<&NamespacedHash>::new();
-    for row_root in dah.row_roots() {
-        if row_root.contains::<NamespacedSha2Hasher<29>>(namespace.into()) {
+    for row_root in inputs.dah.row_roots() {
+        if row_root.contains::<NamespacedSha2Hasher<29>>(inputs.namespace.into()) {
             roots.push(row_root);
         }
     }
 
     if roots.is_empty() {
         assert!(blobs.is_empty(), "Blobs must be empty if no roots contain namespace");
-        assert!(proofs.is_empty(), "Proofs must be empty if no roots contain namespace");
+        assert!(
+            inputs.proofs.is_empty(),
+            "Proofs must be empty if no roots contain namespace"
+        );
     }
 
     let blob_data: Vec<[u8; 512]> = blobs
@@ -117,14 +103,14 @@ pub fn main() {
         .collect();
 
     let mut cursor = 0;
-    for (proof, root) in proofs.iter().zip(roots) {
+    for (proof, root) in inputs.proofs.iter().zip(roots) {
         let share_count = (proof.end_idx() - proof.start_idx()) as usize;
         let end = cursor + share_count;
 
         let raw_leaves = &blob_data[cursor..end];
 
         proof
-            .verify_complete_namespace(root, raw_leaves, namespace.into())
+            .verify_complete_namespace(root, raw_leaves, inputs.namespace.into())
             .expect("Failed to verify proof");
 
         cursor = end;
@@ -137,18 +123,18 @@ pub fn main() {
     // -----------------------------
     println!("cycle-tracker-report-start: execute EVM blocks");
 
-    let mut headers = Vec::with_capacity(executor_inputs.len());
+    let mut headers = Vec::with_capacity(inputs.executor_inputs.len());
     if headers.capacity() != 0 {
-        let first_input = executor_inputs.first().unwrap();
+        let first_input = inputs.executor_inputs.first().unwrap();
 
         assert_eq!(
-            trusted_root,
+            inputs.trusted_root,
             first_input.state_anchor(),
             "State anchor must be equal to trusted root"
         );
 
         assert!(
-            trusted_height <= first_input.parent_header().number(),
+            inputs.trusted_height <= first_input.parent_header().number(),
             "Trusted height must be less than or equal to parent header height",
         );
 
@@ -157,7 +143,7 @@ pub fn main() {
             first_input.custom_beneficiary,
         );
 
-        for input in &executor_inputs {
+        for input in &inputs.executor_inputs {
             let header = executor.execute(input.clone()).expect("EVM block execution failed");
             headers.push(header);
         }
@@ -180,13 +166,13 @@ pub fn main() {
         let signer = sd.signer.as_ref().expect("SignedData must contain signer");
 
         // NOTE: Trim 4 byte Protobuf encoding prefix
-        if signer.pub_key[4..] != pub_key {
+        if signer.pub_key[4..] != inputs.pub_key {
             continue;
         }
 
         let data_bytes = sd.data.as_ref().expect("SignedData must contain data").encode_to_vec();
 
-        verify_signature(&pub_key, &data_bytes, &sd.signature).expect("Sequencer signature verification failed");
+        verify_signature(&inputs.pub_key, &data_bytes, &sd.signature).expect("Sequencer signature verification failed");
 
         tx_data.push(sd.data.unwrap());
     }
@@ -233,8 +219,8 @@ pub fn main() {
     // -----------------------------
     println!("cycle-tracker-report-start: commit public outputs");
 
-    let new_height: u64 = headers.last().map(|h| h.number).unwrap_or(trusted_height);
-    let new_state_root: B256 = headers.last().map(|h| h.state_root).unwrap_or(trusted_root);
+    let new_height: u64 = headers.last().map(|h| h.number).unwrap_or(inputs.trusted_height);
+    let new_state_root: B256 = headers.last().map(|h| h.state_root).unwrap_or(inputs.trusted_root);
 
     let output = BlockExecOutput {
         celestia_header_hash: celestia_header
@@ -251,14 +237,12 @@ pub fn main() {
             .expect("prev_celestia_header_hash must be exactly 32 bytes"),
         new_height,
         new_state_root: new_state_root.into(),
-        prev_height: trusted_height,
-        prev_state_root: trusted_root.into(),
-        namespace,
-        public_key: pub_key.try_into().expect("public key must be exactly 32 bytes"),
+        prev_height: inputs.trusted_height,
+        prev_state_root: inputs.trusted_root.into(),
+        namespace: inputs.namespace,
+        public_key: inputs.pub_key.try_into().expect("public key must be exactly 32 bytes"),
     };
-
     sp1_zkvm::io::commit(&output);
-
     println!("cycle-tracker-report-end: commit public outputs");
 }
 

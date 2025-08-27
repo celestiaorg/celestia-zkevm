@@ -8,3 +8,5 @@ bincode = { workspace = true }
 hex = { workspace = true }
 serde = { workspace = true }
 celestia-types = { workspace = true }
+rsp-client-executor = { workspace = true }
+alloy-primitives = { workspace = true }

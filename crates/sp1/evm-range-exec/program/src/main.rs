@@ -17,7 +17,7 @@
 #![no_main]
 sp1_zkvm::entrypoint!(main);
 
-use evm_exec_types::{BlockExecOutput, BlockRangeExecOutput, Buffer};
+use evm_exec_types::{BlockExecOutput, BlockRangeExecInput, BlockRangeExecOutput, Buffer};
 use sha2::{Digest, Sha256};
 
 pub fn main() {
@@ -26,16 +26,15 @@ pub fn main() {
     // ------------------------------
     println!("cycle-tracker-report-start: deserialize inputs");
 
-    let vkeys = sp1_zkvm::io::read::<Vec<[u32; 8]>>();
-    let public_values = sp1_zkvm::io::read::<Vec<Vec<u8>>>();
+    let inputs: BlockRangeExecInput = sp1_zkvm::io::read::<BlockRangeExecInput>();
 
     assert_eq!(
-        vkeys.len(),
-        public_values.len(),
+        inputs.vkeys.len(),
+        inputs.public_values.len(),
         "mismatch between number of verification keys and public value blobs"
     );
 
-    let proof_count = vkeys.len();
+    let proof_count = inputs.vkeys.len();
 
     println!("cycle-tracker-report-end: deserialize inputs");
 
@@ -45,8 +44,8 @@ pub fn main() {
     println!("cycle-tracker-report-start: verify sp1 proofs");
 
     for i in 0..proof_count {
-        let digest = Sha256::digest(&public_values[i]);
-        sp1_zkvm::lib::verify::verify_sp1_proof(&vkeys[i], &digest.into());
+        let digest = Sha256::digest(&inputs.public_values[i]);
+        sp1_zkvm::lib::verify::verify_sp1_proof(&inputs.vkeys[i], &digest.into());
     }
 
     println!("cycle-tracker-report-end: verify sp1 proofs");
@@ -56,7 +55,8 @@ pub fn main() {
     // ------------------------------
     println!("cycle-tracker-report-start: decode public values from proofs");
 
-    let outputs: Vec<BlockExecOutput> = public_values
+    let outputs: Vec<BlockExecOutput> = inputs
+        .public_values
         .iter()
         .map(|bytes| {
             let mut buffer = Buffer::from(bytes);
