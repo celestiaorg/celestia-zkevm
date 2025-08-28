@@ -54,10 +54,18 @@ pub struct AppContext {
     pub trusted_state: RwLock<TrustedState>,
 }
 
-/// TrustedState tracks the current height and state root which is provided to the proof system as its trusted inputs.
+/// TrustedState tracks the trusted height and state root which is provided to the proof system as inputs.
+/// This type is wrapped in a RwLock by the AppContext such that it can be updated safely across concurrent tasks.
+/// Updates are made optimisticly using the EthClientExecutorInputs queried from the configured EVM full node.
 pub struct TrustedState {
     height: u64,
     root: FixedBytes<32>,
+}
+
+impl TrustedState {
+    pub fn new(height: u64, root: FixedBytes<32>) -> Self {
+        Self { height, root }
+    }
 }
 
 impl AppContext {
@@ -72,10 +80,7 @@ impl AppContext {
         let raw_ns = hex::decode(config.namespace_hex)?;
         let namespace = Namespace::new_v0(raw_ns.as_ref()).context("Failed to construct Namespace")?;
         let pub_key = hex::decode(config.pub_key)?;
-        let trusted_state = RwLock::new(TrustedState {
-            height: 0,
-            root: chain_spec.genesis_hash(),
-        });
+        let trusted_state = RwLock::new(TrustedState::new(0, chain_spec.genesis_header().state_root));
 
         Ok(AppContext {
             chain_spec,
