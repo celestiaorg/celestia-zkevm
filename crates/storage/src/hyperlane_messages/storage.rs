@@ -2,7 +2,7 @@
 /// It is used to store and retrieve Hyperlane messages.
 /// The messages are stored in a column family called "messages".
 /// The index of the message is the key, and the message is the value.
-/// The index is a u32, and the message is a Vec<u8>.
+/// The index is a usize, and the message is a Vec<u8>.
 /// The message is the raw bytes of the message, including the header and the body.
 use crate::Storage;
 use anyhow::{Context, Result};
