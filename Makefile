@@ -71,3 +71,14 @@ query-balance:
   		0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d \
   		--rpc-url http://localhost:8545
 .PHONY: query-balance
+
+## spamoor: Run spamoor transaction flooding against the EVM roll-up.
+spamoor:
+	@echo "--> Running spamoor transaction flooding"
+	@docker run --rm -it \
+  		--network celestia-zkevm-hl-testnet_celestia-zkevm-net \
+  		-e RPC_URL=http://reth:8545 \
+  		-e PRIVATE_KEY=0x82bfcfadbf1712f6550d8d2c00a39f05b33ec78939d0167be2a737d691f33a6a \
+  		ethpandaops/spamoor:latest \
+  		$(ARGS)
+.PHONY: spamoor
