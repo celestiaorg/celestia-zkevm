@@ -6,10 +6,16 @@ members = [
     "crates/sp1/evm-exec-types",
     "crates/sp1/evm-range-exec/program",
     "crates/sp1/evm-range-exec/script",
+    "crates/storage",
+    "crates/evm-state-types",
+    "crates/evm-state-listener",
 ]
 resolver = "2"
 
 [workspace.dependencies]
+anyhow = { version = "1.0", default-features = false }
+storage = { path = "crates/storage" }
+evm-state-types = { path = "crates/evm-state-types" }
 alloy-consensus = { version = "1.0.13" }
 alloy-genesis = { version = "1.0.13", default-features = false }
 alloy-primitives = { version = "1.2.0", default-features = false, features = [
@@ -50,6 +56,14 @@ sp1-sdk = "=5.0.8"
 sp1-zkvm = "=5.0.8"
 tendermint = "0.40.1"
 tendermint-proto = "*"
+tokio = { version = "1.45.0", features = [
+    "sync",
+    "macros",
+    "io-util",
+    "rt",
+    "time",
+    "rt-multi-thread",
+], default-features = false }
 
 [patch.crates-io]
 # Add support for precompiles: https://docs.succinct.xyz/docs/sp1/optimizing-programs/precompiles

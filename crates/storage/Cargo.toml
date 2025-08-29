@@ -1,0 +1,10 @@
+[package]
+name = "storage"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = { workspace = true }
+rocksdb = "0.24.0"
+dotenvy = "0.15.7"
+evm-state-types = { workspace = true }

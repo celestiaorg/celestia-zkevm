@@ -1,0 +1,9 @@
+[package]
+name = "evm-state-types"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+alloy-primitives = { workspace = true }
+anyhow = { workspace = true }
+alloy-sol-types = "1.3"
