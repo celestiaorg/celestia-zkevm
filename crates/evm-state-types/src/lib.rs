@@ -122,7 +122,7 @@ mod tests {
         let message_decoded = decode_hyperlane_message(&message).unwrap();
         //println!("Decoded: {:?}", message_decoded);
 
-        let _message_body_decoded = decode_token_message_body(&message_decoded.body).unwrap();
+        let _message_body_decoded = decode_token_message_body(message_decoded.body).unwrap();
         //println!("Body decoded: {:?}", _message_body_decoded);
     }
 }
