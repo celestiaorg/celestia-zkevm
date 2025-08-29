@@ -27,8 +27,8 @@ impl HyperlaneListener {
     }
     pub fn from_env() -> Self {
         dotenvy::dotenv().ok();
-        let socket = WsConnect::new(env::var("WS_URL").unwrap());
-        let contract_address = Address::from_str(&env::var("CONTRACT_ADDRESS").unwrap()).unwrap();
+        let socket = WsConnect::new(env::var("RETH_WS_URL").unwrap());
+        let contract_address = Address::from_str(&env::var("MAILBOX_CONTRACT_ADDRESS").unwrap()).unwrap();
         let filter = Filter::new().address(contract_address).event(&Dispatch::id());
         Self::new(socket, contract_address, filter)
     }
