@@ -2,7 +2,7 @@
 /// It is used to store and retrieve Hyperlane messages.
 /// The messages are stored in a column family called "messages".
 /// The index of the message is the key, and the message is the value.
-/// The index is a usize, and the message is a Vec<u8>.
+/// The index is a u32, and the message is a Vec<u8>.
 /// The message is the raw bytes of the message, including the header and the body.
 use crate::Storage;
 use anyhow::{Context, Result};
@@ -60,21 +60,27 @@ impl Storage for HyperlaneMessageStore {
 }
 
 impl HyperlaneMessageStore {
-    pub fn insert_message(&self, index: usize, message: &[u8]) -> Result<()> {
+    pub fn insert_message(&self, index: u32, message: &[u8]) -> Result<()> {
         let cf = self.db.cf_handle("messages").context("Missing CF")?;
         self.db.put_cf(cf, index.to_be_bytes(), message)?;
         Ok(())
     }
 
-    pub fn get_message(&self, index: usize) -> Result<Vec<u8>> {
+    pub fn get_message(&self, index: u32) -> Result<Vec<u8>> {
         let cf = self.db.cf_handle("messages").context("Missing CF")?;
         let message = self.db.get_cf(cf, index.to_be_bytes())?;
         message.context("Failed to get message")
     }
 
-    pub fn current_index(&self) -> Result<usize> {
+    pub fn current_index(&self) -> Result<u32> {
         let cf = self.db.cf_handle("messages").context("Missing CF")?;
-        let iter = self.db.iterator_cf(cf, IteratorMode::Start);
-        Ok(iter.count())
+        let mut iter = self.db.iterator_cf(cf, IteratorMode::End);
+        if let Some(Ok((k, _))) = iter.next() {
+            let mut buf = [0u8; 4];
+            buf.copy_from_slice(&k); // safe since key is always 4 bytes
+            Ok(u32::from_be_bytes(buf))
+        } else {
+            Ok(0)
+        }
     }
 }

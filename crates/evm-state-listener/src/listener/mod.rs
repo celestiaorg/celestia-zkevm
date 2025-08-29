@@ -11,6 +11,6 @@ mod tests {
         let store = HyperlaneMessageStore::from_env().unwrap();
         let message = store.get_message(0).unwrap();
         let _message_decoded = decode_hyperlane_message(&message).unwrap();
-        //println!("Message decoded: {:?}", _message_decoded);
+        println!("Message decoded: {:?}", _message_decoded);
     }
 }
