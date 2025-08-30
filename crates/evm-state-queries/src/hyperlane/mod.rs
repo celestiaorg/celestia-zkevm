@@ -4,6 +4,8 @@ pub mod indexer;
 mod tests {
     use std::sync::Arc;
 
+    use alloy_rpc_types::Filter;
+    use evm_state_types::events::Dispatch;
     use storage::{Storage, hyperlane_messages::storage::HyperlaneMessageStore};
 
     use crate::hyperlane::indexer::HyperlaneIndexer;
@@ -21,6 +23,15 @@ mod tests {
         let indexer = HyperlaneIndexer::default();
         let message_store = Arc::new(HyperlaneMessageStore::from_env().unwrap());
         message_store.prune_all().unwrap();
-        indexer.index(message_store, 0, 10000).await.unwrap();
+
+        let from_block = 0;
+        let to_block = 10000;
+
+        let filter = Filter::new()
+            .address(indexer.contract_address)
+            .event(&Dispatch::id())
+            .from_block(from_block)
+            .to_block(to_block);
+        indexer.index(message_store, filter).await.unwrap();
     }
 }

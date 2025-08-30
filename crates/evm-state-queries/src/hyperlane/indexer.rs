@@ -29,14 +29,8 @@ impl HyperlaneIndexer {
         }
     }
 
-    pub async fn index(&self, message_store: Arc<HyperlaneMessageStore>, from_block: u64, to_block: u64) -> Result<()> {
+    pub async fn index(&self, message_store: Arc<HyperlaneMessageStore>, filter: Filter) -> Result<()> {
         let provider = ProviderBuilder::new().connect_ws(self.socket.clone()).await?;
-        let filter = Filter::new()
-            .address(self.contract_address)
-            .event(&Dispatch::id())
-            .from_block(from_block)
-            .to_block(to_block);
-
         let logs = provider.get_logs(&filter).await?;
         for log in logs {
             match Dispatch::decode_log_data(log.data()) {
