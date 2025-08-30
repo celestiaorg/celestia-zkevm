@@ -8,7 +8,11 @@ use alloy_provider::{Provider, ProviderBuilder, WsConnect};
 use alloy_rpc_types::Filter;
 use alloy_sol_types::SolEvent;
 use anyhow::Result;
-use evm_state_types::{Dispatch, DispatchEvent, StoredHyperlaneMessage, decode_hyperlane_message};
+use evm_state_types::{
+    StoredHyperlaneMessage,
+    events::{Dispatch, DispatchEvent},
+    hyperlane::decode_hyperlane_message,
+};
 use storage::hyperlane_messages::storage::HyperlaneMessageStore;
 pub struct HyperlaneIndexer {
     pub socket: WsConnect,

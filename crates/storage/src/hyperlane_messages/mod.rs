@@ -2,7 +2,7 @@ pub mod storage;
 
 #[cfg(test)]
 mod tests {
-    use evm_state_types::{StoredHyperlaneMessage, decode_hyperlane_message};
+    use evm_state_types::{StoredHyperlaneMessage, hyperlane::decode_hyperlane_message};
 
     use crate::{Storage, hyperlane_messages::storage::HyperlaneMessageStore};
 

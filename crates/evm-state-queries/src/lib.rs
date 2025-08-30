@@ -4,7 +4,7 @@ use crate::hyperlane::indexer::HyperlaneIndexer;
 use alloy_primitives::Address;
 use alloy_provider::WsConnect;
 use alloy_rpc_types::Filter;
-use evm_state_types::Dispatch;
+use evm_state_types::events::Dispatch;
 
 pub mod hyperlane;
 
