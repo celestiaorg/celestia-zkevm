@@ -2,13 +2,11 @@ pub mod indexer;
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
+    use crate::hyperlane::indexer::HyperlaneIndexer;
     use alloy_rpc_types::Filter;
     use evm_state_types::events::Dispatch;
+    use std::sync::Arc;
     use storage::{Storage, hyperlane_messages::storage::HyperlaneMessageStore};
-
-    use crate::hyperlane::indexer::HyperlaneIndexer;
 
     #[test]
     fn test_get_message_from_db() {
