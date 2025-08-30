@@ -45,6 +45,7 @@ impl HyperlaneIndexer {
                 Ok(event) => {
                     let dispatch_event: DispatchEvent = event.into();
                     let current_index = message_store.current_index().unwrap();
+                    let next_index = current_index + 1;
                     let hyperlane_message =
                         decode_hyperlane_message(&dispatch_event.message).expect("Failed to decode Hyperlane message");
 
@@ -68,8 +69,8 @@ impl HyperlaneIndexer {
                     }
 
                     let stored_message = StoredHyperlaneMessage::new(hyperlane_message, log.block_number);
-                    message_store.insert_message(current_index + 1, stored_message).unwrap();
-                    println!("Inserted Hyperlane Message at index: {}", current_index);
+                    message_store.insert_message(next_index, stored_message).unwrap();
+                    println!("Inserted Hyperlane Message at index: {}", next_index);
                 }
                 Err(e) => {
                     eprintln!("Failed to decode Dispatch Event: {:?}", e);
