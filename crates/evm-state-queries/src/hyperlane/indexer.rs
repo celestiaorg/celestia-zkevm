@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{env, str::FromStr, sync::Arc};
 
 /// This service listens for Dispatch events emitted from the Mailbox contract
 /// using the reth websocket.
@@ -27,6 +27,14 @@ impl HyperlaneIndexer {
             contract_address,
             filter,
         }
+    }
+
+    pub fn from_env() -> Self {
+        dotenvy::dotenv().ok();
+        let socket = WsConnect::new(env::var("RETH_WS_URL").unwrap());
+        let contract_address = Address::from_str(&env::var("MAILBOX_CONTRACT_ADDRESS").unwrap()).unwrap();
+        let filter = Filter::new().address(contract_address).event(&Dispatch::id());
+        Self::new(socket, contract_address, filter)
     }
 
     pub async fn index(&self, message_store: Arc<HyperlaneMessageStore>, filter: Filter) -> Result<()> {
@@ -70,6 +78,19 @@ impl HyperlaneIndexer {
         }
 
         Ok(())
+    }
+}
+
+impl Default for HyperlaneIndexer {
+    fn default() -> Self {
+        let socket = WsConnect::new("ws://127.0.0.1:8546");
+        let contract_address = Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap();
+        let filter = Filter::new().address(contract_address).event(&Dispatch::id());
+        Self {
+            socket,
+            contract_address,
+            filter,
+        }
     }
 }
 
