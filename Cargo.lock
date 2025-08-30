@@ -2832,7 +2832,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "evm-state-listener"
+name = "evm-state-queries"
 version = "0.1.0"
 dependencies = [
  "alloy-consensus",
@@ -2859,6 +2859,9 @@ dependencies = [
  "alloy-primitives 1.3.1",
  "alloy-sol-types",
  "anyhow",
+ "bincode",
+ "hex",
+ "serde",
 ]
 
 [[package]]
@@ -8073,9 +8076,12 @@ name = "storage"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bincode",
  "dotenvy",
  "evm-state-types",
+ "hex",
  "rocksdb",
+ "tokio",
 ]
 
 [[package]]

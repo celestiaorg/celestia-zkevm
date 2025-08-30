@@ -1,7 +1,7 @@
-use alloy_primitives::B256;
 use alloy_primitives::{U256, keccak256};
 use alloy_sol_types::sol;
 use anyhow::{Result, anyhow};
+use serde::{Deserialize, Serialize};
 
 sol! {
     event Dispatch(
@@ -15,6 +15,18 @@ sol! {
 impl Dispatch {
     pub fn id() -> String {
         "Dispatch(address,uint32,bytes32,bytes)".to_string()
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct StoredHyperlaneMessage {
+    pub block_number: Option<u64>,
+    pub message: HyperlaneMessage,
+}
+
+impl StoredHyperlaneMessage {
+    pub fn new(message: HyperlaneMessage, block_number: Option<u64>) -> Self {
+        Self { block_number, message }
     }
 }
 
@@ -37,19 +49,19 @@ impl From<Dispatch> for DispatchEvent {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct HyperlaneMessage<'a> {
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HyperlaneMessage {
     pub version: u8,
     pub nonce: u32,
     pub origin: u32,
     pub sender: [u8; 32],
     pub destination: u32,
     pub recipient: [u8; 32],
-    pub body: &'a [u8],
-    pub id: B256,
+    pub body: Vec<u8>,
+    pub id: String,
 }
 
-pub fn decode_hyperlane_message(message: &[u8]) -> Result<HyperlaneMessage<'_>> {
+pub fn decode_hyperlane_message(message: &[u8]) -> Result<HyperlaneMessage> {
     const VERSION_OFFSET: usize = 0;
     const NONCE_OFFSET: usize = 1;
     const ORIGIN_OFFSET: usize = 5;
@@ -70,8 +82,8 @@ pub fn decode_hyperlane_message(message: &[u8]) -> Result<HyperlaneMessage<'_>> 
     let destination = u32::from_be_bytes(message[DESTINATION_OFFSET..RECIPIENT_OFFSET].try_into().unwrap());
     let mut recipient = [0u8; 32];
     recipient.copy_from_slice(&message[RECIPIENT_OFFSET..BODY_OFFSET]);
-    let body = &message[BODY_OFFSET..];
-    let id = B256::from(keccak256(message));
+    let body = message[BODY_OFFSET..].to_vec();
+    let id = hex::encode(keccak256(message));
 
     Ok(HyperlaneMessage {
         version,
@@ -112,17 +124,11 @@ mod tests {
     use super::*;
     #[test]
     fn test_decode_hyperlane_message() {
-        let message = [
-            3, 0, 0, 0, 9, 0, 0, 4, 210, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 167, 87, 133, 81, 186, 232, 154, 150, 195,
-            54, 91, 147, 73, 58, 210, 212, 235, 203, 174, 151, 0, 1, 15, 44, 114, 111, 117, 116, 101, 114, 95, 97, 112,
-            112, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            106, 128, 155, 54, 202, 240, 212, 106, 147, 94, 231, 104, 53, 6, 94, 197, 168, 179, 206, 167, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 232,
-        ];
+        let message = hex::decode("0300000009000004d2000000000000000000000000a7578551bae89a96c3365b93493ad2d4ebcbae9700010f2c726f757465725f617070000000000000000000000000000100000000000000000000000000000000000000006a809b36caf0d46a935ee76835065ec5a8b3cea700000000000000000000000000000000000000000000000000000000000003e8").unwrap();
         let message_decoded = decode_hyperlane_message(&message).unwrap();
-        //println!("Decoded: {:?}", message_decoded);
+        println!("Decoded: {:?}", message_decoded);
 
-        let _message_body_decoded = decode_token_message_body(message_decoded.body).unwrap();
-        //println!("Body decoded: {:?}", _message_body_decoded);
+        let _message_body_decoded = decode_token_message_body(&message_decoded.body).unwrap();
+        println!("Body decoded: {:?}", _message_body_decoded);
     }
 }

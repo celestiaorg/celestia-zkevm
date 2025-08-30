@@ -1,19 +1,17 @@
 /// This module contains the implementation of the HyperlaneMessageStore, which is a wrapper around the RocksDB database.
 /// It is used to store and retrieve Hyperlane messages.
 /// The messages are stored in a column family called "messages".
-/// The index of the message is the key, and the message is the value.
-/// The index is a u32, and the message is a Vec<u8>.
-/// The message is the raw bytes of the message, including the header and the body.
 use crate::Storage;
 use anyhow::{Context, Result};
 use dotenvy::dotenv;
+use evm_state_types::StoredHyperlaneMessage;
 use rocksdb::{ColumnFamilyDescriptor, DB, IteratorMode, Options};
 use std::env;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 pub struct HyperlaneMessageStore {
-    pub db: Arc<DB>,
+    pub db: Arc<RwLock<DB>>,
 }
 
 impl Storage for HyperlaneMessageStore {
@@ -29,7 +27,9 @@ impl Storage for HyperlaneMessageStore {
             .unwrap()
             .join(relative);
         let db = DB::open_cf_descriptors(&opts, &db_path, cfs)?;
-        Ok(Self { db: Arc::new(db) })
+        Ok(Self {
+            db: Arc::new(RwLock::new(db)),
+        })
     }
 
     fn from_env() -> Result<Self> {
@@ -44,7 +44,9 @@ impl Storage for HyperlaneMessageStore {
             .unwrap()
             .join(relative);
         let db = DB::open_cf_descriptors(&opts, &db_path, cfs)?;
-        Ok(Self { db: Arc::new(db) })
+        Ok(Self {
+            db: Arc::new(RwLock::new(db)),
+        })
     }
 
     fn get_opts() -> Result<Options> {
@@ -60,21 +62,26 @@ impl Storage for HyperlaneMessageStore {
 }
 
 impl HyperlaneMessageStore {
-    pub fn insert_message(&self, index: u32, message: &[u8]) -> Result<()> {
-        let cf = self.db.cf_handle("messages").context("Missing CF")?;
-        self.db.put_cf(cf, index.to_be_bytes(), message)?;
+    pub fn insert_message(&self, index: u32, message: StoredHyperlaneMessage) -> Result<()> {
+        let read_lock = self.db.read().unwrap();
+        let cf = read_lock.cf_handle("messages").context("Missing CF")?;
+        read_lock.put_cf(cf, index.to_be_bytes(), bincode::serialize(&message)?)?;
         Ok(())
     }
 
-    pub fn get_message(&self, index: u32) -> Result<Vec<u8>> {
-        let cf = self.db.cf_handle("messages").context("Missing CF")?;
-        let message = self.db.get_cf(cf, index.to_be_bytes())?;
-        message.context("Failed to get message")
+    pub fn get_message(&self, index: u32) -> Result<StoredHyperlaneMessage> {
+        let read_lock = self.db.read().unwrap();
+        let cf = read_lock.cf_handle("messages").context("Missing CF")?;
+        let message = read_lock
+            .get_cf(cf, index.to_be_bytes())?
+            .context("Failed to get message")?;
+        bincode::deserialize(&message).context("Failed to deserialize message")
     }
 
     pub fn current_index(&self) -> Result<u32> {
-        let cf = self.db.cf_handle("messages").context("Missing CF")?;
-        let mut iter = self.db.iterator_cf(cf, IteratorMode::End);
+        let read_lock = self.db.read().unwrap();
+        let cf = read_lock.cf_handle("messages").context("Missing CF")?;
+        let mut iter = read_lock.iterator_cf(cf, IteratorMode::End);
         if let Some(Ok((k, _))) = iter.next() {
             let mut buf = [0u8; 4];
             buf.copy_from_slice(&k); // safe since key is always 4 bytes
@@ -82,5 +89,13 @@ impl HyperlaneMessageStore {
         } else {
             Ok(0)
         }
+    }
+
+    pub fn prune_all(&self) -> Result<()> {
+        let mut write_lock = self.db.write().unwrap();
+        write_lock.drop_cf("messages")?;
+        let opts = Options::default();
+        write_lock.create_cf("messages", &opts)?;
+        Ok(())
     }
 }

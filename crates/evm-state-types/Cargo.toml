@@ -7,3 +7,6 @@ edition = "2024"
 alloy-primitives = { workspace = true }
 anyhow = { workspace = true }
 alloy-sol-types = "1.3"
+bincode = { workspace = true }
+serde = { workspace = true }
+hex = { workspace = true }

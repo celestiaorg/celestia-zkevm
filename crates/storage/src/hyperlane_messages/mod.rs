@@ -2,21 +2,19 @@ pub mod storage;
 
 #[cfg(test)]
 mod tests {
+    use evm_state_types::{StoredHyperlaneMessage, decode_hyperlane_message};
+
     use crate::{Storage, hyperlane_messages::storage::HyperlaneMessageStore};
 
     #[test]
     fn test_insert_message() {
         let store = HyperlaneMessageStore::default().unwrap();
-        let message = [
-            3, 0, 0, 0, 9, 0, 0, 4, 210, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 167, 87, 133, 81, 186, 232, 154, 150, 195,
-            54, 91, 147, 73, 58, 210, 212, 235, 203, 174, 151, 0, 1, 15, 44, 114, 111, 117, 116, 101, 114, 95, 97, 112,
-            112, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            106, 128, 155, 54, 202, 240, 212, 106, 147, 94, 231, 104, 53, 6, 94, 197, 168, 179, 206, 167, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 232,
-        ];
+        let message = hex::decode("0300000009000004d2000000000000000000000000a7578551bae89a96c3365b93493ad2d4ebcbae9700010f2c726f757465725f617070000000000000000000000000000100000000000000000000000000000000000000006a809b36caf0d46a935ee76835065ec5a8b3cea700000000000000000000000000000000000000000000000000000000000003e8").unwrap();
         let current_index = store.current_index().unwrap();
-        store.insert_message(current_index, &message).unwrap();
+        let message = decode_hyperlane_message(&message).unwrap();
+        let message = StoredHyperlaneMessage::new(message, None);
+        store.insert_message(current_index, message.clone()).unwrap();
         let retrieved_message = store.get_message(current_index).unwrap();
-        assert_eq!(retrieved_message, message);
+        assert_eq!(retrieved_message.message, message.message);
     }
 }
