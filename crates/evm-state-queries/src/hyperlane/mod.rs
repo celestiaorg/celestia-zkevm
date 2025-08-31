@@ -3,6 +3,7 @@ pub mod indexer;
 #[cfg(test)]
 mod tests {
     use crate::hyperlane::indexer::HyperlaneIndexer;
+    use alloy_provider::ProviderBuilder;
     use alloy_rpc_types::Filter;
     use evm_state_types::events::Dispatch;
     use std::sync::Arc;
@@ -37,11 +38,12 @@ mod tests {
         let from_block = 0;
         let to_block = 10000;
 
+        let provider = Arc::new(ProviderBuilder::new().connect_ws(indexer.socket.clone()).await.unwrap());
         let filter = Filter::new()
             .address(indexer.contract_address)
             .event(&Dispatch::id())
             .from_block(from_block)
             .to_block(to_block);
-        indexer.index(message_store, filter).await.unwrap();
+        indexer.index(message_store, filter, provider).await.unwrap();
     }
 }

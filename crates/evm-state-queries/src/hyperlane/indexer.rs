@@ -4,7 +4,7 @@ use std::{env, str::FromStr, sync::Arc};
 /// using the reth websocket.
 /// Events are then processed and inserted into the storage (rocksDB)
 use alloy_primitives::Address;
-use alloy_provider::{Provider, ProviderBuilder, WsConnect};
+use alloy_provider::{Provider, WsConnect, fillers::FillProvider};
 use alloy_rpc_types::Filter;
 use alloy_sol_types::SolEvent;
 use anyhow::Result;
@@ -14,6 +14,23 @@ use evm_state_types::{
     hyperlane::decode_hyperlane_message,
 };
 use storage::hyperlane_messages::storage::HyperlaneMessageStore;
+
+pub type DefaultProvider = FillProvider<
+    alloy_provider::fillers::JoinFill<
+        alloy_provider::Identity,
+        alloy_provider::fillers::JoinFill<
+            alloy_provider::fillers::GasFiller,
+            alloy_provider::fillers::JoinFill<
+                alloy_provider::fillers::BlobGasFiller,
+                alloy_provider::fillers::JoinFill<
+                    alloy_provider::fillers::NonceFiller,
+                    alloy_provider::fillers::ChainIdFiller,
+                >,
+            >,
+        >,
+    >,
+    alloy_provider::RootProvider,
+>;
 pub struct HyperlaneIndexer {
     pub socket: WsConnect,
     pub contract_address: Address,
@@ -37,23 +54,27 @@ impl HyperlaneIndexer {
         Self::new(socket, contract_address, filter)
     }
 
-    pub async fn index(&self, message_store: Arc<HyperlaneMessageStore>, filter: Filter) -> Result<()> {
-        let provider = ProviderBuilder::new().connect_ws(self.socket.clone()).await?;
+    pub async fn index(
+        &self,
+        message_store: Arc<HyperlaneMessageStore>,
+        filter: Filter,
+        provider: Arc<DefaultProvider>,
+    ) -> Result<()> {
         let logs = provider.get_logs(&filter).await?;
         for log in logs {
             match Dispatch::decode_log_data(log.data()) {
                 Ok(event) => {
                     let dispatch_event: DispatchEvent = event.into();
                     let current_index = message_store.current_index().unwrap();
-                    let next_index = current_index + 1;
+                    let next_index = current_index;
                     let hyperlane_message =
                         decode_hyperlane_message(&dispatch_event.message).expect("Failed to decode Hyperlane message");
 
                     // It is up to the user to set the starting block of the first hyperlane message,
                     // if the user fails to do so, the indexer will still assume that the first message in that block
                     // is the first message that ever occurred.
-                    if current_index != 0 {
-                        let previous_hyperlane_message = message_store.get_message(current_index).unwrap();
+                    if current_index > 1 {
+                        let previous_hyperlane_message = message_store.get_message(current_index - 1).unwrap();
                         if hyperlane_message.nonce != previous_hyperlane_message.message.nonce + 1
                             && hyperlane_message.nonce != 0
                         {

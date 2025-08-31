@@ -85,7 +85,7 @@ impl HyperlaneMessageStore {
         if let Some(Ok((k, _))) = iter.next() {
             let mut buf = [0u8; 4];
             buf.copy_from_slice(&k); // safe since key is always 4 bytes
-            Ok(u32::from_be_bytes(buf))
+            Ok(u32::from_be_bytes(buf) + 1)
         } else {
             Ok(0)
         }
