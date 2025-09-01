@@ -48,15 +48,15 @@ impl HyperlaneIndexer {
 
     pub fn from_env() -> Result<Self> {
         dotenvy::dotenv().ok();
-        let reth_url = env::var("RETH_WS_URL")
-            .map_err(|_| anyhow::anyhow!("RETH_WS_URL environment variable not set"))?;
+        let reth_url =
+            env::var("RETH_WS_URL").map_err(|_| anyhow::anyhow!("RETH_WS_URL environment variable not set"))?;
         let socket = WsConnect::new(reth_url);
-        
+
         let mailbox_addr = env::var("MAILBOX_CONTRACT_ADDRESS")
             .map_err(|_| anyhow::anyhow!("MAILBOX_CONTRACT_ADDRESS environment variable not set"))?;
-        let contract_address = Address::from_str(&mailbox_addr)
-            .map_err(|e| anyhow::anyhow!("Invalid mailbox contract address: {}", e))?;
-            
+        let contract_address =
+            Address::from_str(&mailbox_addr).map_err(|e| anyhow::anyhow!("Invalid mailbox contract address: {}", e))?;
+
         let filter = Filter::new().address(contract_address).event(&Dispatch::id());
         Ok(Self::new(socket, contract_address, filter))
     }
