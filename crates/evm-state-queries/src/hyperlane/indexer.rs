@@ -72,7 +72,7 @@ impl HyperlaneIndexer {
             match Dispatch::decode_log_data(log.data()) {
                 Ok(event) => {
                     let dispatch_event: DispatchEvent = event.into();
-                    let current_index = message_store.current_index().unwrap();
+                    let current_index = message_store.current_index()?;
                     let next_index = current_index;
                     let hyperlane_message =
                         decode_hyperlane_message(&dispatch_event.message).expect("Failed to decode Hyperlane message");
