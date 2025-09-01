@@ -53,7 +53,7 @@ impl EvmClient {
     }
 }
 
-#[cfg(feature = "debug")]
+#[cfg(feature = "alloy")]
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
@@ -98,7 +98,7 @@ mod tests {
         let provider: DefaultProvider =
             ProviderBuilder::new().connect_http(Url::from_str("http://127.0.0.1:8545").unwrap());
         let client = EvmClient::new(provider);
-        let height = 1337;
+        let height = 200;
 
         let proof = client
             .get_proof(

@@ -21,4 +21,3 @@ alloy-trie = { version = "0.9.1", default-features = false }
 
 [features]
 alloy = ["dep:alloy", "dep:tokio"]
-debug = []
