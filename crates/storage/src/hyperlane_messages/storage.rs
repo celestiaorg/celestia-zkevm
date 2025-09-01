@@ -64,19 +64,26 @@ impl Storage for HyperlaneMessageStore {
 impl HyperlaneMessageStore {
     pub fn insert_message(&self, index: u32, message: StoredHyperlaneMessage) -> Result<()> {
         // Serialize outside the lock to minimize lock duration
-        let serialized = bincode::serialize(&message)
-            .context("Failed to serialize message")?;
-        
-        let write_lock = self.db.write()
+        let serialized = bincode::serialize(&message).context("Failed to serialize message")?;
+
+        let write_lock = self
+            .db
+            .write()
             .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
-        let cf = write_lock.cf_handle("messages").context("Missing messages column family")?;
-        write_lock.put_cf(cf, index.to_be_bytes(), serialized)
+        let cf = write_lock
+            .cf_handle("messages")
+            .context("Missing messages column family")?;
+        write_lock
+            .put_cf(cf, index.to_be_bytes(), serialized)
             .context("Failed to insert message into database")?;
         Ok(())
     }
 
     pub fn get_message(&self, index: u32) -> Result<StoredHyperlaneMessage> {
-        let read_lock = self.db.read().unwrap();
+        let read_lock = self
+            .db
+            .read()
+            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
         let cf = read_lock.cf_handle("messages").context("Missing CF")?;
         let message = read_lock
             .get_cf(cf, index.to_be_bytes())?
@@ -85,7 +92,10 @@ impl HyperlaneMessageStore {
     }
 
     pub fn current_index(&self) -> Result<u32> {
-        let read_lock = self.db.read().unwrap();
+        let read_lock = self
+            .db
+            .read()
+            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
         let cf = read_lock.cf_handle("messages").context("Missing CF")?;
         let mut iter = read_lock.iterator_cf(cf, IteratorMode::End);
         if let Some(Ok((k, _))) = iter.next() {
@@ -98,7 +108,10 @@ impl HyperlaneMessageStore {
     }
 
     pub fn prune_all(&self) -> Result<()> {
-        let mut write_lock = self.db.write().unwrap();
+        let mut write_lock = self
+            .db
+            .write()
+            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
         write_lock.drop_cf("messages")?;
         let opts = Options::default();
         write_lock.create_cf("messages", &opts)?;
