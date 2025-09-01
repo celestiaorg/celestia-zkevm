@@ -1,0 +1,18 @@
+[package]
+name = "evm-storage-proofs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1"
+alloy-primitives = { workspace = true }
+alloy = { version = "1.0.27", features = ["full"] }
+tokio = { version = "1.45.0", features = [
+    "sync",
+    "macros",
+    "io-util",
+    "rt",
+    "time",
+    "rt-multi-thread",
+], default-features = false }
+alloy-rlp = "0.3.12"
