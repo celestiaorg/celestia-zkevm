@@ -19,7 +19,7 @@ impl Storage for HyperlaneMessageStore {
         dotenv().ok();
         let opts = HyperlaneMessageStore::get_opts()?;
         let cfs = HyperlaneMessageStore::get_cfs()?;
-        let relative = "testdata/messages/hyperlane".to_string();
+        let relative = ".db/messages/hyperlane".to_string();
         let db_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
             .parent()
             .unwrap()
@@ -36,7 +36,7 @@ impl Storage for HyperlaneMessageStore {
         dotenv().ok();
         let opts = HyperlaneMessageStore::get_opts()?;
         let cfs = HyperlaneMessageStore::get_cfs()?;
-        let relative = env::var("HYPERLANE_MESSAGE_STORE").unwrap_or("testdata/messages/hyperlane".to_string());
+        let relative = env::var("HYPERLANE_MESSAGE_STORE").unwrap_or(".db/messages/hyperlane".to_string());
         let db_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
             .parent()
             .unwrap()

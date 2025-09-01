@@ -88,7 +88,6 @@ impl HyperlaneIndexer {
                             continue;
                         }
                     }
-
                     let stored_message = StoredHyperlaneMessage::new(hyperlane_message, log.block_number);
                     message_store.insert_message(next_index, stored_message).unwrap();
                     println!("Inserted Hyperlane Message at index: {}", next_index);
