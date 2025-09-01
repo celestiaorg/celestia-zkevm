@@ -40,9 +40,14 @@ serde_json = { workspace = true }
 serde_yaml = "0.9"
 sha3 = { workspace = true }
 sp1-sdk = { workspace = true }
+rocksdb = "0.24"
+thiserror = "1.0"
 tendermint = { workspace = true }
 tendermint-proto = { workspace = true }
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 tonic = { version = "0.10", features = ["transport"] }
 tonic-reflection = "0.10"
+
+[dev-dependencies]
+tempfile = "3.8"

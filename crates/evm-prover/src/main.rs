@@ -5,6 +5,7 @@ mod config;
 mod grpc;
 mod proto;
 mod prover;
+mod storage;
 
 use commands::cli::{Cli, Commands};
 

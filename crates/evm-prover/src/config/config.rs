@@ -17,6 +17,7 @@ pub struct Config {
     pub evm_rpc: String,
     pub namespace_hex: String,
     pub pub_key: String,
+    pub storage_path: Option<String>,
 }
 
 impl Config {
@@ -27,6 +28,7 @@ impl Config {
             evm_rpc: "http://127.0.0.1:8545".to_string(),
             namespace_hex: DEFAULT_NAMESPACE.to_string(),
             pub_key: DEFAULT_PUB_KEY_HEX.to_string(),
+            storage_path: None,
         }
     }
 }
