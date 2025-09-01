@@ -12,7 +12,6 @@ alloy-rlp = { workspace = true }
 bincode = { workspace = true }
 bytes = { workspace = true }
 celestia-types = { workspace = true }
-eq-common = { workspace = true }
 hex = "0.4.3"
 nmt-rs = "*"
 prost = { workspace = true }

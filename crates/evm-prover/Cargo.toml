@@ -10,22 +10,27 @@ sp1-build = { workspace = true }
 walkdir = "2.5.0"
 
 [dependencies]
+evm-exec-types = { path = "../sp1/evm-exec-types" }
+
 anyhow = "1.0"
 alloy-genesis = { workspace = true }
+alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 async-trait = "0.1.88"
 bincode = { workspace = true }
+bytes = { workspace = true }
 celestia-types = { workspace = true }
 celestia-rpc = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 dirs = "5"
-eq-common = { workspace = true }
 ev-types = { workspace = true, features = ["grpc"] }
 hex = { workspace = true }
+jsonrpsee-core = { workspace = true }
 nmt-rs = { workspace = true }
 prost = { workspace = true }
 reqwest = { workspace = true }
 reth-chainspec = { workspace = true }
+rsp-client-executor = { workspace = true }
 rsp-host-executor = { workspace = true }
 rsp-primitives = { workspace = true }
 rsp-rpc-db = { workspace = true }
