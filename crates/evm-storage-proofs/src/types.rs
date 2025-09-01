@@ -1,3 +1,12 @@
+use alloy_primitives::{
+    Address, Bytes, FixedBytes,
+    hex::{FromHex, ToHexExt},
+};
+use alloy_rpc_types::EIP1186AccountProofResponse;
+use alloy_trie::{Nibbles, TrieAccount, proof::verify_proof};
+
+use crate::digest_keccak;
+
 pub const HYPERLANE_MERKLE_TREE_KEYS: [&str; 32] = [
     "0x0000000000000000000000000000000000000000000000000000000000000097",
     "0x0000000000000000000000000000000000000000000000000000000000000098",
@@ -32,3 +41,51 @@ pub const HYPERLANE_MERKLE_TREE_KEYS: [&str; 32] = [
     "0x00000000000000000000000000000000000000000000000000000000000000b5",
     "0x00000000000000000000000000000000000000000000000000000000000000b6",
 ];
+
+pub struct HyperlaneBranchProof {
+    pub proof: EIP1186AccountProofResponse,
+}
+
+impl HyperlaneBranchProof {
+    pub fn new(proof: EIP1186AccountProofResponse) -> Self {
+        Self { proof }
+    }
+    pub fn get_branch_node(&self) -> String {
+        self.proof
+            .storage_proof
+            .first()
+            .unwrap()
+            .value
+            .to_be_bytes::<32>()
+            .encode_hex()
+    }
+    pub fn verify(&self, key: &str, contract: Address, root: String) -> bool {
+        let leaf_node: Vec<Bytes> = alloy_rlp::decode_exact(&self.proof.account_proof.last().unwrap()).unwrap();
+        let stored_account = leaf_node.last().unwrap().to_vec();
+        // verify the account proof against the execution state root
+        match verify_proof(
+            FixedBytes::from_hex(root).unwrap(),
+            Nibbles::unpack(&digest_keccak(&contract.0.0)),
+            Some(stored_account.clone()),
+            &self.proof.account_proof,
+        ) {
+            Ok(_) => {}
+            Err(_) => return false,
+        }
+        let account: TrieAccount = alloy_rlp::decode_exact(&stored_account).unwrap();
+        // must rlp encode the 32 byte value before verifying the proof
+        let raw32 = self.proof.storage_proof.first().unwrap().value.to_be_bytes::<32>();
+        let encoded: Vec<u8> = alloy_rlp::encode(raw32.as_slice());
+        // verify the storage proof against the account root
+        match verify_proof(
+            account.storage_root,
+            Nibbles::unpack(&digest_keccak(&alloy_primitives::hex::decode(key).unwrap())),
+            Some(encoded),
+            &self.proof.storage_proof.first().unwrap().proof,
+        ) {
+            Ok(_) => {}
+            Err(_) => return false,
+        }
+        true
+    }
+}

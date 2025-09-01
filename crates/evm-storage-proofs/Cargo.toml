@@ -6,7 +6,8 @@ edition = "2024"
 [dependencies]
 anyhow = "1"
 alloy-primitives = { workspace = true }
-alloy = { version = "1.0.27", features = ["full"] }
+alloy = { version = "1.0.27", features = ["full"], optional = true }
+alloy-rpc-types = { version = "1.0.27", default-features = false }
 tokio = { version = "1.45.0", features = [
     "sync",
     "macros",
@@ -14,9 +15,10 @@ tokio = { version = "1.45.0", features = [
     "rt",
     "time",
     "rt-multi-thread",
-], default-features = false }
-alloy-rlp = "0.3.12"
-alloy-trie = "0.9.1"
+], default-features = false, optional = true }
+alloy-rlp = { version = "0.3.12", default-features = false }
+alloy-trie = { version = "0.9.1", default-features = false }
 
 [features]
+alloy = ["dep:alloy", "dep:tokio"]
 debug = []

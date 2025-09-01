@@ -1,5 +1,6 @@
 use alloy_primitives::Keccak256;
 
+#[cfg(feature = "alloy")]
 pub mod client;
 pub mod types;
 

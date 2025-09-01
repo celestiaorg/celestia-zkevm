@@ -5,7 +5,8 @@ members = [
     "crates/sp1/evm-exec/script",
     "crates/sp1/evm-exec-types",
     "crates/sp1/evm-range-exec/program",
-    "crates/sp1/evm-range-exec/script", "crates/evm-storage-proofs",
+    "crates/sp1/evm-range-exec/script",
+    "crates/evm-storage-proofs",
 ]
 resolver = "2"
 
