@@ -4,10 +4,10 @@ name = "evm-range-exec-program"
 edition = "2021"
 
 [dependencies]
-evm-exec-types = { path = "../../evm-exec-types" }
+bincode = { workspace = true }
 
 celestia-types = { workspace = true }
-bincode = { workspace = true }
+evm-exec-types = { path = "../../evm-exec-types" }
 hex = "0.4.3"
 hex-literal = "0.4.1"
 nmt-rs = "*"

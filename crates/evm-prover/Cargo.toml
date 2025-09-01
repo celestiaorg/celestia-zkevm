@@ -3,20 +3,14 @@ name = "evm-prover"
 version = "0.1.0"
 edition = "2021"
 
-[build-dependencies]
-tonic-build = "0.10"
-prost-build = "0.12"
-sp1-build = { workspace = true }
-walkdir = "2.5.0"
-
 [dependencies]
-anyhow = "1.0"
 alloy-genesis = { workspace = true }
 alloy-provider = { workspace = true }
+anyhow = "1.0"
 async-trait = "0.1.88"
 bincode = { workspace = true }
-celestia-types = { workspace = true }
 celestia-rpc = { workspace = true }
+celestia-types = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 dirs = "5"
 eq-common = { workspace = true }
@@ -41,3 +35,9 @@ tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 tonic = { version = "0.10", features = ["transport"] }
 tonic-reflection = "0.10"
+
+[build-dependencies]
+prost-build = "0.12"
+sp1-build = { workspace = true }
+tonic-build = "0.10"
+walkdir = "2.5.0"

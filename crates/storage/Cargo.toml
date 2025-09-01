@@ -3,14 +3,14 @@ name = "storage"
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
-anyhow = { workspace = true }
-rocksdb = "0.24.0"
-dotenvy = "0.15.7"
-evm-state-types = { workspace = true }
-bincode = { workspace = true }
-hex = { workspace = true }
-tokio = { workspace = true }
-
 [features]
 test = []
+
+[dependencies]
+anyhow = { workspace = true }
+bincode = { workspace = true }
+dotenvy = "0.15.7"
+evm-state-types = { workspace = true }
+hex = { workspace = true }
+rocksdb = "0.24.0"
+tokio = { workspace = true }
