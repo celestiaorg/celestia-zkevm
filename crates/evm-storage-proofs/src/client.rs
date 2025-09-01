@@ -27,10 +27,18 @@ impl EvmClient {
     pub fn new(provider: DefaultProvider) -> Self {
         Self { provider }
     }
-    pub async fn get_proof(&self, key: &str, contract: Address, height: u64) -> Result<EIP1186AccountProofResponse> {
+    pub async fn get_proof(
+        &self,
+        keys: &[&str],
+        contract: Address,
+        height: u64,
+    ) -> Result<EIP1186AccountProofResponse> {
         let proof: EIP1186AccountProofResponse = self
             .provider
-            .get_proof(contract, vec![FixedBytes::from_hex(key)?])
+            .get_proof(
+                contract,
+                keys.iter().map(|k| FixedBytes::from_hex(k).unwrap()).collect(),
+            )
             .block_id(height.into())
             .await?;
         Ok(proof)
@@ -45,20 +53,20 @@ impl EvmClient {
     }
 }
 
-//#[cfg(feature = "debug")]
+#[cfg(feature = "debug")]
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
 
     use crate::{
         client::{DefaultProvider, EvmClient},
-        types::HyperlaneBranchProof,
+        types::{HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof},
     };
     use alloy::{hex::FromHex, providers::ProviderBuilder, transports::http::reqwest::Url};
     use alloy_primitives::Address;
 
     #[tokio::test]
-    async fn test_single_hyperlane_tree_branch() {
+    async fn test_single_node_hyperlane_tree_branch() {
         let contract = Address::from_hex("0xfcb1d485ef46344029d9e8a7925925e146b3430e").unwrap();
         let provider: DefaultProvider =
             ProviderBuilder::new().connect_http(Url::from_str("http://127.0.0.1:8545").unwrap());
@@ -71,14 +79,41 @@ mod tests {
             .get_proof(
                 // starts at 151 up to 182, count is located at 183
                 // get the first one to check against off-chain tree
-                key, contract, height,
+                &[key],
+                contract,
+                height,
             )
             .await
             .unwrap();
 
         let execution_state_root = client.get_storage_root(height).await.unwrap();
         let branch_proof = HyperlaneBranchProof::new(proof);
-        let verified = branch_proof.verify(key, contract, execution_state_root);
+        let verified = branch_proof.verify_single(key, contract, execution_state_root);
+        assert!(verified);
+    }
+
+    #[tokio::test]
+    async fn test_all_nodes_hyperlane_tree_branch() {
+        let contract = Address::from_hex("0xfcb1d485ef46344029d9e8a7925925e146b3430e").unwrap();
+        let provider: DefaultProvider =
+            ProviderBuilder::new().connect_http(Url::from_str("http://127.0.0.1:8545").unwrap());
+        let client = EvmClient::new(provider);
+        let height = 1337;
+
+        let proof = client
+            .get_proof(
+                // starts at 151 up to 182, count is located at 183
+                // get the first one to check against off-chain tree
+                &HYPERLANE_MERKLE_TREE_KEYS,
+                contract,
+                height,
+            )
+            .await
+            .unwrap();
+
+        let execution_state_root = client.get_storage_root(height).await.unwrap();
+        let branch_proof = HyperlaneBranchProof::new(proof);
+        let verified = branch_proof.verify(&HYPERLANE_MERKLE_TREE_KEYS, contract, execution_state_root);
         assert!(verified);
     }
 }
