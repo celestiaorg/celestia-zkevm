@@ -63,9 +63,15 @@ impl Storage for HyperlaneMessageStore {
 
 impl HyperlaneMessageStore {
     pub fn insert_message(&self, index: u32, message: StoredHyperlaneMessage) -> Result<()> {
-        let read_lock = self.db.read().unwrap();
-        let cf = read_lock.cf_handle("messages").context("Missing CF")?;
-        read_lock.put_cf(cf, index.to_be_bytes(), bincode::serialize(&message)?)?;
+        // Serialize outside the lock to minimize lock duration
+        let serialized = bincode::serialize(&message)
+            .context("Failed to serialize message")?;
+        
+        let write_lock = self.db.write()
+            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+        let cf = write_lock.cf_handle("messages").context("Missing messages column family")?;
+        write_lock.put_cf(cf, index.to_be_bytes(), serialized)
+            .context("Failed to insert message into database")?;
         Ok(())
     }
 
