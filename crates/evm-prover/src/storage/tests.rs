@@ -128,34 +128,6 @@ mod tests {
         assert_eq!(latest.unwrap().celestia_height, 20);
     }
 
-    #[tokio::test]
-    async fn test_store_hyperlane_message() {
-        let (storage, _temp_dir) = create_test_storage();
-
-        let message = HyperlaneMessage {
-            id: 1,
-            celestia_height: 100,
-            message_id: [42; 32],
-            message_data: vec![1, 2, 3, 4, 5],
-            origin_domain: 123,
-            destination_domain: 456,
-            created_at: 1234567890,
-        };
-
-        // Store the message
-        storage.store_hyperlane_message(&message).await.unwrap();
-
-        // Retrieve messages for the height
-        let messages = storage.get_hyperlane_messages(100).await.unwrap();
-
-        assert_eq!(messages.len(), 1);
-        let retrieved_message = &messages[0];
-        assert_eq!(retrieved_message.id, message.id);
-        assert_eq!(retrieved_message.celestia_height, message.celestia_height);
-        assert_eq!(retrieved_message.message_id, message.message_id);
-        assert_eq!(retrieved_message.origin_domain, message.origin_domain);
-        assert_eq!(retrieved_message.destination_domain, message.destination_domain);
-    }
 
     #[tokio::test]
     async fn test_proof_not_found() {

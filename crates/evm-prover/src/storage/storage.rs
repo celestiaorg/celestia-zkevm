@@ -50,16 +50,6 @@ pub struct StoredRangeProof {
     pub created_at: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HyperlaneMessage {
-    pub id: u64,
-    pub celestia_height: u64,
-    pub message_id: [u8; 32],
-    pub message_data: Vec<u8>,
-    pub origin_domain: u32,
-    pub destination_domain: u32,
-    pub created_at: u64,
-}
 
 #[async_trait]
 pub trait ProofStorage: Send + Sync {
@@ -78,8 +68,6 @@ pub trait ProofStorage: Send + Sync {
         output: &BlockRangeExecOutput,
     ) -> Result<(), ProofStorageError>;
 
-    async fn store_hyperlane_message(&self, message: &HyperlaneMessage) -> Result<(), ProofStorageError>;
-
     async fn get_block_proof(&self, celestia_height: u64) -> Result<StoredBlockProof, ProofStorageError>;
 
     async fn get_range_proofs(
@@ -94,11 +82,6 @@ pub trait ProofStorage: Send + Sync {
         end_height: u64,
     ) -> Result<Vec<StoredBlockProof>, ProofStorageError>;
 
-    async fn get_hyperlane_messages(
-        &self,
-        celestia_height: u64,
-    ) -> Result<Vec<HyperlaneMessage>, ProofStorageError>;
-
     async fn get_latest_block_proof(&self) -> Result<Option<StoredBlockProof>, ProofStorageError>;
 }
 
@@ -108,7 +91,6 @@ pub struct RocksDbProofStorage {
 
 const CF_BLOCK_PROOFS: &str = "block_proofs";
 const CF_RANGE_PROOFS: &str = "range_proofs";
-const CF_HYPERLANE_MESSAGES: &str = "hyperlane_messages";
 const CF_METADATA: &str = "metadata";
 
 impl RocksDbProofStorage {
@@ -120,7 +102,6 @@ impl RocksDbProofStorage {
         let cfs = vec![
             ColumnFamilyDescriptor::new(CF_BLOCK_PROOFS, Options::default()),
             ColumnFamilyDescriptor::new(CF_RANGE_PROOFS, Options::default()),
-            ColumnFamilyDescriptor::new(CF_HYPERLANE_MESSAGES, Options::default()),
             ColumnFamilyDescriptor::new(CF_METADATA, Options::default()),
         ];
 
@@ -153,12 +134,6 @@ impl RocksDbProofStorage {
         key
     }
 
-    fn message_key(&self, height: u64, id: u64) -> [u8; 16] {
-        let mut key = [0u8; 16];
-        key[..8].copy_from_slice(&height.to_be_bytes());
-        key[8..].copy_from_slice(&id.to_be_bytes());
-        key
-    }
 
     fn get_next_range_id(&self) -> Result<u64, ProofStorageError> {
         let cf = self.get_cf(CF_METADATA)?;
@@ -179,24 +154,6 @@ impl RocksDbProofStorage {
         Ok(current_id)
     }
 
-    fn get_next_message_id(&self) -> Result<u64, ProofStorageError> {
-        let cf = self.get_cf(CF_METADATA)?;
-        let key = b"next_message_id";
-        
-        let current_id = match self.db.get_cf(cf, key)? {
-            Some(bytes) => {
-                let mut id_bytes = [0u8; 8];
-                id_bytes.copy_from_slice(&bytes);
-                u64::from_be_bytes(id_bytes)
-            }
-            None => 1,
-        };
-
-        let next_id = current_id + 1;
-        self.db.put_cf(cf, key, &next_id.to_be_bytes())?;
-        
-        Ok(current_id)
-    }
 }
 
 #[async_trait]
@@ -264,15 +221,6 @@ impl ProofStorage for RocksDbProofStorage {
         Ok(())
     }
 
-    async fn store_hyperlane_message(&self, message: &HyperlaneMessage) -> Result<(), ProofStorageError> {
-        let cf = self.get_cf(CF_HYPERLANE_MESSAGES)?;
-        
-        let key = self.message_key(message.celestia_height, message.id);
-        let value = self.serialize(message)?;
-        
-        self.db.put_cf(cf, key, value)?;
-        Ok(())
-    }
 
     async fn get_block_proof(&self, celestia_height: u64) -> Result<StoredBlockProof, ProofStorageError> {
         let cf = self.get_cf(CF_BLOCK_PROOFS)?;
@@ -336,29 +284,6 @@ impl ProofStorage for RocksDbProofStorage {
         Ok(results)
     }
 
-    async fn get_hyperlane_messages(
-        &self,
-        celestia_height: u64,
-    ) -> Result<Vec<HyperlaneMessage>, ProofStorageError> {
-        let cf = self.get_cf(CF_HYPERLANE_MESSAGES)?;
-        let start_key = self.message_key(celestia_height, 0);
-        let end_key = self.message_key(celestia_height, u64::MAX);
-        
-        let mut results = Vec::new();
-        let iter = self.db.iterator_cf(cf, rocksdb::IteratorMode::From(&start_key, rocksdb::Direction::Forward));
-        
-        for item in iter {
-            let (key, value) = item?;
-            if key.as_ref() > end_key.as_slice() {
-                break;
-            }
-            
-            let message: HyperlaneMessage = self.deserialize(&value)?;
-            results.push(message);
-        }
-        
-        Ok(results)
-    }
 
     async fn get_latest_block_proof(&self) -> Result<Option<StoredBlockProof>, ProofStorageError> {
         let cf = self.get_cf(CF_BLOCK_PROOFS)?;
