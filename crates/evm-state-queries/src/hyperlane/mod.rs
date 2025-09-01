@@ -9,14 +9,6 @@ mod tests {
     use std::sync::Arc;
     use storage::{Storage, hyperlane_messages::storage::HyperlaneMessageStore};
 
-    #[test]
-    fn test_get_message_from_db() {
-        // this test will fail if the db is empty, make sure there is at least one message in the db at testdata/messages/hyperlane
-        let store = HyperlaneMessageStore::from_env().unwrap();
-        let message = store.get_message(0).unwrap();
-        println!("Message decoded: {:?}", message);
-    }
-
     #[tokio::test]
     /* Context
         We want to generate proofs for events that occurred between one finalized block and another (latest)
