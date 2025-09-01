@@ -196,18 +196,16 @@ struct ProofAssignment {
 impl BlockExecProver {
     /// Creates a new instance of [`BlockExecProver`] for the provided [`AppContext`] using default configuration
     /// and prover environment settings.
-    pub fn new(app: AppContext, config_storage_path: Option<String>) -> Result<Arc<Self>> {
+    pub fn new(app: AppContext) -> Result<Arc<Self>> {
         let config = BlockExecProver::default_config();
         let prover = ProverClient::from_env();
 
-        // Initialize RocksDB storage in the configured path or default directory
-        let storage_path = match config_storage_path {
-            Some(path) => std::path::PathBuf::from(path),
-            None => dirs::home_dir()
-                .expect("cannot find home directory")
-                .join(APP_HOME)
-                .join("proofs.db"),
-        };
+        // Initialize RocksDB storage in the default data directory
+        let storage_path = dirs::home_dir()
+            .expect("cannot find home directory")
+            .join(APP_HOME)
+            .join("data")
+            .join("proofs.db");
         
         let storage = Arc::new(RocksDbProofStorage::new(storage_path)?);
 
