@@ -74,7 +74,8 @@ query-balance:
 
 ## spamoor: Run spamoor transaction flooding against the EVM roll-up.
 spamoor:
-	@echo "--> Running spamoor transaction flooding"
-	@chmod +x hyperlane/scripts/run-spamoor.sh
-	@hyperlane/scripts/run-spamoor.sh $(ARGS)
+	@echo "--> Running spamoor transaction flooding daemon"
+	@echo "Spamoor will be available on localhost:8080"
+	@chmod +x scripts/run-spamoor.sh
+	@scripts/run-spamoor.sh $(ARGS)
 .PHONY: spamoor
