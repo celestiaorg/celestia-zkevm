@@ -75,10 +75,6 @@ query-balance:
 ## spamoor: Run spamoor transaction flooding against the EVM roll-up.
 spamoor:
 	@echo "--> Running spamoor transaction flooding"
-	@docker run --rm -it \
-  		--network celestia-zkevm-hl-testnet_celestia-zkevm-net \
-  		-e RPC_URL=http://reth:8545 \
-  		-e PRIVATE_KEY=$(PRIVATE_KEY) \
-  		ethpandaops/spamoor:latest \
-  		$(ARGS)
+	@chmod +x hyperlane/scripts/run-spamoor.sh
+	@hyperlane/scripts/run-spamoor.sh $(ARGS)
 .PHONY: spamoor
