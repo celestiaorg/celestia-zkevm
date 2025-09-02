@@ -80,10 +80,9 @@ impl HyperlaneBranchProof {
             Err(_) => return false,
         }
         let storage_root = self.get_storage_root();
-        for ((index, key), proof) in keys.iter().enumerate().zip(self.proof.storage_proof.iter()) {
-            println!("Branch Node: {}", self.get_branch_node(index));
+        for (key, proof) in keys.iter().zip(self.proof.storage_proof.iter()) {
+            // Skip empty branch nodes as those don't have storage proofs
             if proof.value == Uint::from(0) {
-                println!("No proof for this level in the tree, assume zero hash, key: {}", key);
                 continue;
             }
             match verify_proof(
