@@ -50,10 +50,10 @@ impl HyperlaneBranchProof {
     pub fn new(proof: EIP1186AccountProofResponse) -> Self {
         Self { proof }
     }
-    pub fn get_branch_node(&self) -> String {
+    pub fn get_branch_node(&self, index: usize) -> String {
         self.proof
             .storage_proof
-            .first()
+            .get(index)
             .unwrap()
             .value
             .to_be_bytes::<32>()
@@ -80,7 +80,8 @@ impl HyperlaneBranchProof {
             Err(_) => return false,
         }
         let storage_root = self.get_storage_root();
-        for (key, proof) in keys.iter().zip(self.proof.storage_proof.iter()) {
+        for ((index, key), proof) in keys.iter().enumerate().zip(self.proof.storage_proof.iter()) {
+            println!("Branch Node: {}", self.get_branch_node(index));
             if proof.value == Uint::from(0) {
                 println!("No proof for this level in the tree, assume zero hash, key: {}", key);
                 continue;
