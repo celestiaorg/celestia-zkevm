@@ -4,9 +4,9 @@ name = "evm-exec-types"
 edition = "2021"
 
 [dependencies]
-bincode = { workspace = true }
-hex = { workspace = true }
-serde = { workspace = true }
-celestia-types = { workspace = true }
-rsp-client-executor = { workspace = true }
 alloy-primitives = { workspace = true }
+bincode = { workspace = true }
+celestia-types = { workspace = true }
+hex = { workspace = true }
+rsp-client-executor = { workspace = true }
+serde = { workspace = true }

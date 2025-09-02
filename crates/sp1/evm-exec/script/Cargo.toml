@@ -17,7 +17,6 @@ name = "vkey-evm-exec"
 path = "src/bin/vkey.rs"
 
 [dependencies]
-evm-exec-types = { path = "../../evm-exec-types" }
 
 alloy-genesis = { workspace = true }
 alloy-primitives = { workspace = true }
@@ -25,12 +24,13 @@ alloy-provider = { workspace = true }
 anyhow = "1.0"
 base64 = { workspace = true }
 bincode = { workspace = true }
-celestia-types = { workspace = true }
 celestia-rpc = { workspace = true }
+celestia-types = { workspace = true }
 clap = { version = "4.0", features = ["cargo", "derive", "env"] }
 dotenv = "0.15.0"
 eq-common = { workspace = true }
 ev-types = { workspace = true, features = ["grpc"] }
+evm-exec-types = { path = "../../evm-exec-types" }
 eyre = "0.6.12"
 hashbrown = "0.14.5"
 hex = { workspace = true }
@@ -41,8 +41,8 @@ reqwest = "0.12.15"
 reth-chainspec = { workspace = true }
 reth-primitives = { workspace = true }
 rsp-client-executor = { workspace = true }
-rsp-primitives = { workspace = true }
 rsp-host-executor = { workspace = true }
+rsp-primitives = { workspace = true }
 rsp-rpc-db = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_cbor = { workspace = true }
