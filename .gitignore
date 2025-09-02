@@ -3,11 +3,11 @@
 .tmp
 .env
 .vscode
+.db
 
 build
 
 **/hyperlane_db
 **/target
-
 /tmp
 pgo-data.profdata

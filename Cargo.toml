@@ -1,11 +1,14 @@
 [workspace]
 members = [
     "crates/evm-prover",
+    "crates/evm-state-queries",
+    "crates/evm-state-types",
+    "crates/sp1/evm-exec-types",
     "crates/sp1/evm-exec/program",
     "crates/sp1/evm-exec/script",
-    "crates/sp1/evm-exec-types",
     "crates/sp1/evm-range-exec/program",
     "crates/sp1/evm-range-exec/script",
+    "crates/storage",
 ]
 resolver = "2"
 
@@ -21,6 +24,7 @@ alloy-provider = { version = "1.0.13", default-features = false, features = [
     "reqwest-rustls-tls",
 ] }
 alloy-rlp = "0.3.10"
+anyhow = { version = "1.0", default-features = false }
 base64 = "0.22.1"
 bincode = "1.3.3"
 bytes = "1.10.1"
@@ -29,6 +33,7 @@ celestia-types = "=0.11.2"
 ed25519-dalek = { version = "2.1.0", features = ["alloc", "serde"] }
 ethers = { version = "2.0", features = ["ws", "rustls"] }
 ev-types = { version = "0.0.1", default-features = false }
+evm-state-types = { path = "crates/evm-state-types" }
 hex = "0.4.3"
 jsonrpsee-core = "0.25.1"
 nmt-rs = "*"
@@ -40,7 +45,7 @@ rsp-client-executor = { git = "https://github.com/succinctlabs/rsp.git", tag = "
 rsp-host-executor = { git = "https://github.com/succinctlabs/rsp.git", tag = "reth-1.5.0" }
 rsp-primitives = { git = "https://github.com/succinctlabs/rsp.git", tag = "reth-1.5.0" }
 rsp-rpc-db = { git = "https://github.com/succinctlabs/rsp.git", tag = "reth-1.5.0" }
-serde = "1.0"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_cbor = "0.11.2"
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 sha3 = "0.10"
@@ -48,8 +53,17 @@ sp1-build = "=5.0.8"
 sp1-core-executor = { version = "=5.0.8", features = ["bigint-rug"] }
 sp1-sdk = "=5.0.8"
 sp1-zkvm = "=5.0.8"
+storage = { path = "crates/storage" }
 tendermint = "0.40.1"
 tendermint-proto = "*"
+tokio = { version = "1.45.0", features = [
+    "sync",
+    "macros",
+    "io-util",
+    "rt",
+    "time",
+    "rt-multi-thread",
+], default-features = false }
 
 [patch.crates-io]
 # Add support for precompiles: https://docs.succinct.xyz/docs/sp1/optimizing-programs/precompiles
