@@ -27,6 +27,8 @@ impl EvmClient {
     pub fn new(provider: DefaultProvider) -> Self {
         Self { provider }
     }
+
+    // Get a Patricia Trie merkle proof for some key under some account for a given block height.
     pub async fn get_proof(
         &self,
         keys: &[&str],
@@ -43,6 +45,7 @@ impl EvmClient {
             .await?;
         Ok(proof)
     }
+
     pub async fn get_storage_root(&self, height: u64) -> Result<String> {
         let block = self
             .provider
@@ -111,7 +114,7 @@ mod tests {
             .await
             .unwrap();
 
-        let execution_state_root = client.get_storage_root(height).await.unwrap();
+        let execution_state_root = client.get_state_root(height).await.unwrap();
         let branch_proof = HyperlaneBranchProof::new(proof);
         let verified = branch_proof.verify(&HYPERLANE_MERKLE_TREE_KEYS, contract, execution_state_root);
         assert!(verified);
