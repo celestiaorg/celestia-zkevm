@@ -31,12 +31,15 @@ pub type DefaultProvider = FillProvider<
     >,
     alloy_provider::RootProvider,
 >;
+
+/// HyperlaneIndexer is a service that indexes Hyperlane messages from the Dispatch event emitted from the Mailbox contract.
 pub struct HyperlaneIndexer {
     pub socket: WsConnect,
     pub contract_address: Address,
     pub filter: Filter,
 }
 
+/// Implementation of the HyperlaneIndexer that queries the network for Dispatch messages.
 impl HyperlaneIndexer {
     pub fn new(socket: WsConnect, contract_address: Address, filter: Filter) -> Self {
         Self {
