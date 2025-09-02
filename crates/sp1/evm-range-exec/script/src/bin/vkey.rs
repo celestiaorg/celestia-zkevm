@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let encoded = bincode::serialize(&vk)?;
     let path = "testdata/vkeys/evm-range-exec-vkey.bin";
     fs::write(path, encoded)?;
-    println!("successfully wrote vkey to: {}", path);
+    println!("successfully wrote vkey to: {path}");
 
     Ok(())
 }
