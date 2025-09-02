@@ -28,7 +28,6 @@ celestia-rpc = { workspace = true }
 celestia-types = { workspace = true }
 clap = { version = "4.0", features = ["cargo", "derive", "env"] }
 dotenv = "0.15.0"
-eq-common = { workspace = true }
 ev-types = { workspace = true, features = ["grpc"] }
 evm-exec-types = { path = "../../evm-exec-types" }
 eyre = "0.6.12"

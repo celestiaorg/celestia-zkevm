@@ -9,6 +9,20 @@ use hex::encode;
 use rsp_client_executor::io::EthClientExecutorInput;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+/// BlockExecInput is the input for the BlockExec circuit.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BlockExecInput {
+    pub header_raw: Vec<u8>,
+    pub dah: DataAvailabilityHeader,
+    pub blobs_raw: Vec<u8>,
+    pub pub_key: Vec<u8>,
+    pub namespace: Namespace,
+    pub proofs: Vec<NamespaceProof>,
+    pub executor_inputs: Vec<EthClientExecutorInput>,
+    pub trusted_height: u64,
+    pub trusted_root: FixedBytes<32>,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlockExecOutput {
     // celestia_header_hash is the merkle hash of the Celestia block header.
@@ -49,6 +63,13 @@ impl Display for BlockExecOutput {
     }
 }
 
+/// BlockRangeExecInput is the input for the BlockRangeExec circuit.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BlockRangeExecInput {
+    pub vkeys: Vec<[u32; 8]>,
+    pub public_values: Vec<Vec<u8>>,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlockRangeExecOutput {
     // celestia_header_hash is the hash of the celestia header at which new_height is available.
@@ -81,27 +102,6 @@ impl Display for BlockRangeExecOutput {
         writeln!(f, "  public_key: {}", encode(self.public_key))?;
         writeln!(f, "}}")
     }
-}
-
-/// BlockExecInput is the input for the BlockExec circuit.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BlockExecInput {
-    pub header_raw: Vec<u8>,
-    pub dah: DataAvailabilityHeader,
-    pub blobs_raw: Vec<u8>,
-    pub pub_key: Vec<u8>,
-    pub namespace: Namespace,
-    pub proofs: Vec<NamespaceProof>,
-    pub executor_inputs: Vec<EthClientExecutorInput>,
-    pub trusted_height: u64,
-    pub trusted_root: FixedBytes<32>,
-}
-
-/// BlockRangeExecInput is the input for the BlockRangeExec circuit.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BlockRangeExecInput {
-    pub vkeys: Vec<[u32; 8]>,
-    pub public_values: Vec<Vec<u8>>,
 }
 
 /// A buffer of serializable/deserializable objects.

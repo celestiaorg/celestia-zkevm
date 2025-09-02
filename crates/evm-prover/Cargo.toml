@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 alloy-genesis = { workspace = true }
+alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 anyhow = "1.0"
 async-trait = "0.1.88"
@@ -13,13 +14,14 @@ celestia-rpc = { workspace = true }
 celestia-types = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 dirs = "5"
-eq-common = { workspace = true }
 ev-types = { workspace = true, features = ["grpc"] }
 hex = { workspace = true }
+jsonrpsee-core = { workspace = true }
 nmt-rs = { workspace = true }
 prost = { workspace = true }
 reqwest = { workspace = true }
 reth-chainspec = { workspace = true }
+rsp-client-executor = { workspace = true }
 rsp-host-executor = { workspace = true }
 rsp-primitives = { workspace = true }
 rsp-rpc-db = { workspace = true }
