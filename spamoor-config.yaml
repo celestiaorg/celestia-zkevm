@@ -1,0 +1,17 @@
+# Spamoor configuration using pre-funded genesis account
+- scenario: eoatx
+  name: "High Volume ETH Transfers"
+  description: "Basic ETH transfers with 400 tx/slot throughput using pre-funded account"
+  config:
+    seed: eoatx-demo
+    refill_amount: 1000000000000000000  # 1 ETH in wei
+    refill_balance: 500000000000000000  # 0.5 ETH threshold
+    refill_interval: 600  # 10 minutes
+    throughput: 400       # transactions per slot
+    max_pending: 800      # max pending transactions
+    max_wallets: 1      # number of wallets to use
+    base_fee: 20          # base fee in gwei
+    tip_fee: 2            # priority fee in gwei
+    amount: 100           # transfer amount in wei
+    random_amount: true   # randomize transfer amounts
+    random_target: true   # randomize target addresses

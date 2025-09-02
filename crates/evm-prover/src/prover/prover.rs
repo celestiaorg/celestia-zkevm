@@ -1,93 +1,45 @@
 #![allow(dead_code)]
+use celestia_types::ExtendedHeader;
+use std::collections::BTreeMap;
 use std::fs;
 use std::result::Result::{Err, Ok};
 use std::sync::Arc;
 
 use alloy_genesis::Genesis as AlloyGenesis;
+use alloy_primitives::FixedBytes;
 use alloy_provider::ProviderBuilder;
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
+use bytes::Bytes;
+use celestia_rpc::blob::BlobsAtHeight;
 use celestia_rpc::{client::Client, BlobClient, HeaderClient, ShareClient};
-use celestia_types::{nmt::Namespace, Blob, ExtendedHeader, ShareProof};
-use eq_common::KeccakInclusionToDataRootProofInput;
-use ev_types::v1::SignedHeader;
-use ev_types::v1::{store_service_client::StoreServiceClient, GetMetadataRequest, SignedData};
-use nmt_rs::{
-    simple_merkle::{db::MemDb, proof::Proof, tree::MerkleTree},
-    TmSha2Hasher,
-};
+use celestia_types::nmt::{Namespace, NamespaceProof};
+use celestia_types::Blob;
+use ev_types::v1::SignedData;
+use evm_exec_types::{BlockExecInput, BlockExecOutput, BlockRangeExecInput, BlockRangeExecOutput};
+use jsonrpsee_core::client::Subscription;
 use prost::Message;
 use reth_chainspec::ChainSpec;
+use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
-use serde::{Deserialize, Serialize};
 use sp1_sdk::{
-    include_elf, EnvProver, HashableKey, ProverClient, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin,
-    SP1VerifyingKey,
+    include_elf, EnvProver, ProverClient, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
 };
-use tendermint::block::Header;
-use tendermint_proto::{
-    v0_38::{types::BlockId as RawBlockId, version::Consensus as RawConsensusVersion},
-    Protobuf,
+use tokio::{
+    sync::{mpsc, RwLock, Semaphore},
+    task::JoinSet,
 };
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
+use crate::prover::{ProgramProver, ProverConfig};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_RANGE_EXEC_ELF: &[u8] = include_elf!("evm-range-exec-program");
-
-/// ProverConfig defines metadata about the program binary (ELF), proof mode and any static keys.
-pub struct ProverConfig {
-    pub elf: &'static [u8],
-    pub proof_mode: SP1ProofMode,
-}
-
-/// ProgramProver is a trait implemented per SP1 program*.
-///
-/// Associated types let each program pick its own Input and Output context.
-#[async_trait]
-pub trait ProgramProver {
-    /// Context needed to build the stdin for this program.
-    type Input: Send + 'static;
-    /// Output data to return alongside the proof.
-    type Output: Send + 'static;
-
-    /// Returns the program configuration containing the ELF and proof mode.
-    fn cfg(&self) -> &ProverConfig;
-
-    /// Build the program stdin from the prover inputs.
-    fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin>;
-
-    /// Prove produces a proof and parsed outputs.
-    /// The default implementation matches the configured proof mode and program elf from the prover config.
-    async fn prove(&self, input: Self::Input) -> Result<(SP1ProofWithPublicValues, Self::Output)> {
-        let cfg = self.cfg();
-        let stdin = self.build_stdin(input)?;
-
-        let (pk, _vk) = self.prover().setup(cfg.elf);
-
-        let proof: SP1ProofWithPublicValues = match cfg.proof_mode {
-            SP1ProofMode::Core => self.prover().prove(&pk, &stdin).core().run()?,
-            SP1ProofMode::Compressed => self.prover().prove(&pk, &stdin).compressed().run()?,
-            SP1ProofMode::Groth16 => self.prover().prove(&pk, &stdin).groth16().run()?,
-            SP1ProofMode::Plonk => self.prover().prove(&pk, &stdin).plonk().run()?,
-        };
-
-        let output = self.post_process(proof.clone())?;
-
-        Ok((proof, output))
-    }
-
-    /// Returns the SP1 Prover.
-    fn prover(&self) -> &EnvProver;
-
-    /// Parse or convert program outputs.
-    fn post_process(&self, proof: SP1ProofWithPublicValues) -> Result<Self::Output>;
-}
 
 /// AppContext encapsulates the full set of RPC endpoints and configuration
 /// needed to fetch input data for execution and data availability proofs.
@@ -100,14 +52,28 @@ pub struct AppContext {
     pub namespace: Namespace,
     pub celestia_rpc: String,
     pub evm_rpc: String,
-    pub sequencer_rpc: String,
+    pub pub_key: Vec<u8>,
+    pub trusted_state: RwLock<TrustedState>,
+}
+
+/// TrustedState tracks the trusted height and state root which is provided to the proof system as inputs.
+/// This type is wrapped in a RwLock by the AppContext such that it can be updated safely across concurrent tasks.
+/// Updates are made optimisticly using the EthClientExecutorInputs queried from the configured EVM full node.
+pub struct TrustedState {
+    height: u64,
+    root: FixedBytes<32>,
+}
+
+impl TrustedState {
+    pub fn new(height: u64, root: FixedBytes<32>) -> Self {
+        Self { height, root }
+    }
 }
 
 impl AppContext {
     pub fn from_config(config: Config) -> Result<Self> {
         let genesis = AppContext::load_genesis().context("Error loading app genesis")?;
-
-        let chain_spec = Arc::new(
+        let chain_spec: Arc<ChainSpec> = Arc::new(
             (&genesis)
                 .try_into()
                 .map_err(|e| anyhow!("Failed to convert genesis to chain spec: {e}"))?,
@@ -115,6 +81,8 @@ impl AppContext {
 
         let raw_ns = hex::decode(config.namespace_hex)?;
         let namespace = Namespace::new_v0(raw_ns.as_ref()).context("Failed to construct Namespace")?;
+        let pub_key = hex::decode(config.pub_key)?;
+        let trusted_state = RwLock::new(TrustedState::new(0, chain_spec.genesis_header().state_root));
 
         Ok(AppContext {
             chain_spec,
@@ -122,7 +90,8 @@ impl AppContext {
             namespace,
             celestia_rpc: config.celestia_rpc,
             evm_rpc: config.evm_rpc,
-            sequencer_rpc: config.sequencer_rpc,
+            pub_key,
+            trusted_state,
         })
     }
 
@@ -152,210 +121,6 @@ pub struct BlockExecProver {
     pub prover: EnvProver,
 }
 
-impl BlockExecProver {
-    /// Creates a new instance of [`BlockExecProver`] for the provided [`AppContext`] using default configuration
-    /// and prover environment settings.
-    pub fn new(app: AppContext) -> Self {
-        let config = BlockExecProver::default_config();
-        let prover = ProverClient::from_env();
-
-        Self { app, config, prover }
-    }
-
-    /// Returns the default prover configuration for the block execution program.
-    pub fn default_config() -> ProverConfig {
-        ProverConfig {
-            elf: EVM_EXEC_ELF,
-            proof_mode: SP1ProofMode::Compressed,
-        }
-    }
-
-    /// Generates the serialized state transition function (STF) input for a given EVM block number.
-    async fn generate_stf(&self, block_number: u64) -> Result<Vec<u8>> {
-        let host_executor = EthHostExecutor::eth(self.app.chain_spec.clone(), None);
-        let provider = ProviderBuilder::new().connect_http(self.app.evm_rpc.parse()?);
-        let rpc_db = RpcDb::new(provider.clone(), block_number - 1);
-
-        let client_input = host_executor
-            .execute(block_number, &rpc_db, &provider, self.app.genesis.clone(), None, false)
-            .await?;
-
-        Ok(bincode::serialize(&client_input)?)
-    }
-
-    /// Queries the inclusion height for the given EVM block number from the sequencer rpc.
-    async fn inclusion_height(&self, block_number: u64) -> Result<u64> {
-        let mut client = StoreServiceClient::connect(self.app.sequencer_rpc.clone()).await?;
-        let req = GetMetadataRequest {
-            key: format!("rhb/{}/d", block_number),
-        };
-
-        let resp = client.get_metadata(req).await?;
-        let height = u64::from_le_bytes(resp.into_inner().value[..8].try_into()?);
-
-        Ok(height)
-    }
-
-    /// Queries the extended header from the Celestia data availability rpc.
-    async fn extended_header(&self, height: u64) -> Result<ExtendedHeader> {
-        let client = Client::new(&self.app.celestia_rpc, None).await?;
-        let header = client.header_get_by_height(height).await?;
-
-        Ok(header)
-    }
-
-    /// Queries all blobs from Celestia for the given inclusion height and filters them to find the blob for the
-    /// corresponding EVM block number.
-    async fn blob_for_height(&self, block_number: u64, inclusion_height: u64) -> Result<Blob> {
-        let client = Client::new(&self.app.celestia_rpc, None).await?;
-
-        let blobs = client
-            .blob_get_all(inclusion_height, &[self.app.namespace])
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("No blobs found at inclusion height {}", inclusion_height))?;
-
-        println!("num blobs: {}", blobs.len());
-
-        for blob in blobs {
-            let signed_data = match SignedData::decode(blob.data.as_slice()) {
-                Ok(data) => data,
-                Err(e) => {
-                    println!("Failed to decode SignedData: {:?}", e);
-
-                    let header = match SignedHeader::decode(blob.data.as_slice()) {
-                        Ok(header) => header,
-                        Err(e) => {
-                            println!("Failed to decode SignedHeader: {:?}", e);
-                            continue;
-                        }
-                    };
-
-                    println!("signed header height: {:?}", header.header.unwrap().height);
-                    continue;
-                }
-            };
-
-            let Some(metadata) = signed_data.data.and_then(|d| d.metadata) else {
-                continue;
-            };
-
-            println!("metadata.height {}", metadata.height);
-            if metadata.height == block_number {
-                return Ok(blob);
-            }
-        }
-
-        bail!(
-            "No blob found for block number {} at inclusion height {}",
-            block_number,
-            inclusion_height
-        );
-    }
-
-    /// Queries the Celestia data availability rpc for a ShareProof for the provided blob.
-    async fn blob_inclusion_proof(&self, blob: Blob, header: &ExtendedHeader) -> Result<ShareProof> {
-        let client = Client::new(&self.app.celestia_rpc, None).await?;
-
-        let eds_size = header.dah.row_roots().len() as u64;
-        let ods_size = eds_size / 2;
-        let first_row_index = blob.index.unwrap() / eds_size;
-        let ods_index = blob.index.unwrap() - (first_row_index * ods_size);
-
-        // NOTE: mutated the app version in the header as otherwise we run into v4 unsupported issues
-        let mut modified_header = header.clone();
-        modified_header.header.version.app = 3;
-
-        let range_response = client
-            .share_get_range(&modified_header, ods_index, ods_index + blob.shares_len() as u64)
-            .await?;
-
-        let share_proof = range_response.proof;
-        share_proof.verify(modified_header.dah.hash())?;
-
-        Ok(share_proof)
-    }
-
-    /// Creates an inclusion proof for the data availability root within the provided Header.
-    fn data_root_proof(&self, header: &ExtendedHeader) -> Result<(Vec<u8>, Proof<TmSha2Hasher>)> {
-        let mut tree = MerkleTree::<MemDb<[u8; 32]>, TmSha2Hasher>::with_hasher(TmSha2Hasher::new());
-
-        for field in self.prepare_header_fields(header) {
-            tree.push_raw_leaf(&field);
-        }
-
-        let data_hash_index = 6;
-        let (data_hash, proof) = tree.get_index_with_proof(data_hash_index);
-
-        assert_eq!(header.hash().as_ref(), tree.root());
-
-        Ok((data_hash, proof))
-    }
-
-    /// Prepares leaf data for the provided Header.
-    fn prepare_header_fields(&self, header: &ExtendedHeader) -> Vec<Vec<u8>> {
-        let h = &header.header;
-
-        vec![
-            Protobuf::<RawConsensusVersion>::encode_vec(h.version),
-            h.chain_id.clone().encode_vec(),
-            h.height.encode_vec(),
-            h.time.encode_vec(),
-            Protobuf::<RawBlockId>::encode_vec(h.last_block_id.unwrap_or_default()),
-            h.last_commit_hash.unwrap_or_default().encode_vec(),
-            h.data_hash.unwrap_or_default().encode_vec(),
-            h.validators_hash.encode_vec(),
-            h.next_validators_hash.encode_vec(),
-            h.consensus_hash.encode_vec(),
-            h.app_hash.clone().encode_vec(),
-            h.last_results_hash.unwrap_or_default().encode_vec(),
-            h.evidence_hash.unwrap_or_default().encode_vec(),
-            h.proposer_address.encode_vec(),
-        ]
-    }
-}
-
-/// Input to the EVM block execution proving circuit.
-///
-/// This input contains all necessary data to verify block execution and data
-/// availability of blob data in Celestia.
-#[derive(Serialize, Deserialize)]
-pub struct BlockExecInput {
-    // blob_proof is an inclusion proof of blob data availability in Celestia.
-    pub blob_proof: KeccakInclusionToDataRootProofInput,
-    // data_root_proof is an inclusion proof of the data root within the Celestia header.
-    pub data_root_proof: Proof<TmSha2Hasher>,
-    // header is the Celestia block header at which the blob data is available.
-    pub header: Header,
-    // state_transition_fn is the application of the blob data applied to the EVM state machine.
-    pub state_transition_fn: Vec<u8>,
-}
-
-/// Output of the EVM block execution proving circuit.
-///
-/// This contains the resulting commitments after applying the state transition function and verifying
-/// data availability in Celestia.
-#[derive(Serialize, Deserialize)]
-pub struct BlockExecOutput {
-    // blob_commitment is the blob commitment for the EVM block.
-    pub blob_commitment: [u8; 32],
-    // header_hash is the hash of the EVM block header.
-    pub header_hash: [u8; 32],
-    // prev_header_hash is the hash of the previous EVM block header.
-    pub prev_header_hash: [u8; 32],
-    // celestia_header_hash is the merkle hash of the Celestia block header.
-    pub celestia_header_hash: [u8; 32],
-    // prev_celestia_header_hash is the merkle hash of the previous Celestia block header.
-    pub prev_celestia_header_hash: [u8; 32],
-    // new_height is the block number after the state transition function has been applied.
-    pub new_height: u64,
-    // new_state_root is the EVM application state root after the state transition function has been applied.
-    pub new_state_root: [u8; 32],
-    // prev_height is the block number before the state transition function has been applied.
-    pub prev_height: u64,
-    // prev_state_root is the EVM application state root before the state transition function has been applied.
-    pub prev_state_root: [u8; 32],
-}
-
 #[async_trait]
 impl ProgramProver for BlockExecProver {
     type Input = BlockExecInput;
@@ -375,11 +140,7 @@ impl ProgramProver for BlockExecProver {
     /// Returns an error if serialization of any input component fails.
     fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin> {
         let mut stdin = SP1Stdin::new();
-        stdin.write(&input.blob_proof);
-        stdin.write(&input.state_transition_fn);
-        stdin.write_vec(serde_cbor::to_vec(&input.header)?);
-        stdin.write(&input.data_root_proof);
-
+        stdin.write(&input);
         Ok(stdin)
     }
 
@@ -398,6 +159,305 @@ impl ProgramProver for BlockExecProver {
     }
 }
 
+// TODO: Add these as fields to the BlockExecProver to make configurable?
+const QUEUE_CAP: usize = 256;
+const CONCURRENCY: usize = 16;
+
+struct BlockEvent {
+    height: u64,
+    blobs: Vec<Blob>,
+}
+
+impl BlockEvent {
+    fn new(height: u64, blobs: Vec<Blob>) -> Self {
+        Self { height, blobs }
+    }
+}
+
+struct ProofJob {
+    height: u64,
+    extended_header: ExtendedHeader,
+    proofs: Vec<NamespaceProof>,
+    blobs: Vec<Blob>,
+    executor_inputs: Vec<EthClientExecutorInput>,
+}
+
+struct ScheduledProofJob {
+    job: Arc<ProofJob>,
+    trusted_height: u64,
+    trusted_root: FixedBytes<32>,
+}
+
+impl BlockExecProver {
+    /// Creates a new instance of [`BlockExecProver`] for the provided [`AppContext`] using default configuration
+    /// and prover environment settings.
+    pub fn new(app: AppContext) -> Arc<Self> {
+        let config = BlockExecProver::default_config();
+        let prover = ProverClient::from_env();
+
+        Arc::new(Self { app, config, prover })
+    }
+
+    /// Returns the default prover configuration for the block execution program.
+    pub fn default_config() -> ProverConfig {
+        ProverConfig {
+            elf: EVM_EXEC_ELF,
+            proof_mode: SP1ProofMode::Compressed,
+        }
+    }
+
+    async fn connect_and_subscribe(&self) -> Result<(Arc<Client>, Subscription<BlobsAtHeight>)> {
+        let addr = format!("ws://{}", self.app.celestia_rpc);
+        let client = Arc::new(Client::new(&addr, None).await.context("celestia ws connect")?);
+        let subscription = client
+            .blob_subscribe(self.app.namespace)
+            .await
+            .context("Blob subscription failed")?;
+
+        Ok((client, subscription))
+    }
+
+    /// Generates the state transition function (STF) input for a given EVM block number.
+    async fn eth_client_executor_input(&self, block_number: u64) -> Result<EthClientExecutorInput> {
+        let host_executor = EthHostExecutor::eth(self.app.chain_spec.clone(), None);
+        let provider = ProviderBuilder::new().connect_http(self.app.evm_rpc.parse()?);
+        let rpc_db = RpcDb::new(provider.clone(), block_number - 1);
+
+        let executor_input = host_executor
+            .execute(block_number, &rpc_db, &provider, self.app.genesis.clone(), None, false)
+            .await?;
+
+        Ok(executor_input)
+    }
+
+    /// Runs the block prover loop with a 3-stage pipeline:
+    ///
+    /// 1. **Prepare**: For each [`BlockEvent`] received from the Celestia subscription,
+    ///    fetch and build the proof inputs in parallel (bounded by `CONCURRENCY`).
+    /// 2. **Schedule**: In height order, attach the current trusted snapshot and
+    ///    optimistically advance the shared [`TrustedState`] for subsequent jobs.
+    /// 3. **Prove**: Spawn proof workers (also concurrency-limited) that generate
+    ///    proofs using the assigned inputs.
+    ///
+    /// The Celestia node produces a new [`BlobsAtHeight`] event for each block. An
+    /// event may or may not contain any blobs in the configured namespace at a given
+    /// height. Events are fed into the pipeline via the WebSocket subscription, and
+    /// proofs are generated concurrently while ensuring the trusted state is updated
+    /// monotonically in block-height order.
+    pub async fn run(self: Arc<Self>) -> Result<()> {
+        let (client, mut subscription) = self.connect_and_subscribe().await?;
+
+        // Queues for the 3-stage pipeline
+        let (event_tx, mut event_rx) = mpsc::channel::<BlockEvent>(QUEUE_CAP);
+        let (job_tx, mut job_rx) = mpsc::channel::<ProofJob>(QUEUE_CAP);
+        let (sched_tx, mut sched_rx) = mpsc::channel::<ScheduledProofJob>(QUEUE_CAP);
+
+        // Stage 1: Prepare proof inputs (parallel, IO-bound)
+        let sem = Arc::new(Semaphore::new(CONCURRENCY));
+        tokio::spawn({
+            let client = client.clone();
+            let prover = self.clone();
+
+            let job_tx = job_tx.clone();
+            let sem = sem.clone();
+            async move {
+                let mut tasks = JoinSet::new();
+                while let Some(event) = event_rx.recv().await {
+                    println!("\nNew block event height={}, blobs={}", event.height, event.blobs.len());
+                    let client = client.clone();
+                    let prover = prover.clone();
+
+                    let job_tx = job_tx.clone();
+                    let permit = sem.clone().acquire_owned().await.unwrap();
+
+                    tasks.spawn(async move {
+                        let _permit = permit; // limit concurrent prepares
+                        match prover.prepare_inputs(client, event).await {
+                            Ok(job) => {
+                                let _ = job_tx.send(job).await;
+                            }
+                            Err(e) => eprintln!("failed to retrieve proof inputs: {e:#}"),
+                        }
+                    });
+                }
+
+                while tasks.join_next().await.is_some() {}
+                eprintln!("prepare stage shutting down");
+            }
+        });
+
+        // Stage 2: Assign the trusted height and root for the next proof (single writer of trusted_state, in height order)
+        tokio::spawn({
+            let prover = self.clone();
+            let sched_tx = sched_tx.clone();
+            async move {
+                let mut buf: BTreeMap<u64, ProofJob> = BTreeMap::new();
+                let mut next_height: Option<u64> = None;
+
+                while let Some(job) = job_rx.recv().await {
+                    buf.insert(job.height, job);
+
+                    loop {
+                        let height = match next_height {
+                            Some(h) => h,
+                            None => {
+                                if let Some((&min_height, _)) = buf.iter().next() {
+                                    next_height = Some(min_height);
+                                    min_height
+                                } else {
+                                    break;
+                                }
+                            }
+                        };
+
+                        let Some(job) = buf.remove(&height) else { break };
+
+                        // Snapshot current trusted state for proof
+                        let (trusted_height, trusted_root) = {
+                            let s = prover.app.trusted_state.read().await;
+                            (s.height, s.root)
+                        };
+
+                        // Optimistically advance global trusted_state monotonically for FUTURE jobs
+                        if let Some(next) = job.executor_inputs.last() {
+                            let mut s = prover.app.trusted_state.write().await;
+                            if next.current_block.number > s.height {
+                                s.height = next.current_block.number;
+                                s.root = next.current_block.state_root;
+                            }
+                        }
+
+                        let scheduled = ScheduledProofJob {
+                            job: Arc::new(job),
+                            trusted_height,
+                            trusted_root,
+                        };
+
+                        if sched_tx.send(scheduled).await.is_err() {
+                            break;
+                        }
+
+                        next_height = Some(height + 1);
+                    }
+                }
+
+                eprintln!("schedule stage shutting down");
+            }
+        });
+
+        // Stage 3: Prove (parallel, CPU/IO-bound for remote prover network)
+        let prove_sem = Arc::new(Semaphore::new(CONCURRENCY));
+        tokio::spawn({
+            let prover = self.clone();
+            let prove_sem = prove_sem.clone();
+
+            async move {
+                let mut tasks = JoinSet::new();
+                while let Some(scheduled) = sched_rx.recv().await {
+                    let prover = prover.clone();
+                    let permit = prove_sem.clone().acquire_owned().await.unwrap();
+                    tasks.spawn(async move {
+                        let _permit = permit; // limit concurrent proofs
+
+                        if let Err(e) = prover.prove_and_store(scheduled).await {
+                            eprintln!("prove failed: {e:#}");
+                        }
+                    });
+                }
+
+                while tasks.join_next().await.is_some() {}
+                eprintln!("prove stage shutting down");
+            }
+        });
+
+        while let Some(result) = subscription.next().await {
+            match result {
+                Ok(event) => {
+                    let blobs = event.blobs.unwrap_or_default();
+                    event_tx
+                        .send(BlockEvent::new(event.height, blobs))
+                        .await
+                        .map_err(|_| anyhow::anyhow!("worker queue closed"))?;
+                }
+                Err(e) => {
+                    println!("Subscription error: {e}");
+                    break;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Retrieves the proof inputs required via RPC calls to the configured celestia and evm nodes.
+    async fn prepare_inputs(self: Arc<Self>, client: Arc<Client>, event: BlockEvent) -> Result<ProofJob> {
+        let extended_header = client.header_get_by_height(event.height).await?;
+        // TODO: need rs support for newer celestia app versions.
+        // Here we clone and mutate the app version in the header to avoid versioning errors when working with the rs libs.
+        let mut header_clone = extended_header.clone();
+        header_clone.header.version.app = 3;
+
+        let namespace_data = client
+            .share_get_namespace_data(&header_clone, self.app.namespace)
+            .await?;
+
+        let proofs: Vec<NamespaceProof> = namespace_data.rows.iter().map(|row| row.proof.clone()).collect();
+
+        let signed_data: Vec<SignedData> = event
+            .blobs
+            .iter()
+            .filter_map(|blob| SignedData::decode(Bytes::from(blob.data.clone())).ok())
+            .collect();
+
+        let mut executor_inputs = Vec::with_capacity(signed_data.len());
+        for data in signed_data {
+            let block_number = data
+                .data
+                .as_ref()
+                .and_then(|d| d.metadata.as_ref())
+                .map(|m| m.height)
+                .ok_or_else(|| anyhow!("missing height for SignedData"))?;
+
+            executor_inputs.push(self.eth_client_executor_input(block_number).await?);
+        }
+
+        println!("Got {} evm inputs at height {}", executor_inputs.len(), event.height);
+
+        Ok(ProofJob {
+            height: event.height,
+            extended_header,
+            proofs,
+            blobs: event.blobs,
+            executor_inputs,
+        })
+    }
+
+    async fn prove_and_store(self: Arc<Self>, scheduled: ScheduledProofJob) -> Result<()> {
+        let extended_header = &scheduled.job.extended_header;
+
+        let inputs = BlockExecInput {
+            header_raw: serde_cbor::to_vec(&extended_header.header)?,
+            dah: extended_header.dah.clone(),
+            blobs_raw: serde_cbor::to_vec(&scheduled.job.blobs)?,
+            pub_key: self.app.pub_key.clone(),
+            namespace: self.app.namespace,
+            proofs: scheduled.job.proofs.clone(),
+            executor_inputs: scheduled.job.executor_inputs.clone(),
+            trusted_height: scheduled.trusted_height,
+            trusted_root: scheduled.trusted_root,
+        };
+
+        // TODO: Add storage for SP1ProofWithPublicValues: https://github.com/celestiaorg/celestia-zkevm-hl-testnet/issues/154
+        let (_proof, outputs) = self.prove(inputs).await?;
+        println!(
+            "Successfully created proof for block {}. Outputs: {}",
+            scheduled.job.height, outputs
+        );
+
+        Ok(())
+    }
+}
+
 /// A prover for verifying and aggregating SP1 proofs over a range of blocks.
 ///
 /// This struct is responsible for preparing the standard input (`SP1Stdin`)
@@ -413,61 +473,15 @@ pub struct BlockRangeExecProver {
     prover: EnvProver,
 }
 
-impl BlockRangeExecProver {
-    /// Creates a new instance of [`BlockRangeExecProver`] using default configuration
-    /// and prover environment settings.
-    pub fn new() -> Self {
-        let config = BlockRangeExecProver::default_config();
-        let prover = ProverClient::from_env();
-
-        Self { config, prover }
-    }
-
-    /// Returns the default prover configuration for the block execution program.
-    pub fn default_config() -> ProverConfig {
-        ProverConfig {
-            elf: EVM_RANGE_EXEC_ELF,
-            proof_mode: SP1ProofMode::Groth16,
-        }
-    }
-}
-
-/// Input to a batch execution proving system that verifies multiple SP1 proofs
-/// for a range of EVM blocks.
-///
-/// This is used to verify that N state transitions have occurred using a single
-/// verifying key, producing a new application state root.
-#[derive(Serialize, Deserialize)]
-pub struct BlockRangeExecInput {
-    // proofs is a vector of SP1 proofs with their associated public values
-    pub proofs: Vec<SP1ProofWithPublicValues>,
-    // vkey is the SP1 verifier key for verifying proofs
-    pub vkey: SP1VerifyingKey,
-}
-
-/// Output of a batch execution proof that validates N state transitions
-/// from a trusted starting point.
-///
-/// This contains the resulting commitments after applying a sequence of verified SP1 proofs,
-/// advancing the EVM application state from `trusted_height` to `new_height`.
-#[derive(Serialize, Deserialize)]
-pub struct BlockRangeExecOutput {
-    // celestia_header_hash is the hash of the celestia header at which new_height is available.
-    pub celestia_header_hash: [u8; 32],
-    // trusted_height is the trusted height of the EVM application.
-    pub trusted_height: u64,
-    // trusted_state_root is the state commitment root of the EVM application at trusted_height.
-    pub trusted_state_root: [u8; 32],
-    // new_height is the EVM application block number after N state transitions.
-    pub new_height: u64,
-    // new_state_root is the computed state root of the EVM application after
-    // executing N blocks from trusted_height to new_height.
-    pub new_state_root: [u8; 32],
+/// ProofInput is a convienience type used for proof aggregation inputs within the BlockRangeExecProver program.
+pub struct ProofInput {
+    proof: SP1Proof,
+    vkey: SP1VerifyingKey,
 }
 
 #[async_trait]
 impl ProgramProver for BlockRangeExecProver {
-    type Input = BlockRangeExecInput;
+    type Input = (BlockRangeExecInput, Vec<ProofInput>);
     type Output = BlockRangeExecOutput;
 
     /// Returns the program configuration containing the ELF and proof mode.
@@ -475,10 +489,10 @@ impl ProgramProver for BlockRangeExecProver {
         &self.config
     }
 
-    /// Constructs the SP1Stdin by serializing:
+    /// Constructs the SP1Stdin by serializing the program inputs:
     /// - Verifier key digests (`vkeys`)
     /// - Public inputs for each proof
-    /// - The compressed proofs themselves
+    /// - The compressed SP1 proofs and their associated verifying keys.
     ///
     /// # Errors
     /// - Returns an error if any proof is not in compressed format.
@@ -486,20 +500,20 @@ impl ProgramProver for BlockRangeExecProver {
     fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin> {
         let mut stdin = SP1Stdin::new();
 
-        let (proofs, public_values): (Vec<_>, Vec<_>) = input
-            .proofs
-            .into_iter()
-            .map(|p| (p.proof, p.public_values.to_vec()))
-            .unzip();
+        let (inputs, proof_inputs) = input;
+        if inputs.vkeys.len() != proof_inputs.len() {
+            return Err(anyhow!(
+                "mismatched lengths: {} vkeys vs {} proof_inputs",
+                inputs.vkeys.len(),
+                proof_inputs.len()
+            ));
+        }
 
-        let vkeys = vec![input.vkey.hash_u32(); proofs.len()];
-        stdin.write(&vkeys);
-        stdin.write(&public_values);
-
-        for proof in proofs.iter() {
-            match proof {
+        stdin.write(&inputs);
+        for proof_input in proof_inputs.iter() {
+            match &proof_input.proof {
                 SP1Proof::Compressed(inner) => {
-                    stdin.write_proof(*inner.clone(), input.vkey.vk.clone());
+                    stdin.write_proof(*inner.clone(), proof_input.vkey.vk.clone());
                 }
                 _ => {
                     return Err(anyhow::anyhow!("Expected compressed SP1 proof"));
@@ -524,5 +538,24 @@ impl ProgramProver for BlockRangeExecProver {
     /// Returns the SP1 Prover.
     fn prover(&self) -> &EnvProver {
         &self.prover
+    }
+}
+
+impl BlockRangeExecProver {
+    /// Creates a new instance of [`BlockRangeExecProver`] using default configuration
+    /// and prover environment settings.
+    pub fn new() -> Self {
+        let config = BlockRangeExecProver::default_config();
+        let prover = ProverClient::from_env();
+
+        Self { config, prover }
+    }
+
+    /// Returns the default prover configuration for the block execution program.
+    pub fn default_config() -> ProverConfig {
+        ProverConfig {
+            elf: EVM_RANGE_EXEC_ELF,
+            proof_mode: SP1ProofMode::Groth16,
+        }
     }
 }

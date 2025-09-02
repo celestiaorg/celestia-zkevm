@@ -114,7 +114,7 @@ celestia-appd tx warp set-token 0x726f757465725f61707000000000000000000000000000
 Now that we've deployed the Hyperlane core and warp route infrastructure for a collateral token on Celestia and a synthetic token on Reth, 
 we must establish a link between the two tokens and mailboxes.
 
-1. Enroll the synethetic token contract on Reth as the remote router contract on the celestia-app cosmosnative module.
+1. Enroll the synthetic token contract on Reth as the remote router contract on the celestia-app cosmosnative module.
 NOTE: Here we left-pad the 20byte EVM address to conform to the `HexAddress` spec of cosmosnative.
 
 NOTE: The following can be run from inside the `celestia-validator` service container, or from your host machine if you have access to a key for a funded account.

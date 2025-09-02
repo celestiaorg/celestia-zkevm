@@ -31,11 +31,11 @@ bytes = "1.10.1"
 celestia-rpc = "=0.11.1"
 celestia-types = "=0.11.2"
 ed25519-dalek = { version = "2.1.0", features = ["alloc", "serde"] }
-eq-common = "0.1.4"
 ethers = { version = "2.0", features = ["ws", "rustls"] }
 ev-types = { version = "0.0.1", default-features = false }
 evm-state-types = { path = "crates/evm-state-types" }
 hex = "0.4.3"
+jsonrpsee-core = "0.25.1"
 nmt-rs = "*"
 prost = "0.12"
 reqwest = "0.12.20"
