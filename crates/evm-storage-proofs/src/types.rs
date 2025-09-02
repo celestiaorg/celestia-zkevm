@@ -61,8 +61,7 @@ impl HyperlaneBranchProof {
     }
     pub fn get_stored_account(&self) -> Vec<u8> {
         let leaf_node: Vec<Bytes> = alloy_rlp::decode_exact(self.proof.account_proof.last().unwrap()).unwrap();
-        let stored_account = leaf_node.last().unwrap().to_vec();
-        stored_account
+        leaf_node.last().unwrap().to_vec()
     }
     pub fn get_storage_root(&self) -> FixedBytes<32> {
         let account: TrieAccount = alloy_rlp::decode_exact(self.get_stored_account()).unwrap();
@@ -93,7 +92,7 @@ impl HyperlaneBranchProof {
             ) {
                 Ok(_) => {}
                 Err(_) => {
-                    println!("Failed to verify proof for key: {}", key);
+                    println!("Failed to verify proof for key: {key}");
                     return false;
                 }
             }

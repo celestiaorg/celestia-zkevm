@@ -97,10 +97,10 @@ impl HyperlaneIndexer {
                     }
                     let stored_message = StoredHyperlaneMessage::new(hyperlane_message, log.block_number);
                     message_store.insert_message(next_index, stored_message).unwrap();
-                    println!("Inserted Hyperlane Message at index: {}", next_index);
+                    println!("Inserted Hyperlane Message at index: {next_index}");
                 }
                 Err(e) => {
-                    eprintln!("Failed to decode Dispatch Event: {:?}", e);
+                    eprintln!("Failed to decode Dispatch Event: {e:?}");
                 }
             }
         }
