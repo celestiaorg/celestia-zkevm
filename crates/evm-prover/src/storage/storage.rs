@@ -50,7 +50,6 @@ pub struct StoredRangeProof {
     pub created_at: u64,
 }
 
-
 #[async_trait]
 pub trait ProofStorage: Send + Sync {
     async fn store_block_proof(
@@ -134,11 +133,10 @@ impl RocksDbProofStorage {
         key
     }
 
-
     fn get_next_range_id(&self) -> Result<u64, ProofStorageError> {
         let cf = self.get_cf(CF_METADATA)?;
         let key = b"next_range_id";
-        
+
         let current_id = match self.db.get_cf(cf, key)? {
             Some(bytes) => {
                 let mut id_bytes = [0u8; 8];
@@ -150,10 +148,9 @@ impl RocksDbProofStorage {
 
         let next_id = current_id + 1;
         self.db.put_cf(cf, key, &next_id.to_be_bytes())?;
-        
+
         Ok(current_id)
     }
-
 }
 
 #[async_trait]
@@ -165,7 +162,7 @@ impl ProofStorage for RocksDbProofStorage {
         output: &BlockExecOutput,
     ) -> Result<(), ProofStorageError> {
         let cf = self.get_cf(CF_BLOCK_PROOFS)?;
-        
+
         let stored_proof = StoredBlockProof {
             celestia_height,
             celestia_header_hash: output.celestia_header_hash,
@@ -182,7 +179,7 @@ impl ProofStorage for RocksDbProofStorage {
 
         let key = self.height_key(celestia_height);
         let value = self.serialize(&stored_proof)?;
-        
+
         self.db.put_cf(cf, key, value)?;
         Ok(())
     }
@@ -196,7 +193,7 @@ impl ProofStorage for RocksDbProofStorage {
     ) -> Result<(), ProofStorageError> {
         let cf = self.get_cf(CF_RANGE_PROOFS)?;
         let id = self.get_next_range_id()?;
-        
+
         let stored_proof = StoredRangeProof {
             id,
             start_height,
@@ -216,16 +213,15 @@ impl ProofStorage for RocksDbProofStorage {
 
         let key = self.range_key(start_height, end_height);
         let value = self.serialize(&stored_proof)?;
-        
+
         self.db.put_cf(cf, key, value)?;
         Ok(())
     }
 
-
     async fn get_block_proof(&self, celestia_height: u64) -> Result<StoredBlockProof, ProofStorageError> {
         let cf = self.get_cf(CF_BLOCK_PROOFS)?;
         let key = self.height_key(celestia_height);
-        
+
         match self.db.get_cf(cf, key)? {
             Some(data) => Ok(self.deserialize(&data)?),
             None => Err(ProofStorageError::ProofNotFound(celestia_height)),
@@ -240,22 +236,24 @@ impl ProofStorage for RocksDbProofStorage {
         let cf = self.get_cf(CF_RANGE_PROOFS)?;
         let start_key = self.range_key(start_height, 0);
         let end_key = self.range_key(end_height, u64::MAX);
-        
+
         let mut results = Vec::new();
-        let iter = self.db.iterator_cf(cf, rocksdb::IteratorMode::From(&start_key, rocksdb::Direction::Forward));
-        
+        let iter = self
+            .db
+            .iterator_cf(cf, rocksdb::IteratorMode::From(&start_key, rocksdb::Direction::Forward));
+
         for item in iter {
             let (key, value) = item?;
             if key.as_ref() > end_key.as_slice() {
                 break;
             }
-            
+
             let proof: StoredRangeProof = self.deserialize(&value)?;
             if proof.start_height >= start_height && proof.end_height <= end_height {
                 results.push(proof);
             }
         }
-        
+
         Ok(results)
     }
 
@@ -267,35 +265,36 @@ impl ProofStorage for RocksDbProofStorage {
         let cf = self.get_cf(CF_BLOCK_PROOFS)?;
         let start_key = self.height_key(start_height);
         let end_key = self.height_key(end_height);
-        
+
         let mut results = Vec::new();
-        let iter = self.db.iterator_cf(cf, rocksdb::IteratorMode::From(&start_key, rocksdb::Direction::Forward));
-        
+        let iter = self
+            .db
+            .iterator_cf(cf, rocksdb::IteratorMode::From(&start_key, rocksdb::Direction::Forward));
+
         for item in iter {
             let (key, value) = item?;
             if key.as_ref() > end_key.as_slice() {
                 break;
             }
-            
+
             let proof: StoredBlockProof = self.deserialize(&value)?;
             results.push(proof);
         }
-        
+
         Ok(results)
     }
 
-
     async fn get_latest_block_proof(&self) -> Result<Option<StoredBlockProof>, ProofStorageError> {
         let cf = self.get_cf(CF_BLOCK_PROOFS)?;
-        
+
         let iter = self.db.iterator_cf(cf, rocksdb::IteratorMode::End);
-        
+
         for item in iter {
             let (_, value) = item?;
             let proof: StoredBlockProof = self.deserialize(&value)?;
             return Ok(Some(proof));
         }
-        
+
         Ok(None)
     }
 }

@@ -128,7 +128,6 @@ mod tests {
         assert_eq!(latest.unwrap().celestia_height, 20);
     }
 
-
     #[tokio::test]
     async fn test_proof_not_found() {
         let (storage, _temp_dir) = create_test_storage();

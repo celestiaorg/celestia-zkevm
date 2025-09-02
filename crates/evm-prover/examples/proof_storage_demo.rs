@@ -1,6 +1,6 @@
-use evm_prover::storage::{RocksDbProofStorage, ProofStorage};
-use evm_exec_types::BlockExecOutput;
 use celestia_types::nmt::Namespace;
+use evm_exec_types::BlockExecOutput;
+use evm_prover::storage::{ProofStorage, RocksDbProofStorage};
 use sp1_sdk::{SP1ProofWithPublicValues, SP1PublicValues};
 
 #[tokio::main]
@@ -35,7 +35,7 @@ async fn main() -> anyhow::Result<()> {
     // Retrieve the proof
     println!("Retrieving proof for Celestia height 42...");
     let stored_proof = storage.get_block_proof(42).await?;
-    
+
     println!("Retrieved proof:");
     println!("  Celestia Height: {}", stored_proof.celestia_height);
     println!("  EVM Height: {}", stored_proof.evm_height);

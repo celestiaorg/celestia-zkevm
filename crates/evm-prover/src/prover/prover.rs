@@ -479,21 +479,18 @@ impl BlockExecProver {
         let (proof, outputs) = self.prove(inputs).await?;
 
         // Store the proof in the database
-        if let Err(e) = self
+        if let Err(_e) = self
             .storage
-            .store_block_proof(assigned.job.height, &proof, &outputs)
+            .store_block_proof(scheduled.job.height, &proof, &outputs)
             .await
         {
-            eprintln!(
-                "Failed to store proof for block {}: {}",
-                scheduled.job.height, outputs, e
-            );
+            eprintln!("Failed to store proof for block {}: {}", scheduled.job.height, outputs,);
             // Note: We continue execution even if storage fails to avoid breaking the proving pipeline
         }
 
         println!(
             "Successfully created and stored proof for block {}. Outputs: {}",
-            scheduled.job.height, outputs, outputs
+            scheduled.job.height, outputs,
         );
 
         Ok(())

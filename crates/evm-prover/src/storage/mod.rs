@@ -2,4 +2,4 @@ pub mod storage;
 #[cfg(test)]
 mod tests;
 
-pub use storage::{ProofStorage, ProofStorageError, StoredBlockProof, StoredRangeProof, RocksDbProofStorage};
+pub use storage::{ProofStorage, ProofStorageError, RocksDbProofStorage, StoredBlockProof, StoredRangeProof};
