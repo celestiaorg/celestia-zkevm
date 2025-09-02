@@ -71,3 +71,11 @@ query-balance:
   		0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d \
   		--rpc-url http://localhost:8545
 .PHONY: query-balance
+
+## spamoor: Run spamoor transaction flooding against the EVM roll-up.
+spamoor:
+	@echo "--> Running spamoor transaction flooding daemon"
+	@echo "Spamoor will be available on localhost:8080"
+	@chmod +x scripts/run-spamoor.sh
+	@scripts/run-spamoor.sh $(ARGS)
+.PHONY: spamoor

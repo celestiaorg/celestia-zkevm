@@ -55,7 +55,7 @@ struct Args {
 
 /// Loads the genesis file from disk and converts it into a ChainSpec
 fn load_chain_spec_from_genesis(path: &str) -> Result<(Genesis, Arc<ChainSpec>), Box<dyn Error>> {
-    let genesis_json = fs::read_to_string(path).wrap_err_with(|| format!("Failed to read genesis file at {}", path))?;
+    let genesis_json = fs::read_to_string(path).wrap_err_with(|| format!("Failed to read genesis file at {path}"))?;
     let alloy_genesis: AlloyGenesis = serde_json::from_str(&genesis_json)?;
 
     let genesis = Genesis::Custom(alloy_genesis.config);
@@ -79,7 +79,7 @@ async fn generate_client_executor_input(
     let client_input = host_executor
         .execute(block_number, &rpc_db, &provider, genesis, None, false)
         .await
-        .wrap_err_with(|| format!("Failed to execute block {}", block_number))?;
+        .wrap_err_with(|| format!("Failed to execute block {block_number}"))?;
 
     Ok(client_input)
 }
@@ -115,7 +115,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let pub_key = get_sequencer_pubkey().await?;
 
     for block_number in start_height..(start_height + num_blocks) {
-        println!("\nProcessing block: {}", block_number);
+        println!("\nProcessing block: {block_number}");
 
         let blobs: Vec<Blob> = celestia_client
             .blob_get_all(block_number, &[namespace])
@@ -150,7 +150,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             };
 
             let height = data.metadata.unwrap().height;
-            println!("Got SignedData for EVM block {}", height);
+            println!("Got SignedData for EVM block {height}");
 
             let client_executor_input =
                 generate_client_executor_input(config::EVM_RPC_URL, height, chain_spec.clone(), genesis.clone())
@@ -162,30 +162,30 @@ async fn main() -> Result<(), Box<dyn Error>> {
         println!("Got EthClientExecutorInputs, total: {}", executor_inputs.len());
 
         // Create output dir: testdata/inputs/block-{celestia_block_number}/
-        let block_dir = format!("testdata/inputs/block-{}", block_number);
+        let block_dir = format!("testdata/inputs/block-{block_number}");
         fs::create_dir_all(&block_dir)?;
 
-        println!("Writing proof input data to: {}", block_dir);
+        println!("Writing proof input data to: {block_dir}");
 
         let header_json = serde_json::to_string_pretty(&extended_header.header)?;
-        fs::write(format!("{}/header.json", block_dir), header_json)?;
+        fs::write(format!("{block_dir}/header.json"), header_json)?;
 
         let dah_json = serde_json::to_string_pretty(&extended_header.dah)?;
-        fs::write(format!("{}/dah.json", block_dir), dah_json)?;
+        fs::write(format!("{block_dir}/dah.json"), dah_json)?;
 
         let blobs_encoded = serde_json::to_string_pretty(&blobs)?;
-        fs::write(format!("{}/blobs.json", block_dir), blobs_encoded)?;
+        fs::write(format!("{block_dir}/blobs.json"), blobs_encoded)?;
 
         let pk_encoded = bincode::serialize(&pub_key)?;
-        fs::write(format!("{}/pub_key.bin", block_dir), pk_encoded)?;
+        fs::write(format!("{block_dir}/pub_key.bin"), pk_encoded)?;
 
         let proofs_encoded = bincode::serialize(&proofs)?;
-        fs::write(format!("{}/namespace_proofs.bin", block_dir), proofs_encoded)?;
+        fs::write(format!("{block_dir}/namespace_proofs.bin"), proofs_encoded)?;
 
         let executor_inputs_encoded = bincode::serialize(&executor_inputs)?;
-        fs::write(format!("{}/executor_inputs.bin", block_dir), executor_inputs_encoded)?;
+        fs::write(format!("{block_dir}/executor_inputs.bin"), executor_inputs_encoded)?;
 
-        println!("Finished processing blobs for Celestia block: {}", block_number);
+        println!("Finished processing blobs for Celestia block: {block_number}");
     }
 
     Ok(())

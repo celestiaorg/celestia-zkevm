@@ -176,18 +176,15 @@ impl BlockEvent {
     }
 }
 
-// TODO: these types may need better names...
 struct ProofJob {
     height: u64,
     extended_header: ExtendedHeader,
     proofs: Vec<NamespaceProof>,
     blobs: Vec<Blob>,
     executor_inputs: Vec<EthClientExecutorInput>,
-    // If there are executor inputs, this captures the chain state we optimistically advance to
-    next_state: Option<(u64, FixedBytes<32>)>,
 }
 
-struct ProofAssignment {
+struct ScheduledProofJob {
     job: Arc<ProofJob>,
     trusted_height: u64,
     trusted_root: FixedBytes<32>,
@@ -206,10 +203,15 @@ impl BlockExecProver {
             .join(APP_HOME)
             .join("data")
             .join("proofs.db");
-        
+
         let storage = Arc::new(RocksDbProofStorage::new(storage_path)?);
 
-        Ok(Arc::new(Self { app, config, prover, storage }))
+        Ok(Arc::new(Self {
+            app,
+            config,
+            prover,
+            storage,
+        }))
     }
 
     /// Creates a new instance with custom storage (useful for testing)
@@ -217,7 +219,12 @@ impl BlockExecProver {
         let config = BlockExecProver::default_config();
         let prover = ProverClient::from_env();
 
-        Arc::new(Self { app, config, prover, storage })
+        Arc::new(Self {
+            app,
+            config,
+            prover,
+            storage,
+        })
     }
 
     /// Returns the default prover configuration for the block execution program.
@@ -272,7 +279,7 @@ impl BlockExecProver {
         // Queues for the 3-stage pipeline
         let (event_tx, mut event_rx) = mpsc::channel::<BlockEvent>(QUEUE_CAP);
         let (job_tx, mut job_rx) = mpsc::channel::<ProofJob>(QUEUE_CAP);
-        let (assign_tx, mut assign_rx) = mpsc::channel::<ProofAssignment>(QUEUE_CAP);
+        let (sched_tx, mut sched_rx) = mpsc::channel::<ScheduledProofJob>(QUEUE_CAP);
 
         // Stage 1: Prepare proof inputs (parallel, IO-bound)
         let sem = Arc::new(Semaphore::new(CONCURRENCY));
@@ -311,7 +318,7 @@ impl BlockExecProver {
         // Stage 2: Assign the trusted height and root for the next proof (single writer of trusted_state, in height order)
         tokio::spawn({
             let prover = self.clone();
-            let assign_tx = assign_tx.clone();
+            let sched_tx = sched_tx.clone();
             async move {
                 let mut buf: BTreeMap<u64, ProofJob> = BTreeMap::new();
                 let mut next_height: Option<u64> = None;
@@ -334,10 +341,6 @@ impl BlockExecProver {
 
                         let Some(job) = buf.remove(&height) else { break };
 
-                        // TODO: We should no longer need a RwLock on the TrustedState here.
-                        // Since this task owns the scheduling of proofs and trusted state is only updated here,
-                        // we should be able to safely ignore the locking.
-
                         // Snapshot current trusted state for proof
                         let (trusted_height, trusted_root) = {
                             let s = prover.app.trusted_state.read().await;
@@ -345,21 +348,21 @@ impl BlockExecProver {
                         };
 
                         // Optimistically advance global trusted_state monotonically for FUTURE jobs
-                        if let Some((new_height, new_state_root)) = job.next_state {
+                        if let Some(next) = job.executor_inputs.last() {
                             let mut s = prover.app.trusted_state.write().await;
-                            if new_height > s.height {
-                                s.height = new_height;
-                                s.root = new_state_root;
+                            if next.current_block.number > s.height {
+                                s.height = next.current_block.number;
+                                s.root = next.current_block.state_root;
                             }
                         }
 
-                        let assigned = ProofAssignment {
+                        let scheduled = ScheduledProofJob {
                             job: Arc::new(job),
                             trusted_height,
                             trusted_root,
                         };
 
-                        if assign_tx.send(assigned).await.is_err() {
+                        if sched_tx.send(scheduled).await.is_err() {
                             break;
                         }
 
@@ -367,7 +370,7 @@ impl BlockExecProver {
                     }
                 }
 
-                eprintln!("assign stage shutting down");
+                eprintln!("schedule stage shutting down");
             }
         });
 
@@ -379,13 +382,13 @@ impl BlockExecProver {
 
             async move {
                 let mut tasks = JoinSet::new();
-                while let Some(assigned) = assign_rx.recv().await {
+                while let Some(scheduled) = sched_rx.recv().await {
                     let prover = prover.clone();
                     let permit = prove_sem.clone().acquire_owned().await.unwrap();
                     tasks.spawn(async move {
                         let _permit = permit; // limit concurrent proofs
 
-                        if let Err(e) = prover.prove_assigned(assigned).await {
+                        if let Err(e) = prover.prove_and_store(scheduled).await {
                             eprintln!("prove failed: {e:#}");
                         }
                     });
@@ -449,49 +452,48 @@ impl BlockExecProver {
 
         println!("Got {} evm inputs at height {}", executor_inputs.len(), event.height);
 
-        // Assign the candidate next state (if any)
-        let next_state = executor_inputs
-            .last()
-            .map(|next| (next.current_block.number, next.current_block.state_root));
-
         Ok(ProofJob {
             height: event.height,
             extended_header,
             proofs,
             blobs: event.blobs,
             executor_inputs,
-            next_state,
         })
     }
 
-    // TODO: build BlockExecInput in state 2 and remove ProofAssignment type,
-    // pass directly via the Channel and run self.prove(inputs)
-    async fn prove_assigned(self: Arc<Self>, assigned: ProofAssignment) -> Result<()> {
-        let ext = &assigned.job.extended_header;
+    async fn prove_and_store(self: Arc<Self>, scheduled: ScheduledProofJob) -> Result<()> {
+        let extended_header = &scheduled.job.extended_header;
 
         let inputs = BlockExecInput {
-            header_raw: serde_cbor::to_vec(&ext.header)?,
-            dah: ext.dah.clone(),
-            blobs_raw: serde_cbor::to_vec(&assigned.job.blobs)?,
+            header_raw: serde_cbor::to_vec(&extended_header.header)?,
+            dah: extended_header.dah.clone(),
+            blobs_raw: serde_cbor::to_vec(&scheduled.job.blobs)?,
             pub_key: self.app.pub_key.clone(),
             namespace: self.app.namespace,
-            proofs: assigned.job.proofs.clone(),
-            executor_inputs: assigned.job.executor_inputs.clone(),
-            trusted_height: assigned.trusted_height,
-            trusted_root: assigned.trusted_root,
+            proofs: scheduled.job.proofs.clone(),
+            executor_inputs: scheduled.job.executor_inputs.clone(),
+            trusted_height: scheduled.trusted_height,
+            trusted_root: scheduled.trusted_root,
         };
 
         let (proof, outputs) = self.prove(inputs).await?;
-        
+
         // Store the proof in the database
-        if let Err(e) = self.storage.store_block_proof(assigned.job.height, &proof, &outputs).await {
-            eprintln!("Failed to store proof for block {}: {}", assigned.job.height, e);
+        if let Err(e) = self
+            .storage
+            .store_block_proof(assigned.job.height, &proof, &outputs)
+            .await
+        {
+            eprintln!(
+                "Failed to store proof for block {}: {}",
+                scheduled.job.height, outputs, e
+            );
             // Note: We continue execution even if storage fails to avoid breaking the proving pipeline
         }
 
         println!(
             "Successfully created and stored proof for block {}. Outputs: {}",
-            assigned.job.height, outputs
+            scheduled.job.height, outputs, outputs
         );
 
         Ok(())

@@ -10,7 +10,7 @@ pub fn init() -> Result<()> {
     let home_dir = dirs::home_dir().expect("cannot find home directory").join(APP_HOME);
 
     if !home_dir.exists() {
-        println!("creating home directory at {:?}", home_dir);
+        println!("creating home directory at {home_dir:?}");
         fs::create_dir_all(&home_dir)?;
     }
 
@@ -21,17 +21,17 @@ pub fn init() -> Result<()> {
 
     let config_path = config_dir.join(CONFIG_FILE);
     if !config_path.exists() {
-        println!("creating default config at {:?}", config_path);
+        println!("creating default config at {config_path:?}");
         let config = Config::default();
         let yaml = serde_yaml::to_string(&config)?;
         fs::write(config_path, yaml)?;
     } else {
-        println!("config file already exists at {:?}", config_path);
+        println!("config file already exists at {config_path:?}");
     }
 
     let genesis_path = config_dir.join(GENESIS_FILE);
     if !genesis_path.exists() {
-        println!("writing embedded genesis to {:?}", genesis_path);
+        println!("writing embedded genesis to {genesis_path:?}");
         fs::write(&genesis_path, DEFAULT_GENESIS_JSON)?;
     }
 
@@ -60,5 +60,5 @@ pub async fn start() -> Result<()> {
 }
 
 pub fn version() {
-    println!("version: {}", VERSION);
+    println!("version: {VERSION}");
 }
