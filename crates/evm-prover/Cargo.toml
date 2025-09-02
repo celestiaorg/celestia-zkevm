@@ -9,13 +9,11 @@ anyhow = "1.0"
 alloy-genesis = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
-anyhow = "1.0"
 async-trait = "0.1.88"
 bincode = { workspace = true }
 bytes = { workspace = true }
 celestia-types = { workspace = true }
 celestia-rpc = { workspace = true }
-celestia-types = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 dirs = "5"
 ev-types = { workspace = true, features = ["grpc"] }

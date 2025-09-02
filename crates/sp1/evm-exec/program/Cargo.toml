@@ -12,7 +12,6 @@ bincode = { workspace = true }
 bytes = { workspace = true }
 celestia-types = { workspace = true }
 ed25519-dalek = { workspace = true }
-eq-common = { workspace = true }
 ev-types = { workspace = true, default-features = false }
 evm-exec-types = { path = "../../evm-exec-types" }
 hex = "0.4.3"
