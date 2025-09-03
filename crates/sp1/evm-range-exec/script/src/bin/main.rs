@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         // Read the output.
         let range_exec_output: BlockRangeExecOutput = bincode::deserialize(output.as_slice())?;
-        println!("Outputs: {}", range_exec_output);
+        println!("Outputs: {range_exec_output}");
 
         // Record the total gas and number of cycles executed.
         println!("Total gas: {}", report.gas.unwrap());
@@ -89,7 +89,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
 
             let json = serde_json::to_string_pretty(&benchmark_report).unwrap();
-            fs::write(format!("testdata/benchmarks/{}", output_file), json)?;
+            fs::write(format!("testdata/benchmarks/{output_file}"), json)?;
         }
     } else {
         // Setup the program for proving.

@@ -1,12 +1,12 @@
 [package]
+name = "evm-state-types"
 version = "0.1.0"
-name = "evm-exec-types"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 alloy-primitives = { workspace = true }
+alloy-sol-types = "1.3"
+anyhow = { workspace = true }
 bincode = { workspace = true }
-celestia-types = { workspace = true }
 hex = { workspace = true }
-rsp-client-executor = { workspace = true }
 serde = { workspace = true }
