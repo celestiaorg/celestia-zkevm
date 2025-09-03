@@ -27,7 +27,7 @@ jobs:
         with:
           cache: true
           components: rustfmt, clippy
-          toolchain: 1.86.0
+          toolchain: 1.88.0
 
       - name: Install SP1 toolchain
         run: |
