@@ -20,6 +20,7 @@ pub enum ProofStorageError {
     #[error("Proof not found for height: {0}")]
     ProofNotFound(u64),
     #[error("Range proof not found for range: {0}-{1}")]
+    #[allow(dead_code)]
     RangeProofNotFound(u64, u64),
 }
 
@@ -59,6 +60,7 @@ pub trait ProofStorage: Send + Sync {
         output: &BlockExecOutput,
     ) -> Result<(), ProofStorageError>;
 
+    #[allow(dead_code)]
     async fn store_range_proof(
         &self,
         start_height: u64,
@@ -67,20 +69,24 @@ pub trait ProofStorage: Send + Sync {
         output: &BlockRangeExecOutput,
     ) -> Result<(), ProofStorageError>;
 
+    #[allow(dead_code)]
     async fn get_block_proof(&self, celestia_height: u64) -> Result<StoredBlockProof, ProofStorageError>;
 
+    #[allow(dead_code)]
     async fn get_range_proofs(
         &self,
         start_height: u64,
         end_height: u64,
     ) -> Result<Vec<StoredRangeProof>, ProofStorageError>;
 
+    #[allow(dead_code)]
     async fn get_block_proofs_in_range(
         &self,
         start_height: u64,
         end_height: u64,
     ) -> Result<Vec<StoredBlockProof>, ProofStorageError>;
 
+    #[allow(dead_code)]
     async fn get_latest_block_proof(&self) -> Result<Option<StoredBlockProof>, ProofStorageError>;
 }
 
