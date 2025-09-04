@@ -16,6 +16,21 @@ sp1-sdk = { workspace = true }
 dotenv = "0.15.0"
 clap = { version = "4.0", features = ["cargo", "derive", "env"] }
 bincode = { workspace = true }
+storage = { workspace = true }
+evm-hyperlane-types-sp1 = { workspace = true }
+alloy-primitives = { workspace = true }
+evm-storage-proofs = { workspace = true, features = ["alloy"] }
+alloy-provider = { workspace = true }
+url = { version = "2.5", default-features = false }
+tokio = { version = "1.45.0", features = [
+    "sync",
+    "macros",
+    "io-util",
+    "rt",
+    "time",
+    "rt-multi-thread",
+], default-features = false }
+
 
 [build-dependencies]
 sp1-build = "5.0.8"

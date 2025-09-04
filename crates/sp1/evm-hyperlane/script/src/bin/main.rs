@@ -10,8 +10,19 @@
 //! RUST_LOG=info cargo run --release -- --prove
 //! ```
 
+use std::str::FromStr;
+
+use alloy_primitives::Address;
+use alloy_provider::ProviderBuilder;
 use clap::{command, Parser};
+use evm_hyperlane_types_sp1::{tree::MerkleTree, HyperlaneMessageInputs};
+use evm_storage_proofs::{
+    client::EvmClient,
+    types::{HyperlaneBranchProof, HYPERLANE_MERKLE_TREE_KEYS},
+};
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
+use storage::{hyperlane_messages::storage::HyperlaneMessageStore, Storage};
+use url::Url;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_HYPERLANE_ELF: &[u8] = include_elf!("evm-hyperlane-program");
@@ -26,11 +37,21 @@ struct Args {
     #[arg(long)]
     prove: bool,
 
-    #[arg(long, default_value = "20")]
-    n: u32,
+    #[arg(long)]
+    contract: String,
+
+    #[arg(long)]
+    start_height: u32,
+
+    #[arg(long)]
+    target_height: u32,
+
+    #[arg(long)]
+    rpc_url: String,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     // Setup the logger.
     sp1_sdk::utils::setup_logger();
     dotenv::dotenv().ok();
@@ -48,11 +69,39 @@ fn main() {
 
     // Setup the inputs.
     let mut stdin = SP1Stdin::new();
-    stdin.write(&args.n);
+    let message_db = HyperlaneMessageStore::from_env().unwrap();
+    let mut messages = Vec::new();
+    for height in args.start_height..=args.target_height {
+        let message = message_db.get_message(height).unwrap();
+        messages.push(message);
+    }
 
-    println!("n: {}", args.n);
+    let provider = ProviderBuilder::new().connect_http(Url::from_str(&args.rpc_url).unwrap());
+    let evm_client = EvmClient::new(provider);
+    let proof = evm_client
+        .get_proof(
+            &HYPERLANE_MERKLE_TREE_KEYS,
+            Address::from_str(&args.contract).unwrap(),
+            args.target_height.into(),
+        )
+        .await
+        .unwrap();
+
+    let execution_state_root = evm_client.get_state_root(args.target_height.into()).await.unwrap();
+    let branch_proof = HyperlaneBranchProof::new(proof);
+
+    let inputs = HyperlaneMessageInputs::new(
+        execution_state_root,
+        Address::from_str(&args.contract).unwrap(),
+        messages.into_iter().map(|m| m.message).collect(),
+        branch_proof,
+        MerkleTree::default(),
+    );
+    stdin.write(&inputs);
 
     if args.execute {
+        client.execute(EVM_HYPERLANE_ELF, &stdin).run().unwrap();
+        println!("Program executed successfully!");
     } else {
         // Setup the program for proving.
         let (pk, vk) = client.setup(EVM_HYPERLANE_ELF);

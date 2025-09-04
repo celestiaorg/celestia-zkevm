@@ -46,7 +46,7 @@ impl EvmClient {
         Ok(proof)
     }
 
-    pub async fn get_storage_root(&self, height: u64) -> Result<String> {
+    pub async fn get_state_root(&self, height: u64) -> Result<String> {
         let block = self
             .provider
             .get_block(height.into())
@@ -89,9 +89,9 @@ mod tests {
             .await
             .unwrap();
 
-        let execution_state_root = client.get_storage_root(height).await.unwrap();
+        let execution_state_root = client.get_state_root(height).await.unwrap();
         let branch_proof = HyperlaneBranchProof::new(proof);
-        let verified = branch_proof.verify_single(key, contract, execution_state_root);
+        let verified = branch_proof.verify_single(key, contract, &execution_state_root);
         assert!(verified);
     }
 
@@ -101,7 +101,7 @@ mod tests {
         let provider: DefaultProvider =
             ProviderBuilder::new().connect_http(Url::from_str("http://127.0.0.1:8545").unwrap());
         let client = EvmClient::new(provider);
-        let height = 1900;
+        let height = 570;
 
         let proof = client
             .get_proof(
@@ -116,7 +116,12 @@ mod tests {
 
         let execution_state_root = client.get_state_root(height).await.unwrap();
         let branch_proof = HyperlaneBranchProof::new(proof);
-        let verified = branch_proof.verify(&HYPERLANE_MERKLE_TREE_KEYS, contract, execution_state_root);
+        let verified = branch_proof.verify(&HYPERLANE_MERKLE_TREE_KEYS, contract, &execution_state_root);
         assert!(verified);
+
+        for (idx, key) in HYPERLANE_MERKLE_TREE_KEYS.iter().enumerate() {
+            let value = branch_proof.get_branch_node(idx);
+            println!("key: {key}, value: {value}");
+        }
     }
 }

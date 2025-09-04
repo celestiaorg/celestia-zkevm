@@ -2,6 +2,7 @@
 members = [
     "crates/evm-prover",
     "crates/evm-state-queries",
+    "crates/evm-storage-proofs",
     "crates/evm-state-types",
     "crates/evm-storage-proofs",
     "crates/sp1/evm-exec-types",

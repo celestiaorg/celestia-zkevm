@@ -2938,11 +2938,18 @@ dependencies = [
 name = "evm-hyperlane-script"
 version = "0.1.0"
 dependencies = [
+ "alloy-primitives 1.3.1",
+ "alloy-provider",
  "bincode",
  "clap",
  "dotenv",
+ "evm-hyperlane-types",
+ "evm-storage-proofs",
  "sp1-build",
  "sp1-sdk",
+ "storage",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -2950,9 +2957,13 @@ name = "evm-hyperlane-types"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives 1.3.1",
+ "anyhow",
+ "borsh",
  "evm-state-types",
  "evm-storage-proofs",
+ "hex",
  "serde",
+ "sha3",
 ]
 
 [[package]]

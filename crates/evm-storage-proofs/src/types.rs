@@ -78,7 +78,7 @@ impl HyperlaneBranchProof {
         account.storage_root
     }
 
-    pub fn verify(&self, keys: &[&str], contract: Address, root: String) -> bool {
+    pub fn verify(&self, keys: &[&str], contract: Address, root: &str) -> bool {
         // verify the account proof against the execution state root
         match verify_proof(
             FixedBytes::from_hex(root).unwrap(),
@@ -111,7 +111,7 @@ impl HyperlaneBranchProof {
         true
     }
 
-    pub fn verify_single(&self, key: &str, contract: Address, root: String) -> bool {
+    pub fn verify_single(&self, key: &str, contract: Address, root: &str) -> bool {
         // verify the account proof against the execution state root
         match verify_proof(
             FixedBytes::from_hex(root).unwrap(),
