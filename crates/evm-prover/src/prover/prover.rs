@@ -516,8 +516,8 @@ pub struct BlockRangeExecProver {
 
 /// ProofInput is a convienience type used for proof aggregation inputs within the BlockRangeExecProver program.
 pub struct ProofInput {
-    proof: SP1Proof,
-    vkey: SP1VerifyingKey,
+    pub proof: SP1Proof,
+    pub vkey: SP1VerifyingKey,
 }
 
 #[async_trait]

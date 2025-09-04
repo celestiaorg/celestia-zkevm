@@ -10,6 +10,15 @@ service Prover {
       returns (ProveStateTransitionResponse);
   rpc ProveStateMembership(ProveStateMembershipRequest)
       returns (ProveStateMembershipResponse);
+  
+  // Proof store query methods
+  rpc GetBlockProof(GetBlockProofRequest) returns (GetBlockProofResponse);
+  rpc GetBlockProofsInRange(GetBlockProofsInRangeRequest) returns (GetBlockProofsInRangeResponse);
+  rpc GetRangeProof(GetRangeProofRequest) returns (GetRangeProofResponse);
+  rpc GetLatestBlockProof(GetLatestBlockProofRequest) returns (GetLatestBlockProofResponse);
+  
+  // Proof aggregation method
+  rpc AggregateBlockProofs(AggregateBlockProofsRequest) returns (AggregateBlockProofsResponse);
 }
 
 message InfoRequest {}
@@ -43,4 +52,62 @@ message ProveStateMembershipRequest {
 message ProveStateMembershipResponse {
   bytes proof = 1;
   int64 height = 2;
+}
+
+// Proof store query messages
+message GetBlockProofRequest {
+  uint64 celestia_height = 1;
+}
+
+message GetBlockProofResponse {
+  StoredBlockProof proof = 1;
+}
+
+message GetBlockProofsInRangeRequest {
+  uint64 start_height = 1;
+  uint64 end_height = 2;
+}
+
+message GetBlockProofsInRangeResponse {
+  repeated StoredBlockProof proofs = 1;
+}
+
+message GetRangeProofRequest {
+  uint64 start_height = 1;
+  uint64 end_height = 2;
+}
+
+message GetRangeProofResponse {
+  repeated StoredRangeProof proofs = 1;
+}
+
+message GetLatestBlockProofRequest {}
+
+message GetLatestBlockProofResponse {
+  StoredBlockProof proof = 1;
+}
+
+message StoredBlockProof {
+  uint64 celestia_height = 1;
+  bytes proof_data = 2;
+  bytes public_values = 3;
+  uint64 created_at = 4;
+}
+
+message StoredRangeProof {
+  uint64 start_height = 1;
+  uint64 end_height = 2;
+  bytes proof_data = 3;
+  bytes public_values = 4;
+  uint64 created_at = 5;
+}
+
+message AggregateBlockProofsRequest {
+  uint64 start_height = 1;
+  uint64 end_height = 2;
+}
+
+message AggregateBlockProofsResponse {
+  bytes proof = 1;
+  bytes public_values = 2;
 }

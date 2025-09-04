@@ -47,6 +47,98 @@ pub struct ProveStateMembershipResponse {
     #[prost(int64, tag = "2")]
     pub height: i64,
 }
+/// Proof store query messages
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetBlockProofRequest {
+    #[prost(uint64, tag = "1")]
+    pub celestia_height: u64,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetBlockProofResponse {
+    #[prost(message, optional, tag = "1")]
+    pub proof: ::core::option::Option<StoredBlockProof>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetBlockProofsInRangeRequest {
+    #[prost(uint64, tag = "1")]
+    pub start_height: u64,
+    #[prost(uint64, tag = "2")]
+    pub end_height: u64,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetBlockProofsInRangeResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub proofs: ::prost::alloc::vec::Vec<StoredBlockProof>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetRangeProofRequest {
+    #[prost(uint64, tag = "1")]
+    pub start_height: u64,
+    #[prost(uint64, tag = "2")]
+    pub end_height: u64,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetRangeProofResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub proofs: ::prost::alloc::vec::Vec<StoredRangeProof>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetLatestBlockProofRequest {}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetLatestBlockProofResponse {
+    #[prost(message, optional, tag = "1")]
+    pub proof: ::core::option::Option<StoredBlockProof>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StoredBlockProof {
+    #[prost(uint64, tag = "1")]
+    pub celestia_height: u64,
+    #[prost(bytes = "vec", tag = "2")]
+    pub proof_data: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bytes = "vec", tag = "3")]
+    pub public_values: ::prost::alloc::vec::Vec<u8>,
+    #[prost(uint64, tag = "4")]
+    pub created_at: u64,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StoredRangeProof {
+    #[prost(uint64, tag = "1")]
+    pub start_height: u64,
+    #[prost(uint64, tag = "2")]
+    pub end_height: u64,
+    #[prost(bytes = "vec", tag = "3")]
+    pub proof_data: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bytes = "vec", tag = "4")]
+    pub public_values: ::prost::alloc::vec::Vec<u8>,
+    #[prost(uint64, tag = "5")]
+    pub created_at: u64,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AggregateBlockProofsRequest {
+    #[prost(uint64, tag = "1")]
+    pub start_height: u64,
+    #[prost(uint64, tag = "2")]
+    pub end_height: u64,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AggregateBlockProofsResponse {
+    #[prost(bytes = "vec", tag = "1")]
+    pub proof: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bytes = "vec", tag = "2")]
+    pub public_values: ::prost::alloc::vec::Vec<u8>,
+}
 /// Generated client implementations.
 pub mod prover_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -208,6 +300,139 @@ pub mod prover_client {
                 );
             self.inner.unary(req, path, codec).await
         }
+        /// Proof store query methods
+        pub async fn get_block_proof(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetBlockProofRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetBlockProofResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/celestia.prover.v1.Prover/GetBlockProof",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("celestia.prover.v1.Prover", "GetBlockProof"));
+            self.inner.unary(req, path, codec).await
+        }
+        pub async fn get_block_proofs_in_range(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetBlockProofsInRangeRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetBlockProofsInRangeResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/celestia.prover.v1.Prover/GetBlockProofsInRange",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("celestia.prover.v1.Prover", "GetBlockProofsInRange"),
+                );
+            self.inner.unary(req, path, codec).await
+        }
+        pub async fn get_range_proof(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetRangeProofRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetRangeProofResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/celestia.prover.v1.Prover/GetRangeProof",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("celestia.prover.v1.Prover", "GetRangeProof"));
+            self.inner.unary(req, path, codec).await
+        }
+        pub async fn get_latest_block_proof(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetLatestBlockProofRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetLatestBlockProofResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/celestia.prover.v1.Prover/GetLatestBlockProof",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("celestia.prover.v1.Prover", "GetLatestBlockProof"),
+                );
+            self.inner.unary(req, path, codec).await
+        }
+        /// Proof aggregation method
+        pub async fn aggregate_block_proofs(
+            &mut self,
+            request: impl tonic::IntoRequest<super::AggregateBlockProofsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::AggregateBlockProofsResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/celestia.prover.v1.Prover/AggregateBlockProofs",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("celestia.prover.v1.Prover", "AggregateBlockProofs"),
+                );
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -233,6 +458,43 @@ pub mod prover_server {
             request: tonic::Request<super::ProveStateMembershipRequest>,
         ) -> std::result::Result<
             tonic::Response<super::ProveStateMembershipResponse>,
+            tonic::Status,
+        >;
+        /// Proof store query methods
+        async fn get_block_proof(
+            &self,
+            request: tonic::Request<super::GetBlockProofRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetBlockProofResponse>,
+            tonic::Status,
+        >;
+        async fn get_block_proofs_in_range(
+            &self,
+            request: tonic::Request<super::GetBlockProofsInRangeRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetBlockProofsInRangeResponse>,
+            tonic::Status,
+        >;
+        async fn get_range_proof(
+            &self,
+            request: tonic::Request<super::GetRangeProofRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetRangeProofResponse>,
+            tonic::Status,
+        >;
+        async fn get_latest_block_proof(
+            &self,
+            request: tonic::Request<super::GetLatestBlockProofRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetLatestBlockProofResponse>,
+            tonic::Status,
+        >;
+        /// Proof aggregation method
+        async fn aggregate_block_proofs(
+            &self,
+            request: tonic::Request<super::AggregateBlockProofsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::AggregateBlockProofsResponse>,
             tonic::Status,
         >;
     }
@@ -436,6 +698,237 @@ pub mod prover_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = ProveStateMembershipSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/celestia.prover.v1.Prover/GetBlockProof" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetBlockProofSvc<T: Prover>(pub Arc<T>);
+                    impl<
+                        T: Prover,
+                    > tonic::server::UnaryService<super::GetBlockProofRequest>
+                    for GetBlockProofSvc<T> {
+                        type Response = super::GetBlockProofResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GetBlockProofRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Prover>::get_block_proof(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetBlockProofSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/celestia.prover.v1.Prover/GetBlockProofsInRange" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetBlockProofsInRangeSvc<T: Prover>(pub Arc<T>);
+                    impl<
+                        T: Prover,
+                    > tonic::server::UnaryService<super::GetBlockProofsInRangeRequest>
+                    for GetBlockProofsInRangeSvc<T> {
+                        type Response = super::GetBlockProofsInRangeResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GetBlockProofsInRangeRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Prover>::get_block_proofs_in_range(&inner, request)
+                                    .await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetBlockProofsInRangeSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/celestia.prover.v1.Prover/GetRangeProof" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetRangeProofSvc<T: Prover>(pub Arc<T>);
+                    impl<
+                        T: Prover,
+                    > tonic::server::UnaryService<super::GetRangeProofRequest>
+                    for GetRangeProofSvc<T> {
+                        type Response = super::GetRangeProofResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GetRangeProofRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Prover>::get_range_proof(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetRangeProofSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/celestia.prover.v1.Prover/GetLatestBlockProof" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetLatestBlockProofSvc<T: Prover>(pub Arc<T>);
+                    impl<
+                        T: Prover,
+                    > tonic::server::UnaryService<super::GetLatestBlockProofRequest>
+                    for GetLatestBlockProofSvc<T> {
+                        type Response = super::GetLatestBlockProofResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GetLatestBlockProofRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Prover>::get_latest_block_proof(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetLatestBlockProofSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/celestia.prover.v1.Prover/AggregateBlockProofs" => {
+                    #[allow(non_camel_case_types)]
+                    struct AggregateBlockProofsSvc<T: Prover>(pub Arc<T>);
+                    impl<
+                        T: Prover,
+                    > tonic::server::UnaryService<super::AggregateBlockProofsRequest>
+                    for AggregateBlockProofsSvc<T> {
+                        type Response = super::AggregateBlockProofsResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::AggregateBlockProofsRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Prover>::aggregate_block_proofs(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = AggregateBlockProofsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
