@@ -1,9 +1,8 @@
 #[cfg(test)]
 mod integration_tests {
-    use crate::config::config::Config;
     use crate::proto::celestia::prover::v1::{
-        prover_client::ProverClient, prover_server::ProverServer, AggregateBlockProofsRequest, GetBlockProofRequest,
-        GetBlockProofsInRangeRequest, GetLatestBlockProofRequest,
+        prover_client::ProverClient, prover_server::ProverServer, GetBlockProofRequest, GetBlockProofsInRangeRequest,
+        GetLatestBlockProofRequest,
     };
     use crate::prover::service::ProverService;
     use crate::storage::proof_storage::RocksDbProofStorage;
@@ -46,11 +45,7 @@ mod integration_tests {
         let prover_client = SP1ProverClient::from_env();
         let (_, vkey) = prover_client.setup(crate::prover::prover::EVM_EXEC_ELF);
 
-        let service = ProverService {
-            block_range_prover: crate::prover::prover::BlockRangeExecProver::new(),
-            proof_storage: proof_storage.clone(),
-            vkey,
-        };
+        let service = ProverService::new_for_test(proof_storage.clone(), vkey);
 
         // Start gRPC server on available port
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -83,7 +78,7 @@ mod integration_tests {
         let proof = create_mock_proof();
         let output = create_mock_block_output();
         service
-            .proof_storage
+            .proof_storage()
             .store_block_proof(42, &proof, &output)
             .await
             .unwrap();
@@ -109,7 +104,7 @@ mod integration_tests {
 
         for height in [10, 15, 20, 25, 30] {
             service
-                .proof_storage
+                .proof_storage()
                 .store_block_proof(height, &proof, &output)
                 .await
                 .unwrap();
@@ -138,17 +133,17 @@ mod integration_tests {
         let output = create_mock_block_output();
 
         service
-            .proof_storage
+            .proof_storage()
             .store_block_proof(10, &proof, &output)
             .await
             .unwrap();
         service
-            .proof_storage
+            .proof_storage()
             .store_block_proof(20, &proof, &output)
             .await
             .unwrap();
         service
-            .proof_storage
+            .proof_storage()
             .store_block_proof(15, &proof, &output)
             .await
             .unwrap();
@@ -207,8 +202,8 @@ mod integration_tests {
         let proof = create_mock_proof();
         let output = create_mock_block_output();
 
-        service.proof_storage.store_block_proof(10, &proof, &output).await.unwrap();
-        service.proof_storage.store_block_proof(11, &proof, &output).await.unwrap();
+        service.proof_storage().store_block_proof(10, &proof, &output).await.unwrap();
+        service.proof_storage().store_block_proof(11, &proof, &output).await.unwrap();
 
         // Test aggregation
         let request = tonic::Request::new(AggregateBlockProofsRequest {

@@ -1,12 +1,32 @@
-use evm_prover::proto::celestia::prover::v1::{
-    prover_client::ProverClient, AggregateBlockProofsRequest, GetBlockProofRequest, GetBlockProofsInRangeRequest,
+// Note: This example shows how to use the gRPC client.
+// Since evm-prover is a binary crate, we can't import from it directly.
+// Instead, this is a template showing how to use the generated proto client.
+// To use this, you'd need to copy the proto definitions to your client crate.
+
+// Example usage (uncomment when you have the proto client available):
+/*
+use your_client_crate::proto::celestia::prover::v1::{
+    prover_client::ProverClient, 
+    AggregateBlockProofsRequest, GetBlockProofRequest, GetBlockProofsInRangeRequest,
     GetLatestBlockProofRequest,
 };
+*/
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Connect to the gRPC server
-    let mut client = ProverClient::connect("http://127.0.0.1:50051").await?;
+fn main() {
+    println!("📚 gRPC Client Usage Example");
+    println!();
+    println!("This example shows how to use the gRPC client for the Prover service.");
+    println!("Since evm-prover is a binary crate, you'll need to:");
+    println!("1. Copy the proto files to your client project");  
+    println!("2. Generate the gRPC client code");
+    println!("3. Use the methods shown below");
+    println!();
+    
+    #[allow(dead_code)]
+    async fn example_usage() -> Result<(), Box<dyn std::error::Error>> {
+        // This is how you would use the client (when available):
+        /*
+        let mut client = ProverClient::connect("http://127.0.0.1:50051").await?;
 
     println!("🚀 Connected to gRPC Prover Service");
 
@@ -85,6 +105,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => println!("❌ Error: {}", e),
     }
 
-    println!("\n🎉 Done! All gRPC methods tested.");
-    Ok(())
+        println!("\\n🎉 Done! All gRPC methods tested.");
+        Ok(())
+        */
+        Ok(())
+    }
+    
+    println!("✅ Example template ready!");
+    println!("📖 Check the comments above for implementation details.");
 }

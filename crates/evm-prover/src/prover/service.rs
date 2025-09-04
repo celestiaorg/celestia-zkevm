@@ -26,6 +26,16 @@ pub struct ProverService {
     vkey: SP1VerifyingKey,
 }
 
+impl Clone for ProverService {
+    fn clone(&self) -> Self {
+        Self {
+            block_range_prover: BlockRangeExecProver::new(), // Create new instance
+            proof_storage: Arc::clone(&self.proof_storage),
+            vkey: self.vkey.clone(),
+        }
+    }
+}
+
 impl ProverService {
     pub fn new(_config: Config) -> Result<Self> {
         let block_range_prover = BlockRangeExecProver::new();
@@ -48,6 +58,11 @@ impl ProverService {
             proof_storage,
             vkey,
         })
+    }
+
+    /// Get a reference to the proof storage
+    pub fn proof_storage(&self) -> &Arc<dyn ProofStorage> {
+        &self.proof_storage
     }
 
     /// Parse client_id to extract block range
@@ -105,6 +120,15 @@ impl ProverService {
             proof_data: stored.proof_data,
             public_values: stored.public_values,
             created_at: stored.created_at,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_for_test(proof_storage: Arc<dyn ProofStorage>, vkey: SP1VerifyingKey) -> Self {
+        Self {
+            block_range_prover: BlockRangeExecProver::new(),
+            proof_storage,
+            vkey,
         }
     }
 }
@@ -338,11 +362,7 @@ mod tests {
         let prover_client = ProverClient::from_env();
         let (_, vkey) = prover_client.setup(crate::prover::prover::EVM_EXEC_ELF);
 
-        let service = ProverService {
-            block_range_prover: BlockRangeExecProver::new(),
-            proof_storage,
-            vkey,
-        };
+        let service = ProverService::new_for_test(proof_storage, vkey);
 
         (service, temp_dir)
     }
