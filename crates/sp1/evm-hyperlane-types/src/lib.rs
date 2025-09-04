@@ -1,25 +1,27 @@
+use std::str::FromStr;
+
 use alloy_primitives::Address;
 use evm_state_types::hyperlane::HyperlaneMessage;
-use evm_storage_proofs::types::{HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof};
+use evm_storage_proofs::types::{HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProofInputs};
 use serde::{Deserialize, Serialize};
 pub mod tree;
 use tree::MerkleTree;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HyperlaneMessageInputs {
     pub state_root: String,
-    pub contract: Address,
+    pub contract: String,
     pub messages: Vec<HyperlaneMessage>,
-    pub branch_proof: HyperlaneBranchProof,
+    pub branch_proof: HyperlaneBranchProofInputs,
     pub snapshot: MerkleTree,
 }
 
 impl HyperlaneMessageInputs {
     pub fn new(
         state_root: String,
-        contract: Address,
+        contract: String,
         messages: Vec<HyperlaneMessage>,
-        branch_proof: HyperlaneBranchProof,
+        branch_proof: HyperlaneBranchProofInputs,
         snapshot: MerkleTree,
     ) -> Self {
         Self {
@@ -37,23 +39,31 @@ impl HyperlaneMessageInputs {
                 .insert(message_id)
                 .expect("Failed to insert message id into snapshot");
         }
-        self.branch_proof
-            .verify(&HYPERLANE_MERKLE_TREE_KEYS, self.contract, &self.state_root);
+        self.branch_proof.verify(
+            &HYPERLANE_MERKLE_TREE_KEYS,
+            Address::from_str(&self.contract).unwrap(),
+            &self.state_root,
+        );
         for idx in 0..HYPERLANE_MERKLE_TREE_KEYS.len() {
+            // The branch nodes of the snapshot after insert must match the branch nodes of the incremental
+            // tree on the EVM chain.
             assert_eq!(self.snapshot.branch[idx], self.branch_proof.get_branch_node(idx));
         }
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HyperlaneMessageOutputs {
     pub state_root: String,
     // todo: output just the id, not the entire message
-    pub messages: Vec<HyperlaneMessage>,
+    pub message_ids: Vec<String>,
 }
 
 impl HyperlaneMessageOutputs {
-    pub fn new(state_root: String, messages: Vec<HyperlaneMessage>) -> Self {
-        Self { state_root, messages }
+    pub fn new(state_root: String, message_ids: Vec<String>) -> Self {
+        Self {
+            state_root,
+            message_ids,
+        }
     }
 }

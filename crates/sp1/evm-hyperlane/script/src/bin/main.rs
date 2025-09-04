@@ -10,15 +10,15 @@
 //! RUST_LOG=info cargo run --release -- --prove
 //! ```
 
-use std::str::FromStr;
+use std::{str::FromStr, time::Instant};
 
 use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
 use clap::{command, Parser};
-use evm_hyperlane_types_sp1::{tree::MerkleTree, HyperlaneMessageInputs};
+use evm_hyperlane_types_sp1::{tree::MerkleTree, HyperlaneMessageInputs, HyperlaneMessageOutputs};
 use evm_storage_proofs::{
     client::EvmClient,
-    types::{HyperlaneBranchProof, HYPERLANE_MERKLE_TREE_KEYS},
+    types::{HyperlaneBranchProof, HyperlaneBranchProofInputs, HYPERLANE_MERKLE_TREE_KEYS},
 };
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 use storage::{hyperlane_messages::storage::HyperlaneMessageStore, Storage};
@@ -95,9 +95,9 @@ async fn main() {
 
     let inputs = HyperlaneMessageInputs::new(
         execution_state_root,
-        Address::from_str(&args.contract).unwrap(),
+        args.contract,
         messages.into_iter().map(|m| m.message).collect(),
-        branch_proof,
+        HyperlaneBranchProofInputs::from(branch_proof),
         MerkleTree::default(),
     );
     stdin.write(&inputs);
@@ -108,14 +108,19 @@ async fn main() {
     } else {
         // Setup the program for proving.
         let (pk, vk) = client.setup(EVM_HYPERLANE_ELF);
-
+        let start_time = Instant::now();
         // Generate the proof
         let proof = client.prove(&pk, &stdin).run().expect("failed to generate proof");
-
+        println!("Proof generation time: {:?}", Instant::now() - start_time);
         println!("Successfully generated proof!");
 
         // Verify the proof.
         client.verify(&proof, &vk).expect("failed to verify proof");
         println!("Successfully verified proof!");
+
+        let proof_outputs: HyperlaneMessageOutputs = bincode::deserialize(proof.public_values.as_slice()).unwrap();
+        println!("Proof outputs: {proof_outputs:?}");
     }
 }
+
+// 190

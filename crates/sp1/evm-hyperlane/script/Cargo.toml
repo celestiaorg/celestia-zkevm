@@ -2,6 +2,8 @@
 version = "0.1.0"
 name = "evm-hyperlane-script"
 edition = "2021"
+default-run = "evm-hyperlane"
+
 
 [[bin]]
 name = "evm-hyperlane"

@@ -25,6 +25,8 @@ impl Storage for HyperlaneMessageStore {
             .unwrap()
             .parent()
             .unwrap()
+            .parent()
+            .unwrap()
             .join(relative);
         let db = DB::open_cf_descriptors(&opts, &db_path, cfs)?;
         Ok(Self {
@@ -38,6 +40,8 @@ impl Storage for HyperlaneMessageStore {
         let cfs = HyperlaneMessageStore::get_cfs()?;
         let relative = env::var("HYPERLANE_MESSAGE_STORE").unwrap_or(".db/messages/hyperlane".to_string());
         let db_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
+            .parent()
+            .unwrap()
             .parent()
             .unwrap()
             .parent()

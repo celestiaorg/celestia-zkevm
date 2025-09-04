@@ -6,5 +6,8 @@ sp1_zkvm::entrypoint!(main);
 pub fn main() {
     let mut inputs: HyperlaneMessageInputs = sp1_zkvm::io::read::<HyperlaneMessageInputs>();
     inputs.verify();
-    sp1_zkvm::io::commit(&HyperlaneMessageOutputs::new(inputs.state_root, inputs.messages));
+    sp1_zkvm::io::commit(&HyperlaneMessageOutputs::new(
+        inputs.state_root,
+        inputs.messages.iter().map(|m| m.id()).collect(),
+    ));
 }

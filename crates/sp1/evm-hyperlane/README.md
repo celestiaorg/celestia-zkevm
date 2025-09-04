@@ -16,7 +16,7 @@ An SP1 program that verifies the existence of Hyperlane Messages against a given
 | Name | Type | Description |
 |---|---|---|
 | state_root | String | The state root of the execution client reth at the target height for verification |
-| messages | Vec<HyperlaneMessage> | Currently we output all messages, but later it will be only the Ids |
+| messages | Vec<String> | The ids of the Hyperlane messages that we proofed |
 
 
 ## Usage
@@ -55,7 +55,7 @@ See `.env.example` at the root of the repository.
 Run the `evm-exec` binary in execution mode.
 
 ```shell
-RUST_LOG=info cargo run -p evm-hyperlane-script -release -- --execute ...
+RUST_LOG=info cargo run -p evm-hyperlane-script --release -- --execute --contract 0xFCb1d485ef46344029D9E8A7925925e146B3430E --start-idx 0 --end-idx 23 --target-height 268 --rpc-url http://127.0.0.1:8545
 ```
 
 Run the `evm-exec` binary in proving mode.

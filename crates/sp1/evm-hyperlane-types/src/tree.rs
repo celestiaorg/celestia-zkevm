@@ -61,14 +61,14 @@ pub fn keccak256_concat(left: &str, right: &str) -> Result<String> {
 // Incremental Merkle Tree implementation based on the implementation from cosmwasm-hyperlane:
 // https://github.com/hyperlane-xyz/cosmwasm/blob/main/packages/interface/src/types/merkle.rs
 pub struct MerkleTree {
-    pub branch: Box<[String; TREE_DEPTH]>,
+    pub branch: [String; TREE_DEPTH],
     pub count: u128,
 }
 
 impl Default for MerkleTree {
     fn default() -> Self {
         Self {
-            branch: Box::new(std::array::from_fn(|_| ZERO_BYTES.to_string())),
+            branch: std::array::from_fn(|_| ZERO_BYTES.to_string()),
             count: Default::default(),
         }
     }

@@ -52,6 +52,14 @@ pub struct HyperlaneBranchProof {
     pub proof: EIP1186AccountProofResponse,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HyperlaneBranchProofInputs {
+    pub account_proof: Vec<Vec<u8>>,
+    pub storage_proofs: Vec<Vec<Vec<u8>>>,
+    pub account_value: Vec<u8>,
+    pub storage_values: Vec<Vec<u8>>,
+}
+
 /// Verify a Hyperlane Tree branch node's storage proof against the execution state root.
 impl HyperlaneBranchProof {
     pub fn new(proof: EIP1186AccountProofResponse) -> Self {
@@ -141,4 +149,85 @@ fn encode(value: Uint<256, 4>) -> Vec<u8> {
     let raw32 = value.to_be_bytes::<32>();
     let encoded: Vec<u8> = alloy_rlp::encode(raw32.as_slice());
     encoded
+}
+
+impl From<HyperlaneBranchProof> for HyperlaneBranchProofInputs {
+    fn from(proof: HyperlaneBranchProof) -> Self {
+        Self {
+            account_proof: proof.proof.account_proof.iter().map(|b| b.to_vec()).collect(),
+            account_value: proof.proof.account_proof.last().unwrap().to_vec(),
+            storage_proofs: proof
+                .proof
+                .storage_proof
+                .iter()
+                .map(|b| b.proof.iter().map(|b| b.to_vec()).collect())
+                .collect(),
+            storage_values: proof
+                .proof
+                .storage_proof
+                .iter()
+                .map(|b| b.value.to_be_bytes::<32>().to_vec())
+                .collect(),
+        }
+    }
+}
+
+/// Verify a Hyperlane Tree branch node's storage proof against the execution state root.
+impl HyperlaneBranchProofInputs {
+    pub fn new(proof: HyperlaneBranchProof) -> Self {
+        Self::from(proof)
+    }
+
+    pub fn get_branch_node(&self, index: usize) -> String {
+        self.storage_values
+            .get(index)
+            .expect("Failed to get branch node")
+            .encode_hex()
+    }
+
+    pub fn get_stored_account(&self) -> Vec<u8> {
+        let leaf_node: Vec<Bytes> = alloy_rlp::decode_exact(self.account_value.as_slice()).unwrap();
+        leaf_node.last().unwrap().to_vec()
+    }
+
+    pub fn get_state_root(&self) -> FixedBytes<32> {
+        let account: TrieAccount = alloy_rlp::decode_exact(self.get_stored_account()).unwrap();
+        account.storage_root
+    }
+
+    pub fn verify(&self, keys: &[&str], contract: Address, root: &str) -> bool {
+        let proof_vec: Vec<Bytes> = self.account_proof.iter().map(|b| Bytes::from(b.to_vec())).collect();
+        match verify_proof(
+            FixedBytes::from_hex(root).unwrap(),
+            Nibbles::unpack(digest_keccak(&contract.0.0)),
+            Some(self.get_stored_account()),
+            &proof_vec,
+        ) {
+            Ok(_) => {}
+            Err(_) => return false,
+        }
+        let storage_root = self.get_state_root();
+        for (key, (proof, value)) in keys
+            .iter()
+            .zip(self.storage_proofs.iter().zip(self.storage_values.iter()))
+        {
+            // Skip empty branch nodes as those don't have storage proofs
+            if value.as_slice() == Uint::<256, 4>::from(0).to_be_bytes::<32>().as_slice() {
+                continue;
+            }
+            match verify_proof(
+                storage_root,
+                Nibbles::unpack(digest_keccak(&alloy_primitives::hex::decode(key).unwrap())),
+                Some(encode(Uint::from_be_bytes::<32>(value.as_slice().try_into().unwrap()))),
+                &proof.iter().map(|b| Bytes::from(b.to_vec())).collect::<Vec<Bytes>>(),
+            ) {
+                Ok(_) => {}
+                Err(_) => {
+                    println!("Failed to verify proof for key: {key}");
+                    return false;
+                }
+            }
+        }
+        true
+    }
 }
