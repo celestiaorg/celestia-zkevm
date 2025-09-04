@@ -3,7 +3,7 @@ mod tests {
     use crate::{
         prover::prover::EVM_EXEC_ELF,
         storage::{
-            storage::{ProofStorageError, RocksDbProofStorage},
+            proof_storage::{ProofStorageError, RocksDbProofStorage},
             ProofStorage,
         },
     };
