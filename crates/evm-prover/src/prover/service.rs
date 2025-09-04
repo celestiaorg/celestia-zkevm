@@ -67,36 +67,35 @@ impl ProverService {
 
     /// Parse client_id to extract block range
     /// Expected format: "start_height-end_height" (e.g., "100-200")
-    fn parse_block_range(&self, client_id: &str) -> Result<(u64, u64), Status> {
+    fn parse_block_range(&self, client_id: &str) -> Result<(u64, u64), Box<Status>> {
         Self::parse_block_range_impl(client_id)
     }
 
-    fn parse_block_range_impl(client_id: &str) -> Result<(u64, u64), Status> {
+    fn parse_block_range_impl(client_id: &str) -> Result<(u64, u64), Box<Status>> {
         let parts: Vec<&str> = client_id.split('-').collect();
         if parts.len() != 2 {
-            return Err(Status::invalid_argument(
+            return Err(Box::new(Status::invalid_argument(
                 "client_id must be in format 'start_height-end_height'",
-            ));
+            )));
         }
 
         let start_height = parts[0]
             .parse::<u64>()
-            .map_err(|_| Status::invalid_argument("Invalid start height"))?;
+            .map_err(|_| Box::new(Status::invalid_argument("Invalid start height")))?;
         let end_height = parts[1]
             .parse::<u64>()
-            .map_err(|_| Status::invalid_argument("Invalid end height"))?;
+            .map_err(|_| Box::new(Status::invalid_argument("Invalid end height")))?;
 
         if start_height > end_height {
-            return Err(Status::invalid_argument("Start height must be <= end height"));
+            return Err(Box::new(Status::invalid_argument("Start height must be <= end height")));
         }
 
         // Validate reasonable range size to prevent resource exhaustion
         const MAX_RANGE_SIZE: u64 = 1000;
         if end_height - start_height + 1 > MAX_RANGE_SIZE {
-            return Err(Status::invalid_argument(format!(
-                "Range too large. Maximum allowed: {} blocks",
-                MAX_RANGE_SIZE
-            )));
+            return Err(Box::new(Status::invalid_argument(format!(
+                "Range too large. Maximum allowed: {MAX_RANGE_SIZE} blocks"
+            ))));
         }
 
         Ok((start_height, end_height))
@@ -169,7 +168,7 @@ impl Prover for ProverService {
             .proof_storage
             .get_block_proof(req.celestia_height)
             .await
-            .map_err(|e| Status::not_found(format!("Block proof not found: {}", e)))?;
+            .map_err(|e| Status::not_found(format!("Block proof not found: {e}")))?;
 
         let response = GetBlockProofResponse {
             proof: Some(Self::to_proto_block_proof(stored_proof)),
@@ -191,8 +190,7 @@ impl Prover for ProverService {
         }
         if req.end_height - req.start_height + 1 > MAX_RANGE_SIZE {
             return Err(Status::invalid_argument(format!(
-                "Range too large. Maximum allowed: {} blocks",
-                MAX_RANGE_SIZE
+                "Range too large. Maximum allowed: {MAX_RANGE_SIZE} blocks"
             )));
         }
 
@@ -200,7 +198,7 @@ impl Prover for ProverService {
             .proof_storage
             .get_block_proofs_in_range(req.start_height, req.end_height)
             .await
-            .map_err(|e| Status::internal(format!("Failed to query proof store: {}", e)))?;
+            .map_err(|e| Status::internal(format!("Failed to query proof store: {e}")))?;
 
         let proto_proofs = stored_proofs.into_iter().map(Self::to_proto_block_proof).collect();
 
@@ -219,7 +217,7 @@ impl Prover for ProverService {
             .proof_storage
             .get_range_proofs(req.start_height, req.end_height)
             .await
-            .map_err(|e| Status::internal(format!("Failed to query range proofs: {}", e)))?;
+            .map_err(|e| Status::internal(format!("Failed to query range proofs: {e}")))?;
 
         let proto_proofs = stored_proofs.into_iter().map(Self::to_proto_range_proof).collect();
 
@@ -236,7 +234,7 @@ impl Prover for ProverService {
             .proof_storage
             .get_latest_block_proof()
             .await
-            .map_err(|e| Status::internal(format!("Failed to get latest proof: {}", e)))?;
+            .map_err(|e| Status::internal(format!("Failed to get latest proof: {e}")))?;
 
         match stored_proof {
             Some(proof) => {
@@ -262,8 +260,7 @@ impl Prover for ProverService {
         }
         if req.end_height - req.start_height + 1 > MAX_RANGE_SIZE {
             return Err(Status::invalid_argument(format!(
-                "Range too large. Maximum allowed: {} blocks",
-                MAX_RANGE_SIZE
+                "Range too large. Maximum allowed: {MAX_RANGE_SIZE} blocks"
             )));
         }
 
@@ -272,7 +269,7 @@ impl Prover for ProverService {
             .proof_storage
             .get_block_proofs_in_range(req.start_height, req.end_height)
             .await
-            .map_err(|e| Status::internal(format!("Failed to query proof store: {}", e)))?;
+            .map_err(|e| Status::internal(format!("Failed to query proof store: {e}")))?;
 
         if block_proofs.is_empty() {
             return Err(Status::not_found(format!(
@@ -291,7 +288,7 @@ impl Prover for ProverService {
             // Deserialize the SP1 proof
             let proof = SP1Proof::Compressed(
                 bincode::deserialize(&stored_proof.proof_data)
-                    .map_err(|e| Status::internal(format!("Failed to deserialize proof: {}", e)))?,
+                    .map_err(|e| Status::internal(format!("Failed to deserialize proof: {e}")))?,
             );
 
             proof_inputs.push(ProofInput {
@@ -312,7 +309,7 @@ impl Prover for ProverService {
             .block_range_prover
             .prove((range_input, proof_inputs))
             .await
-            .map_err(|e| Status::internal(format!("Failed to generate aggregated proof: {}", e)))?;
+            .map_err(|e| Status::internal(format!("Failed to generate aggregated proof: {e}")))?;
 
         let response = AggregateBlockProofsResponse {
             proof: aggregated_proof.bytes(),

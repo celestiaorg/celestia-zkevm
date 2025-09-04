@@ -50,7 +50,7 @@ mod integration_tests {
         // Start gRPC server on available port
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
-        let addr_str = format!("http://{}", addr);
+        let addr_str = format!("http://{addr}");
 
         let server_service = service.clone();
         tokio::spawn(async move {
