@@ -1,0 +1,10 @@
+[package]
+name = "evm-hyperlane-types"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+evm-storage-proofs = { workspace = true }
+evm-state-types = { workspace = true }
+serde = { workspace = true }
+alloy-primitives = { workspace = true }

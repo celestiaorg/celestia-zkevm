@@ -1,0 +1,21 @@
+[package]
+version = "0.1.0"
+name = "evm-hyperlane-script"
+edition = "2021"
+
+[[bin]]
+name = "evm-hyperlane"
+path = "src/bin/main.rs"
+
+[[bin]]
+name = "vkey-evm-hyperlane"
+path = "src/bin/vkey.rs"
+
+[dependencies]
+sp1-sdk = { workspace = true }
+dotenv = "0.15.0"
+clap = { version = "4.0", features = ["cargo", "derive", "env"] }
+bincode = { workspace = true }
+
+[build-dependencies]
+sp1-build = "5.0.8"

@@ -4,6 +4,7 @@ use alloy_primitives::{
 };
 use alloy_rpc_types::EIP1186AccountProofResponse;
 use alloy_trie::{Nibbles, TrieAccount, proof::verify_proof};
+use serde::{Deserialize, Serialize};
 
 use crate::digest_keccak;
 
@@ -46,6 +47,7 @@ pub const HYPERLANE_MERKLE_TREE_KEYS: [&str; 32] = [
 ];
 
 /// HyperlaneBranchProof contains a Patricia Trie merkle proof (storage proof) for Hyperlane Tree branch nodes.
+#[derive(Serialize, Deserialize)]
 pub struct HyperlaneBranchProof {
     pub proof: EIP1186AccountProofResponse,
 }

@@ -7,13 +7,17 @@ members = [
     "crates/sp1/evm-exec-types",
     "crates/sp1/evm-exec/program",
     "crates/sp1/evm-exec/script",
+    "crates/sp1/evm-hyperlane-types",
     "crates/sp1/evm-range-exec/program",
     "crates/sp1/evm-range-exec/script",
+    "crates/sp1/evm-hyperlane/program",
+    "crates/sp1/evm-hyperlane/script",
     "crates/storage",
 ]
 resolver = "2"
 
 [workspace.dependencies]
+evm-hyperlane-types-sp1 = { package = "evm-hyperlane-types", path = "crates/sp1/evm-hyperlane-types" }
 alloy-consensus = { version = "1.0.13" }
 alloy-genesis = { version = "1.0.13", default-features = false }
 alloy-primitives = { version = "1.2.0", default-features = false, features = [
@@ -35,6 +39,7 @@ ed25519-dalek = { version = "2.1.0", features = ["alloc", "serde"] }
 ethers = { version = "2.0", features = ["ws", "rustls"] }
 ev-types = { version = "0.0.1", default-features = false }
 evm-state-types = { path = "crates/evm-state-types" }
+evm-storage-proofs = { path = "crates/evm-storage-proofs" }
 hex = "0.4.3"
 jsonrpsee-core = "0.25.1"
 nmt-rs = "*"
