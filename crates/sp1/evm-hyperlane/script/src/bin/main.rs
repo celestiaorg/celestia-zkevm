@@ -41,7 +41,10 @@ struct Args {
     contract: String,
 
     #[arg(long)]
-    start_height: u32,
+    start_idx: u32,
+
+    #[arg(long)]
+    end_idx: u32,
 
     #[arg(long)]
     target_height: u32,
@@ -71,7 +74,7 @@ async fn main() {
     let mut stdin = SP1Stdin::new();
     let message_db = HyperlaneMessageStore::from_env().unwrap();
     let mut messages = Vec::new();
-    for height in args.start_height..=args.target_height {
+    for height in args.start_idx..=args.end_idx {
         let message = message_db.get_message(height).unwrap();
         messages.push(message);
     }
