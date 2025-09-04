@@ -28,7 +28,7 @@ pub async fn create_grpc_server(config: Config) -> Result<()> {
     println!("Successfully got pubkey from evnode: {}", config_clone.pub_key);
 
     tokio::spawn({
-        let block_prover = BlockExecProver::new(AppContext::from_config(config_clone)?);
+        let block_prover = BlockExecProver::new(AppContext::from_config(config_clone)?)?;
         async move {
             if let Err(e) = block_prover.run().await {
                 eprintln!("Block prover task failed: {e:?}");
