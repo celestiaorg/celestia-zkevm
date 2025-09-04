@@ -252,10 +252,9 @@ impl ProofStorage for RocksDbProofStorage {
     async fn get_latest_block_proof(&self) -> Result<Option<StoredBlockProof>, ProofStorageError> {
         let cf = self.get_cf(CF_BLOCK_PROOFS)?;
 
-        let iter = self.db.iterator_cf(cf, rocksdb::IteratorMode::End);
+        let mut iter = self.db.iterator_cf(cf, rocksdb::IteratorMode::End);
 
-        for item in iter {
-            let (_, value) = item?;
+        if let Some(Ok((_, value))) = iter.next() {
             let proof: StoredBlockProof = self.deserialize(&value)?;
             return Ok(Some(proof));
         }

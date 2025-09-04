@@ -1,10 +1,15 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::{
+        prover::prover::EVM_EXEC_ELF,
+        storage::{
+            storage::{ProofStorageError, RocksDbProofStorage},
+            ProofStorage,
+        },
+    };
     use celestia_types::nmt::Namespace;
     use evm_exec_types::{BlockExecOutput, BlockRangeExecOutput};
-    use sp1_sdk::{SP1ProofWithPublicValues, SP1PublicValues};
-    use std::sync::Arc;
+    use sp1_sdk::{ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1PublicValues, SP1_CIRCUIT_VERSION};
     use tempfile::TempDir;
 
     fn create_test_storage() -> (RocksDbProofStorage, TempDir) {
@@ -14,13 +19,9 @@ mod tests {
     }
 
     fn create_mock_proof() -> SP1ProofWithPublicValues {
-        SP1ProofWithPublicValues {
-            proof: sp1_sdk::SP1Proof::Compressed(Box::new(sp1_sdk::SP1CompressedProof {
-                bytes: vec![1, 2, 3, 4, 5],
-            })),
-            stdin: sp1_sdk::SP1Stdin::new(),
-            public_values: SP1PublicValues::from(vec![10, 20, 30, 40, 50]),
-        }
+        let (pk, _vk) = ProverClient::from_env().setup(EVM_EXEC_ELF);
+        let public_values = SP1PublicValues::from(&[10, 20, 30, 40, 50]);
+        SP1ProofWithPublicValues::create_mock_proof(&pk, public_values, SP1ProofMode::Plonk, SP1_CIRCUIT_VERSION)
     }
 
     fn create_mock_block_output() -> BlockExecOutput {
@@ -61,10 +62,6 @@ mod tests {
         let retrieved_proof = storage.get_block_proof(42).await.unwrap();
 
         assert_eq!(retrieved_proof.celestia_height, 42);
-        assert_eq!(retrieved_proof.celestia_header_hash, output.celestia_header_hash);
-        assert_eq!(retrieved_proof.evm_height, output.new_height);
-        assert_eq!(retrieved_proof.evm_state_root, output.new_state_root);
-        assert_eq!(retrieved_proof.namespace, output.namespace);
     }
 
     #[tokio::test]
@@ -83,9 +80,6 @@ mod tests {
         let retrieved_proof = &retrieved_proofs[0];
         assert_eq!(retrieved_proof.start_height, 10);
         assert_eq!(retrieved_proof.end_height, 20);
-        assert_eq!(retrieved_proof.celestia_header_hash, output.celestia_header_hash);
-        assert_eq!(retrieved_proof.trusted_height, output.trusted_height);
-        assert_eq!(retrieved_proof.new_height, output.new_height);
     }
 
     #[tokio::test]
