@@ -7,6 +7,8 @@ mod proto;
 mod prover;
 mod storage;
 #[cfg(test)]
+mod tests_integration;
+#[cfg(test)]
 mod tests_storage;
 
 use commands::cli::{Cli, Commands};
