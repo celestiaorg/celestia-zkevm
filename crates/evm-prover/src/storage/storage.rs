@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use celestia_types::nmt::Namespace;
 use evm_exec_types::{BlockExecOutput, BlockRangeExecOutput};
 use rocksdb::{ColumnFamily, ColumnFamilyDescriptor, Options, DB};
 use serde::{Deserialize, Serialize};
@@ -27,10 +26,6 @@ pub enum ProofStorageError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredBlockProof {
     pub celestia_height: u64,
-    pub celestia_header_hash: [u8; 32],
-    pub evm_height: u64,
-    pub evm_state_root: [u8; 32],
-    pub namespace: Namespace,
     pub proof_data: Vec<u8>,
     pub public_values: Vec<u8>,
     pub created_at: u64,
@@ -38,14 +33,8 @@ pub struct StoredBlockProof {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredRangeProof {
-    pub id: u64,
     pub start_height: u64,
     pub end_height: u64,
-    pub celestia_header_hash: [u8; 32],
-    pub trusted_height: u64,
-    pub trusted_state_root: [u8; 32],
-    pub new_height: u64,
-    pub new_state_root: [u8; 32],
     pub proof_data: Vec<u8>,
     pub public_values: Vec<u8>,
     pub created_at: u64,
@@ -138,25 +127,6 @@ impl RocksDbProofStorage {
         key[8..].copy_from_slice(&end.to_be_bytes());
         key
     }
-
-    fn get_next_range_id(&self) -> Result<u64, ProofStorageError> {
-        let cf = self.get_cf(CF_METADATA)?;
-        let key = b"next_range_id";
-
-        let current_id = match self.db.get_cf(cf, key)? {
-            Some(bytes) => {
-                let mut id_bytes = [0u8; 8];
-                id_bytes.copy_from_slice(&bytes);
-                u64::from_be_bytes(id_bytes)
-            }
-            None => 1,
-        };
-
-        let next_id = current_id + 1;
-        self.db.put_cf(cf, key, &next_id.to_be_bytes())?;
-
-        Ok(current_id)
-    }
 }
 
 #[async_trait]
@@ -165,16 +135,12 @@ impl ProofStorage for RocksDbProofStorage {
         &self,
         celestia_height: u64,
         proof: &SP1ProofWithPublicValues,
-        output: &BlockExecOutput,
+        _output: &BlockExecOutput,
     ) -> Result<(), ProofStorageError> {
         let cf = self.get_cf(CF_BLOCK_PROOFS)?;
 
         let stored_proof = StoredBlockProof {
             celestia_height,
-            celestia_header_hash: output.celestia_header_hash,
-            evm_height: output.new_height,
-            evm_state_root: output.new_state_root,
-            namespace: output.namespace,
             proof_data: proof.bytes(),
             public_values: proof.public_values.to_vec(),
             created_at: std::time::SystemTime::now()
@@ -195,20 +161,13 @@ impl ProofStorage for RocksDbProofStorage {
         start_height: u64,
         end_height: u64,
         proof: &SP1ProofWithPublicValues,
-        output: &BlockRangeExecOutput,
+        _output: &BlockRangeExecOutput,
     ) -> Result<(), ProofStorageError> {
         let cf = self.get_cf(CF_RANGE_PROOFS)?;
-        let id = self.get_next_range_id()?;
 
         let stored_proof = StoredRangeProof {
-            id,
             start_height,
             end_height,
-            celestia_header_hash: output.celestia_header_hash,
-            trusted_height: output.trusted_height,
-            trusted_state_root: output.trusted_state_root,
-            new_height: output.new_height,
-            new_state_root: output.new_state_root,
             proof_data: proof.bytes(),
             public_values: proof.public_values.to_vec(),
             created_at: std::time::SystemTime::now()
