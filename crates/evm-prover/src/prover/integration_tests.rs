@@ -1,74 +1,84 @@
 #[cfg(test)]
-mod integration_tests {
-    use crate::proto::celestia::prover::v1::{
-        prover_client::ProverClient, prover_server::ProverServer, GetBlockProofRequest, GetBlockProofsInRangeRequest,
-        GetLatestBlockProofRequest,
-    };
-    use crate::prover::service::ProverService;
-    use crate::storage::proof_storage::RocksDbProofStorage;
-    use celestia_types::nmt::Namespace;
-    use evm_exec_types::BlockExecOutput;
-    use sp1_sdk::{
-        ProverClient as SP1ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1PublicValues, SP1_CIRCUIT_VERSION,
-    };
-    use std::sync::Arc;
-    use tempfile::TempDir;
-    use tokio::net::TcpListener;
-    use tonic::transport::{Channel, Server};
+use crate::proto::celestia::prover::v1::{
+    prover_client::ProverClient, prover_server::ProverServer, GetBlockProofRequest, GetBlockProofsInRangeRequest,
+    GetLatestBlockProofRequest,
+};
+#[cfg(test)]
+use crate::prover::service::ProverService;
+#[cfg(test)]
+use crate::storage::proof_storage::RocksDbProofStorage;
+#[cfg(test)]
+use celestia_types::nmt::Namespace;
+#[cfg(test)]
+use evm_exec_types::BlockExecOutput;
+#[cfg(test)]
+use sp1_sdk::{
+    ProverClient as SP1ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1PublicValues, SP1_CIRCUIT_VERSION,
+};
+#[cfg(test)]
+use std::sync::Arc;
+#[cfg(test)]
+use tempfile::TempDir;
+#[cfg(test)]
+use tokio::net::TcpListener;
+#[cfg(test)]
+use tonic::transport::{Channel, Server};
 
-    // Helper to create mock data
-    fn create_mock_proof() -> SP1ProofWithPublicValues {
-        let (pk, _vk) = SP1ProverClient::from_env().setup(crate::prover::prover::EVM_EXEC_ELF);
-        let public_values = SP1PublicValues::from(&[10, 20, 30, 40, 50]);
-        SP1ProofWithPublicValues::create_mock_proof(&pk, public_values, SP1ProofMode::Plonk, SP1_CIRCUIT_VERSION)
+#[cfg(test)]
+fn create_mock_proof() -> SP1ProofWithPublicValues {
+    let (pk, _vk) = SP1ProverClient::from_env().setup(crate::prover::prover::EVM_EXEC_ELF);
+    let public_values = SP1PublicValues::from(&[10, 20, 30, 40, 50]);
+    SP1ProofWithPublicValues::create_mock_proof(&pk, public_values, SP1ProofMode::Plonk, SP1_CIRCUIT_VERSION)
+}
+
+#[cfg(test)]
+fn create_mock_block_output() -> BlockExecOutput {
+    BlockExecOutput {
+        celestia_header_hash: [1; 32],
+        prev_celestia_header_hash: [2; 32],
+        new_height: 100,
+        new_state_root: [3; 32],
+        prev_height: 99,
+        prev_state_root: [4; 32],
+        namespace: Namespace::new_v0(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).unwrap(),
+        public_key: [5; 32],
     }
+}
 
-    fn create_mock_block_output() -> BlockExecOutput {
-        BlockExecOutput {
-            celestia_header_hash: [1; 32],
-            prev_celestia_header_hash: [2; 32],
-            new_height: 100,
-            new_state_root: [3; 32],
-            prev_height: 99,
-            prev_state_root: [4; 32],
-            namespace: Namespace::new_v0(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).unwrap(),
-            public_key: [5; 32],
-        }
-    }
+#[cfg(test)]
+async fn setup_test_server() -> (ProverClient<Channel>, ProverService, TempDir, String) {
+    // Create test service
+    let temp_dir = TempDir::new().unwrap();
+    let storage_path = temp_dir.path().to_path_buf();
+    let proof_storage = Arc::new(RocksDbProofStorage::new(storage_path).unwrap());
 
-    async fn setup_test_server() -> (ProverClient<Channel>, ProverService, TempDir, String) {
-        // Create test service
-        let temp_dir = TempDir::new().unwrap();
-        let storage_path = temp_dir.path().to_path_buf();
-        let proof_storage = Arc::new(RocksDbProofStorage::new(storage_path).unwrap());
+    let prover_client = SP1ProverClient::from_env();
+    let (_, vkey) = prover_client.setup(crate::prover::prover::EVM_EXEC_ELF);
 
-        let prover_client = SP1ProverClient::from_env();
-        let (_, vkey) = prover_client.setup(crate::prover::prover::EVM_EXEC_ELF);
+    let service = ProverService::new_for_test(proof_storage.clone(), vkey);
 
-        let service = ProverService::new_for_test(proof_storage.clone(), vkey);
+    // Start gRPC server on available port
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let addr_str = format!("http://{addr}");
 
-        // Start gRPC server on available port
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let addr_str = format!("http://{addr}");
+    let server_service = service.clone();
+    tokio::spawn(async move {
+        Server::builder()
+            .add_service(ProverServer::new(server_service))
+            .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener))
+            .await
+            .unwrap();
+    });
 
-        let server_service = service.clone();
-        tokio::spawn(async move {
-            Server::builder()
-                .add_service(ProverServer::new(server_service))
-                .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener))
-                .await
-                .unwrap();
-        });
+    // Give server time to start
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        // Give server time to start
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    // Create client
+    let client = ProverClient::connect(addr_str.clone()).await.unwrap();
 
-        // Create client
-        let client = ProverClient::connect(addr_str.clone()).await.unwrap();
-
-        (client, service, temp_dir, addr_str)
-    }
+    (client, service, temp_dir, addr_str)
+}
 
     #[tokio::test]
     async fn test_grpc_get_block_proof_integration() {
@@ -218,4 +228,3 @@ mod integration_tests {
         assert!(!inner.public_values.is_empty());
     }
     */
-}
