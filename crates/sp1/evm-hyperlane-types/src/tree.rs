@@ -151,9 +151,9 @@ mod tests {
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 232,
         ];
         tree.insert(keccak256_hash(&message).unwrap()).unwrap();
-        println!("{:?}", tree);
+        println!("{tree:?}");
         let root = tree.root_with_ctx(&ZERO_HASHES.map(|s| s.to_string())).unwrap();
-        println!("root: {}", root);
+        println!("root: {root}");
         /// Hash bytes using Keccak256
         fn keccak256_hash(data: &[u8]) -> Result<String> {
             let mut hasher = Keccak256::new();

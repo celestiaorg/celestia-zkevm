@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 use celestia_types::ExtendedHeader;
-use evm_hyperlane_types_sp1::tree::MerkleTree;
 use std::collections::BTreeMap;
 use std::fs;
 use std::result::Result::{Err, Ok};
@@ -59,11 +58,6 @@ pub struct AppContext {
     pub evm_rpc: String,
     pub pub_key: Vec<u8>,
     pub trusted_state: RwLock<TrustedState>,
-    // The latest merkle tree snapshot to insert new hyperlane messages into.
-    // For example, if previously we proofed messages at heights 100-109, then the snapshot will be the
-    // merkle tree snapshot after proofing at height 109. And we will want to insert all new messages
-    // from block 110 - TrustedState::height into this snapshot.
-    pub snapshot: RwLock<MerkleTree>,
 }
 
 /// TrustedState tracks the trusted height and state root which is provided to the proof system as inputs.
@@ -102,9 +96,6 @@ impl AppContext {
             evm_rpc: config.evm_rpc,
             pub_key,
             trusted_state,
-            // For now initialize with the default merkle tree.
-            // Later this should load the latest snapshot from the database.
-            snapshot: RwLock::new(MerkleTree::default()),
         })
     }
 
