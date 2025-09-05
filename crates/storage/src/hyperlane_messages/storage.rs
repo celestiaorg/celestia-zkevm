@@ -15,43 +15,12 @@ pub struct HyperlaneMessageStore {
 }
 
 impl Storage for HyperlaneMessageStore {
-    fn default() -> Result<Self> {
-        dotenv().ok();
-        let opts = HyperlaneMessageStore::get_opts()?;
-        let cfs = HyperlaneMessageStore::get_cfs()?;
-        let relative = ".db/messages/hyperlane".to_string();
-        let db_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join(relative);
-        let db = DB::open_cf_descriptors(&opts, &db_path, cfs)?;
-        Ok(Self {
-            db: Arc::new(RwLock::new(db)),
-        })
-    }
-
     fn from_env() -> Result<Self> {
         dotenv().ok();
         let opts = HyperlaneMessageStore::get_opts()?;
         let cfs = HyperlaneMessageStore::get_cfs()?;
-        let relative = env::var("HYPERLANE_MESSAGE_STORE").unwrap_or(".db/messages/hyperlane".to_string());
-        let db_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join(relative);
-        let db = DB::open_cf_descriptors(&opts, &db_path, cfs)?;
+        let absolute = env::var("HYPERLANE_MESSAGE_STORE").unwrap_or(".db/messages/hyperlane".to_string());
+        let db = DB::open_cf_descriptors(&opts, &PathBuf::from(absolute), cfs)?;
         Ok(Self {
             db: Arc::new(RwLock::new(db)),
         })

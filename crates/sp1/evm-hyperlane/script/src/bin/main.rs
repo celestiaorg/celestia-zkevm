@@ -72,7 +72,7 @@ async fn main() {
 
     // Setup the inputs.
     let mut stdin = SP1Stdin::new();
-    let message_db = HyperlaneMessageStore::default().unwrap();
+    let message_db = HyperlaneMessageStore::from_env().unwrap();
     let mut messages = Vec::new();
     for height in args.start_idx..=args.end_idx {
         let message = message_db.get_message(height).unwrap();
