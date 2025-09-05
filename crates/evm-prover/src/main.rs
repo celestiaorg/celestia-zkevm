@@ -5,6 +5,9 @@ mod config;
 mod grpc;
 mod proto;
 mod prover;
+mod storage;
+#[cfg(test)]
+mod tests_storage;
 
 use commands::cli::{Cli, Commands};
 
