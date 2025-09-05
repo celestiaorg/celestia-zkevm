@@ -7,7 +7,6 @@ edition = "2021"
 alloy-genesis = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
-evm-hyperlane-types-sp1 = { workspace = true }
 anyhow = "1.0"
 async-trait = "0.1.88"
 bincode = { workspace = true }
@@ -18,6 +17,7 @@ clap = { version = "4", features = ["derive"] }
 dirs = "5"
 ev-types = { workspace = true, features = ["grpc"] }
 evm-exec-types = { path = "../sp1/evm-exec-types" }
+evm-hyperlane-types-sp1 = { workspace = true }
 hex = { workspace = true }
 jsonrpsee-core = { workspace = true }
 nmt-rs = { workspace = true }

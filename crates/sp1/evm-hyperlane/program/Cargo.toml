@@ -4,5 +4,5 @@ name = "evm-hyperlane-program"
 edition = "2021"
 
 [dependencies]
-sp1-zkvm = { workspace = true }
 evm-hyperlane-types-sp1 = { workspace = true }
+sp1-zkvm = { workspace = true }
