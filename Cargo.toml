@@ -56,10 +56,10 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_cbor = "0.11.2"
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 sha3 = "0.10"
-sp1-build = "=5.0.8"
-sp1-core-executor = { version = "=5.0.8", features = ["bigint-rug"] }
-sp1-sdk = "=5.0.8"
-sp1-zkvm = "=5.0.8"
+sp1-build = "=5.2.1"
+sp1-core-executor = { version = "=5.2.1", features = ["bigint-rug"] }
+sp1-sdk = "=5.2.1"
+sp1-zkvm = "=5.2.1"
 storage = { path = "crates/storage" }
 tendermint = "0.40.1"
 tendermint-proto = "*"
