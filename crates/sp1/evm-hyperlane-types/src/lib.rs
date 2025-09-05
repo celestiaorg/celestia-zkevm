@@ -8,6 +8,7 @@ pub mod tree;
 use tree::MerkleTree;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+/// Inputs for the hyperlane message circuit.
 pub struct HyperlaneMessageInputs {
     pub state_root: String,
     pub contract: String,
@@ -16,6 +17,7 @@ pub struct HyperlaneMessageInputs {
     pub snapshot: MerkleTree,
 }
 
+/// Implementation of the hyperlane message inputs.
 impl HyperlaneMessageInputs {
     pub fn new(
         state_root: String,

@@ -7,6 +7,7 @@ edition = "2021"
 alloy-genesis = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
+evm-hyperlane-types-sp1 = { workspace = true }
 anyhow = "1.0"
 async-trait = "0.1.88"
 bincode = { workspace = true }

@@ -2983,6 +2983,7 @@ dependencies = [
  "dirs",
  "ev-types",
  "evm-exec-types",
+ "evm-hyperlane-types",
  "hex",
  "jsonrpsee-core",
  "nmt-rs",
