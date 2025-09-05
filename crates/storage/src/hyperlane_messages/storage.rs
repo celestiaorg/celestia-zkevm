@@ -19,8 +19,8 @@ impl Storage for HyperlaneMessageStore {
         dotenv().ok();
         let opts = HyperlaneMessageStore::get_opts()?;
         let cfs = HyperlaneMessageStore::get_cfs()?;
-        let absolute = env::var("HYPERLANE_MESSAGE_STORE").unwrap_or(".db/messages/hyperlane".to_string());
-        let db = DB::open_cf_descriptors(&opts, &PathBuf::from(absolute), cfs)?;
+        let absolute = env::var("HYPERLANE_MESSAGE_STORE").expect("HYPERLANE_MESSAGE_STORE must be set");
+        let db = DB::open_cf_descriptors(&opts, PathBuf::from(absolute), cfs)?;
         Ok(Self {
             db: Arc::new(RwLock::new(db)),
         })
