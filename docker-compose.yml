@@ -98,33 +98,34 @@ services:
       - "8546:8546" # ws
     volumes:
       - ./testnet/reth:/home/reth
+      - ./testnet/eth-genesis.json:/home/reth/eth-genesis.json:ro
       - reth:/home/reth/eth-home
     entrypoint: /bin/sh -c
     command:
       - |
-          ev-reth node \
-            --chain /home/reth/eth-genesis.json \
-            --datadir /home/reth/eth-home \
-            --metrics 0.0.0.0:9001 \
-            --authrpc.addr 0.0.0.0 \
-            --authrpc.port 8551 \
-            --authrpc.jwtsecret /home/reth/jwt.hex \
-            --http --http.addr 0.0.0.0 --http.port 8545 \
-            --http.api eth,net,web3,txpool \
-            --ws --ws.addr 0.0.0.0 --ws.port 8546 \
-            --ws.api eth,net,web3 \
-            --engine.persistence-threshold 0 \
-            --engine.memory-block-buffer-target 0 \
-            --disable-discovery \
-            --txpool.pending-max-count 200000 \
-            --txpool.pending-max-size 200 \
-            --txpool.queued-max-count 200000 \
-            --txpool.queued-max-size 200 \
-            --txpool.max-account-slots 2048 \
-            --txpool.max-new-txns 2048 \
-            --txpool.additional-validation-tasks 16 \
-            --rpc.eth-proof-window 120000 \
-            --ev-reth.enable
+        ev-reth node \
+          --chain /home/reth/eth-genesis.json \
+          --datadir /home/reth/eth-home \
+          --metrics 0.0.0.0:9001 \
+          --authrpc.addr 0.0.0.0 \
+          --authrpc.port 8551 \
+          --authrpc.jwtsecret /home/reth/jwt.hex \
+          --http --http.addr 0.0.0.0 --http.port 8545 \
+          --http.api eth,net,web3,txpool \
+          --ws --ws.addr 0.0.0.0 --ws.port 8546 \
+          --ws.api eth,net,web3 \
+          --engine.persistence-threshold 0 \
+          --engine.memory-block-buffer-target 0 \
+          --disable-discovery \
+          --txpool.pending-max-count 200000 \
+          --txpool.pending-max-size 200 \
+          --txpool.queued-max-count 200000 \
+          --txpool.queued-max-size 200 \
+          --txpool.max-account-slots 2048 \
+          --txpool.max-new-txns 2048 \
+          --txpool.additional-validation-tasks 16 \
+          --rpc.eth-proof-window 120000 \
+          --ev-reth.enable
     networks:
       - celestia-zkevm-net
 
@@ -166,10 +167,10 @@ services:
     ports:
       - "50051:50051"
     volumes:
-      - ./crates/evm-prover/docker-entrypoint.sh:/app/docker-entrypoint.sh:ro
+      - ./testnet/evm-prover/docker-entrypoint.sh:/app/docker-entrypoint.sh:ro
+      - ./testnet/evm-prover/config.yaml:/home/evm-prover/.evm-prover/config/config.yaml:ro
+      - ./testnet/eth-genesis.json:/home/evm-prover/.evm-prover/config/eth-genesis.json:ro
       - evm-prover-data:/home/evm-prover
-    environment:
-      - HOME=/home/evm-prover
     entrypoint: /app/docker-entrypoint.sh
     healthcheck:
       test: >

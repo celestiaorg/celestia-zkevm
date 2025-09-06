@@ -6,12 +6,8 @@ init_service() {
     echo "Initializing evm-prover service..."
     /app/evm-prover init
     
-    # Copy default config if it doesn't exist
-    if [ ! -f "$HOME/.evm-prover/config/config.yaml" ]; then
-        echo "Copying default configuration..."
-        mkdir -p "$HOME/.evm-prover/config"
-        cp /app/config.yaml "$HOME/.evm-prover/config/config.yaml"
-    fi
+    # Create config directory if it doesn't exist
+    mkdir -p "$HOME/.evm-prover/config"
 }
 
 # Function to start the service

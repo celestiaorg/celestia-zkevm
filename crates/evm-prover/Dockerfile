@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y \
 # Install SP1 toolchain
 RUN curl -L https://sp1up.succinct.xyz | bash \
     && export PATH="$HOME/.sp1/bin:$PATH" \
-    && sp1up --version 5.0.8 \
+    && sp1up --version 5.2.1 \
     && sp1up --c-toolchain --arch amd64
 
 # Copy the workspace Cargo files
@@ -83,9 +83,6 @@ COPY --from=builder /app/target/release/evm-prover /app/evm-prover
 
 # Copy the resources directory
 COPY --from=builder /app/crates/evm-prover/resources /app/resources
-
-# Copy the default configuration
-COPY crates/evm-prover/config.yaml /app/config.yaml
 
 # Change ownership to the non-root user
 RUN chown -R evm-prover:evm-prover /app
