@@ -4,9 +4,13 @@ use alloy_primitives::{
 };
 use alloy_rpc_types::EIP1186AccountProofResponse;
 use alloy_trie::{Nibbles, TrieAccount, proof::verify_proof};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::digest_keccak;
+
+pub type MerkleProof = Vec<Vec<u8>>;
+pub type StoredValue = Vec<u8>;
 
 // These are the fixed keys for the Hyperlane Tree branch nodes.
 // They index into the MerkleTreeHook contract's storage slots for range 151-182 (inclusive).
@@ -54,10 +58,10 @@ pub struct HyperlaneBranchProof {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HyperlaneBranchProofInputs {
-    pub account_proof: Vec<Vec<u8>>,
-    pub storage_proofs: Vec<Vec<Vec<u8>>>,
-    pub account_value: Vec<u8>,
-    pub storage_values: Vec<Vec<u8>>,
+    pub account_proof: MerkleProof,
+    pub storage_proofs: Vec<MerkleProof>,
+    pub account_value: StoredValue,
+    pub storage_values: Vec<StoredValue>,
 }
 
 /// Verify a Hyperlane Tree branch node's storage proof against the execution state root.
@@ -66,38 +70,39 @@ impl HyperlaneBranchProof {
         Self { proof }
     }
 
-    pub fn get_branch_node(&self, index: usize) -> String {
-        self.proof
+    pub fn get_branch_node(&self, index: usize) -> Result<String> {
+        Ok(self
+            .proof
             .storage_proof
             .get(index)
-            .unwrap()
+            .context("Failed to get branch node")?
             .value
             .to_be_bytes::<32>()
-            .encode_hex()
+            .encode_hex())
     }
 
-    pub fn get_stored_account(&self) -> Vec<u8> {
-        let leaf_node: Vec<Bytes> = alloy_rlp::decode_exact(self.proof.account_proof.last().unwrap()).unwrap();
-        leaf_node.last().unwrap().to_vec()
+    pub fn get_stored_account(&self) -> Result<Vec<u8>> {
+        let leaf_node: Vec<Bytes> = alloy_rlp::decode_exact(self.proof.account_proof.last().unwrap())?;
+        Ok(leaf_node.last().expect("Failed to get stored account").to_vec())
     }
 
-    pub fn get_state_root(&self) -> FixedBytes<32> {
-        let account: TrieAccount = alloy_rlp::decode_exact(self.get_stored_account()).unwrap();
-        account.storage_root
+    pub fn get_state_root(&self) -> Result<FixedBytes<32>> {
+        let account: TrieAccount = alloy_rlp::decode_exact(self.get_stored_account()?).unwrap();
+        Ok(account.storage_root)
     }
 
-    pub fn verify(&self, keys: &[&str], contract: Address, root: &str) -> bool {
+    pub fn verify(&self, keys: &[&str], contract: Address, root: &str) -> Result<bool> {
         // verify the account proof against the execution state root
         match verify_proof(
             FixedBytes::from_hex(root).unwrap(),
             Nibbles::unpack(digest_keccak(&contract.0.0)),
-            Some(self.get_stored_account()),
+            Some(self.get_stored_account()?),
             &self.proof.account_proof,
         ) {
             Ok(_) => {}
-            Err(_) => return false,
+            Err(_) => return Ok(false),
         }
-        let storage_root = self.get_state_root();
+        let storage_root = self.get_state_root()?;
         for (key, proof) in keys.iter().zip(self.proof.storage_proof.iter()) {
             // Skip empty branch nodes as those don't have storage proofs
             if proof.value == Uint::from(0) {
@@ -105,43 +110,43 @@ impl HyperlaneBranchProof {
             }
             match verify_proof(
                 storage_root,
-                Nibbles::unpack(digest_keccak(&alloy_primitives::hex::decode(key).unwrap())),
+                Nibbles::unpack(digest_keccak(&alloy_primitives::hex::decode(key)?)),
                 Some(encode(proof.value)),
                 &proof.proof,
             ) {
                 Ok(_) => {}
                 Err(_) => {
                     println!("Failed to verify proof for key: {key}");
-                    return false;
+                    return Ok(false);
                 }
             }
         }
-        true
+        Ok(true)
     }
 
-    pub fn verify_single(&self, key: &str, contract: Address, root: &str) -> bool {
+    pub fn verify_single(&self, key: &str, contract: Address, root: &str) -> Result<bool> {
         // verify the account proof against the execution state root
         match verify_proof(
             FixedBytes::from_hex(root).unwrap(),
             Nibbles::unpack(digest_keccak(&contract.0.0)),
-            Some(self.get_stored_account()),
+            Some(self.get_stored_account()?),
             &self.proof.account_proof,
         ) {
             Ok(_) => {}
-            Err(_) => return false,
+            Err(_) => return Ok(false),
         }
-        let account: TrieAccount = alloy_rlp::decode_exact(self.get_stored_account()).unwrap();
+        let account: TrieAccount = alloy_rlp::decode_exact(self.get_stored_account()?)?;
         // verify the storage proof against the account root
         match verify_proof(
             account.storage_root,
-            Nibbles::unpack(digest_keccak(&alloy_primitives::hex::decode(key).unwrap())),
+            Nibbles::unpack(digest_keccak(&alloy_primitives::hex::decode(key)?)),
             Some(encode(self.proof.storage_proof.first().unwrap().value)),
             &self.proof.storage_proof.first().unwrap().proof,
         ) {
             Ok(_) => {}
-            Err(_) => return false,
+            Err(_) => return Ok(false),
         }
-        true
+        Ok(true)
     }
 }
 
@@ -185,28 +190,29 @@ impl HyperlaneBranchProofInputs {
             .encode_hex()
     }
 
-    pub fn get_stored_account(&self) -> Vec<u8> {
-        let leaf_node: Vec<Bytes> = alloy_rlp::decode_exact(self.account_value.as_slice()).unwrap();
-        leaf_node.last().unwrap().to_vec()
+    pub fn get_stored_account(&self) -> Result<Vec<u8>> {
+        let leaf_node: Vec<Bytes> = alloy_rlp::decode_exact(self.account_value.as_slice())?;
+        Ok(leaf_node.last().context("Failed to get stored account")?.to_vec())
     }
 
-    pub fn get_state_root(&self) -> FixedBytes<32> {
-        let account: TrieAccount = alloy_rlp::decode_exact(self.get_stored_account()).unwrap();
-        account.storage_root
+    pub fn get_state_root(&self) -> Result<FixedBytes<32>> {
+        let account: TrieAccount = alloy_rlp::decode_exact(self.get_stored_account()?).unwrap();
+        Ok(account.storage_root)
     }
 
-    pub fn verify(&self, keys: &[&str], contract: Address, root: &str) -> bool {
+    pub fn verify(&self, keys: &[&str], contract: Address, root: &str) -> Result<bool> {
         let proof_vec: Vec<Bytes> = self.account_proof.iter().map(|b| Bytes::from(b.to_vec())).collect();
         match verify_proof(
             FixedBytes::from_hex(root).unwrap(),
             Nibbles::unpack(digest_keccak(&contract.0.0)),
-            Some(self.get_stored_account()),
+            Some(self.get_stored_account()?),
             &proof_vec,
         ) {
             Ok(_) => {}
-            Err(_) => return false,
+            Err(_) => return Ok(false),
         }
-        let storage_root = self.get_state_root();
+        let storage_root = self.get_state_root()?;
+
         for (key, (proof, value)) in keys
             .iter()
             .zip(self.storage_proofs.iter().zip(self.storage_values.iter()))
@@ -224,10 +230,10 @@ impl HyperlaneBranchProofInputs {
                 Ok(_) => {}
                 Err(_) => {
                     println!("Failed to verify proof for key: {key}");
-                    return false;
+                    return Ok(false);
                 }
             }
         }
-        true
+        Ok(true)
     }
 }

@@ -92,7 +92,7 @@ mod tests {
         let execution_state_root = client.get_state_root(height).await.unwrap();
         let branch_proof = HyperlaneBranchProof::new(proof);
         let verified = branch_proof.verify_single(key, contract, &execution_state_root);
-        assert!(verified);
+        assert!(verified.unwrap());
     }
 
     #[tokio::test]
@@ -117,10 +117,10 @@ mod tests {
         let execution_state_root = client.get_state_root(height).await.unwrap();
         let branch_proof = HyperlaneBranchProof::new(proof);
         let verified = branch_proof.verify(&HYPERLANE_MERKLE_TREE_KEYS, contract, &execution_state_root);
-        assert!(verified);
+        assert!(verified.unwrap());
 
         for (idx, key) in HYPERLANE_MERKLE_TREE_KEYS.iter().enumerate() {
-            let value = branch_proof.get_branch_node(idx);
+            let value = branch_proof.get_branch_node(idx).unwrap();
             println!("key: {key}, value: {value}");
         }
     }

@@ -122,5 +122,3 @@ async fn main() {
         println!("Proof outputs: {proof_outputs:?}");
     }
 }
-
-// 190
