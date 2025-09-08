@@ -93,15 +93,19 @@ impl HyperlaneBranchProof {
 
     pub fn verify(&self, keys: &[&str], contract: Address, root: &str) -> Result<bool> {
         // verify the account proof against the execution state root
-        match verify_proof(
+        if verify_proof(
             FixedBytes::from_hex(root).unwrap(),
             Nibbles::unpack(digest_keccak(&contract.0.0)),
             Some(self.get_stored_account()?),
             &self.proof.account_proof,
-        ) {
-            Ok(_) => {}
-            Err(_) => return Ok(false),
+        )
+        .is_ok()
+        {
+            // do nothing
+        } else {
+            return Ok(false);
         }
+
         let storage_root = self.get_state_root()?;
         for (key, proof) in keys.iter().zip(self.proof.storage_proof.iter()) {
             // Skip empty branch nodes as those don't have storage proofs
