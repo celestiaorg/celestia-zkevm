@@ -575,13 +575,14 @@ mod tests {
     async fn test_get_range_proof_success() {
         let (service, _temp_dir) = create_test_service().await;
         let proof = create_mock_proof();
+        let namespace = Namespace::new_v0(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).unwrap().0;
         let range_output = evm_exec_types::BlockRangeExecOutput {
             celestia_header_hash: [3; 32],
             trusted_height: 10,
             trusted_state_root: [1; 32],
             new_height: 20,
             new_state_root: [2; 32],
-            namespace: Namespace::new_v0(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).unwrap(),
+            namespace,
             public_key: [5; 32],
         };
 
@@ -626,13 +627,14 @@ mod tests {
     async fn test_get_range_proof_multiple() {
         let (service, _temp_dir) = create_test_service().await;
         let proof = create_mock_proof();
+        let namespace = Namespace::new_v0(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).unwrap().0;
         let range_output1 = evm_exec_types::BlockRangeExecOutput {
             celestia_header_hash: [3; 32],
             trusted_height: 10,
             trusted_state_root: [1; 32],
             new_height: 15,
             new_state_root: [2; 32],
-            namespace: Namespace::new_v0(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).unwrap(),
+            namespace,
             public_key: [5; 32],
         };
         let range_output2 = evm_exec_types::BlockRangeExecOutput {
@@ -641,7 +643,7 @@ mod tests {
             trusted_state_root: [1; 32],
             new_height: 18,
             new_state_root: [2; 32],
-            namespace: Namespace::new_v0(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).unwrap(),
+            namespace,
             public_key: [5; 32],
         };
 
