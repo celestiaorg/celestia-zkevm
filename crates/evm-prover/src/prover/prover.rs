@@ -34,6 +34,7 @@ use tokio::{
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
 use crate::prover::{ProgramProver, ProverConfig};
+use crate::storage::{ProofStorage, RocksDbProofStorage};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_EXEC_ELF: &[u8] = include_elf!("evm-exec-program");
@@ -119,6 +120,7 @@ pub struct BlockExecProver {
     pub app: AppContext,
     pub config: ProverConfig,
     pub prover: EnvProver,
+    pub storage: Arc<dyn ProofStorage>,
 }
 
 #[async_trait]
@@ -191,11 +193,38 @@ struct ScheduledProofJob {
 impl BlockExecProver {
     /// Creates a new instance of [`BlockExecProver`] for the provided [`AppContext`] using default configuration
     /// and prover environment settings.
-    pub fn new(app: AppContext) -> Arc<Self> {
+    pub fn new(app: AppContext) -> Result<Arc<Self>> {
         let config = BlockExecProver::default_config();
         let prover = ProverClient::from_env();
 
-        Arc::new(Self { app, config, prover })
+        // Initialize RocksDB storage in the default data directory
+        let storage_path = dirs::home_dir()
+            .expect("cannot find home directory")
+            .join(APP_HOME)
+            .join("data")
+            .join("proofs.db");
+
+        let storage = Arc::new(RocksDbProofStorage::new(storage_path)?);
+
+        Ok(Arc::new(Self {
+            app,
+            config,
+            prover,
+            storage,
+        }))
+    }
+
+    /// Creates a new instance with custom storage (useful for testing)
+    pub fn with_storage(app: AppContext, storage: Arc<dyn ProofStorage>) -> Arc<Self> {
+        let config = BlockExecProver::default_config();
+        let prover = ProverClient::from_env();
+
+        Arc::new(Self {
+            app,
+            config,
+            prover,
+            storage,
+        })
     }
 
     /// Returns the default prover configuration for the block execution program.
@@ -447,11 +476,23 @@ impl BlockExecProver {
             trusted_root: scheduled.trusted_root,
         };
 
-        // TODO: Add storage for SP1ProofWithPublicValues: https://github.com/celestiaorg/celestia-zkevm-hl-testnet/issues/154
-        let (_proof, outputs) = self.prove(inputs).await?;
+        let (proof, outputs) = self.prove(inputs).await?;
+
+        if let Err(e) = self
+            .storage
+            .store_block_proof(scheduled.job.height, &proof, &outputs)
+            .await
+        {
+            eprintln!(
+                "Failed to store proof for block {}: {} - error: {e:#}",
+                scheduled.job.height, outputs,
+            );
+            // Note: We continue execution even if storage fails to avoid breaking the proving pipeline
+        }
+
         println!(
-            "Successfully created proof for block {}. Outputs: {}",
-            scheduled.job.height, outputs
+            "Successfully created and stored proof for block {}. Outputs: {}",
+            scheduled.job.height, outputs,
         );
 
         Ok(())

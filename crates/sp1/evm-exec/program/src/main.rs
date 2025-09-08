@@ -84,12 +84,14 @@ pub fn main() {
         }
     }
 
+    assert_eq!(
+        roots.len(),
+        inputs.proofs.len(),
+        "Number of proofs must equal the number of row roots"
+    );
+
     if roots.is_empty() {
         assert!(blobs.is_empty(), "Blobs must be empty if no roots contain namespace");
-        assert!(
-            inputs.proofs.is_empty(),
-            "Proofs must be empty if no roots contain namespace"
-        );
     }
 
     let blob_data: Vec<[u8; 512]> = blobs
