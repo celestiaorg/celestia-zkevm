@@ -8,6 +8,8 @@ use sp1_sdk::{EnvProver, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 pub mod prover;
 pub mod service;
 
+pub mod circuits;
+
 /// ProverConfig defines metadata about the program binary (ELF), proof mode and any static keys.
 pub struct ProverConfig {
     pub elf: &'static [u8],
