@@ -44,8 +44,8 @@ mod tests {
             trusted_state_root: [7; 32],
             new_height: 100,
             new_state_root: [8; 32],
-            namespace: Namespace::new_v0(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).unwrap(),
-            public_key: [9; 32],
+            namespace: [9; 29],
+            public_key: [10; 32],
         }
     }
 
