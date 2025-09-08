@@ -570,4 +570,190 @@ mod tests {
         assert_eq!(proto_block.public_values, stored_block.public_values);
         assert_eq!(proto_block.created_at, stored_block.created_at);
     }
+
+    #[tokio::test]
+    async fn test_get_range_proof_success() {
+        let (service, _temp_dir) = create_test_service().await;
+        let proof = create_mock_proof();
+        let range_output = evm_exec_types::BlockRangeExecOutput {
+            celestia_header_hash: [3; 32],
+            trusted_height: 10,
+            trusted_state_root: [1; 32],
+            new_height: 20,
+            new_state_root: [2; 32],
+            namespace: Namespace::new_v0(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).unwrap(),
+            public_key: [5; 32],
+        };
+
+        // Store a range proof first
+        service
+            .proof_storage
+            .store_range_proof(10, 20, &proof, &range_output)
+            .await
+            .unwrap();
+
+        // Test the gRPC method
+        let request = Request::new(GetRangeProofRequest {
+            start_height: 10,
+            end_height: 20,
+        });
+
+        let response = service.get_range_proof(request).await.unwrap();
+        let inner_response = response.into_inner();
+
+        assert_eq!(inner_response.proofs.len(), 1);
+        let stored_proof = &inner_response.proofs[0];
+        assert_eq!(stored_proof.start_height, 10);
+        assert_eq!(stored_proof.end_height, 20);
+    }
+
+    #[tokio::test]
+    async fn test_get_range_proof_empty() {
+        let (service, _temp_dir) = create_test_service().await;
+
+        let request = Request::new(GetRangeProofRequest {
+            start_height: 10,
+            end_height: 20,
+        });
+
+        let response = service.get_range_proof(request).await.unwrap();
+        let inner_response = response.into_inner();
+
+        assert_eq!(inner_response.proofs.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_range_proof_multiple() {
+        let (service, _temp_dir) = create_test_service().await;
+        let proof = create_mock_proof();
+        let range_output1 = evm_exec_types::BlockRangeExecOutput {
+            celestia_header_hash: [3; 32],
+            trusted_height: 10,
+            trusted_state_root: [1; 32],
+            new_height: 15,
+            new_state_root: [2; 32],
+            namespace: Namespace::new_v0(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).unwrap(),
+            public_key: [5; 32],
+        };
+        let range_output2 = evm_exec_types::BlockRangeExecOutput {
+            celestia_header_hash: [3; 32],
+            trusted_height: 12,
+            trusted_state_root: [1; 32],
+            new_height: 18,
+            new_state_root: [2; 32],
+            namespace: Namespace::new_v0(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).unwrap(),
+            public_key: [5; 32],
+        };
+
+        // Store multiple range proofs
+        service
+            .proof_storage
+            .store_range_proof(10, 15, &proof, &range_output1)
+            .await
+            .unwrap();
+        service
+            .proof_storage
+            .store_range_proof(12, 18, &proof, &range_output2)
+            .await
+            .unwrap();
+
+        // Test querying a range that includes both
+        let request = Request::new(GetRangeProofRequest {
+            start_height: 10,
+            end_height: 20,
+        });
+
+        let response = service.get_range_proof(request).await.unwrap();
+        let inner_response = response.into_inner();
+
+        assert_eq!(inner_response.proofs.len(), 2);
+        let heights: Vec<(u64, u64)> = inner_response
+            .proofs
+            .iter()
+            .map(|p| (p.start_height, p.end_height))
+            .collect();
+        assert!(heights.contains(&(10, 15)));
+        assert!(heights.contains(&(12, 18)));
+    }
+
+    #[tokio::test]
+    async fn test_aggregate_block_proofs_success() {
+        let (service, _temp_dir) = create_test_service().await;
+        let proof = create_mock_proof();
+        let output = create_mock_block_output();
+
+        // Store multiple block proofs
+        for height in [10, 11, 12] {
+            service
+                .proof_storage
+                .store_block_proof(height, &proof, &output)
+                .await
+                .unwrap();
+        }
+
+        // Test aggregation
+        let request = Request::new(AggregateBlockProofsRequest {
+            start_height: 10,
+            end_height: 12,
+        });
+
+        let response = service.aggregate_block_proofs(request).await.unwrap();
+        let inner_response = response.into_inner();
+
+        assert!(!inner_response.proof.is_empty());
+        assert!(!inner_response.public_values.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_aggregate_block_proofs_no_proofs() {
+        let (service, _temp_dir) = create_test_service().await;
+
+        let request = Request::new(AggregateBlockProofsRequest {
+            start_height: 100,
+            end_height: 200,
+        });
+
+        let result = service.aggregate_block_proofs(request).await;
+        assert!(result.is_err());
+
+        let status = result.unwrap_err();
+        assert_eq!(status.code(), Code::NotFound);
+        assert!(status.message().contains("No proofs found"));
+    }
+
+    #[tokio::test]
+    async fn test_aggregate_block_proofs_invalid_range() {
+        let (service, _temp_dir) = create_test_service().await;
+
+        // Test invalid range (end < start)
+        let request = Request::new(AggregateBlockProofsRequest {
+            start_height: 200,
+            end_height: 100,
+        });
+
+        let result = service.aggregate_block_proofs(request).await;
+        assert!(result.is_err());
+
+        let status = result.unwrap_err();
+        assert_eq!(status.code(), Code::InvalidArgument);
+        assert!(status.message().contains("End height must be >= start height"));
+    }
+
+    #[tokio::test]
+    async fn test_aggregate_block_proofs_too_large() {
+        let (service, _temp_dir) = create_test_service().await;
+
+        // Test range too large (> 1000 blocks)
+        let request = Request::new(AggregateBlockProofsRequest {
+            start_height: 100,
+            end_height: 1200,
+        });
+
+        let result = service.aggregate_block_proofs(request).await;
+        assert!(result.is_err());
+
+        let status = result.unwrap_err();
+        assert_eq!(status.code(), Code::InvalidArgument);
+        assert!(status.message().contains("Range too large"));
+    }
 }
