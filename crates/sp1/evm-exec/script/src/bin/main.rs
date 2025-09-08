@@ -21,6 +21,7 @@
 use std::env;
 use std::error::Error;
 use std::fs;
+use std::time::Instant;
 
 use alloy_primitives::FixedBytes;
 use anyhow::Result;
@@ -137,13 +138,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         // Setup the program for proving.
         let (pk, vk) = client.setup(ELF);
-
         // Generate the proof.
+        let start_time = Instant::now();
         let proof = client
             .prove(&pk, &stdin)
             .compressed()
             .run()
             .expect("failed to generate proof");
+        println!("prover time: {:?}", Instant::now() - start_time);
 
         println!("Successfully generated proof!");
 
