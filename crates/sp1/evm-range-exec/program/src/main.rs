@@ -129,7 +129,11 @@ pub fn main() {
         trusted_state_root: first.prev_state_root,
         new_state_root: last.new_state_root,
         new_height: last.new_height,
-        namespace: last.namespace,
+        namespace: last
+            .namespace
+            .as_bytes()
+            .try_into()
+            .expect("namespace must be 29 bytes"),
         public_key: last.public_key,
     };
 

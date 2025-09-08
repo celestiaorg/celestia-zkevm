@@ -84,7 +84,7 @@ pub struct BlockRangeExecOutput {
     // executing N blocks from trusted_height to new_height.
     pub new_state_root: [u8; 32],
     // namespace is the Celestia namespace that contains the blob data.
-    pub namespace: Namespace,
+    pub namespace: [u8; 29],
     // public_key is the sequencer's public key used to verify the signatures of the signed data.
     pub public_key: [u8; 32],
 }
@@ -98,7 +98,7 @@ impl Display for BlockRangeExecOutput {
         writeln!(f, "  trusted_state_root: {}", encode(self.trusted_state_root))?;
         writeln!(f, "  new_height: {}", self.new_height)?;
         writeln!(f, "  new_state_root: {}", encode(self.new_state_root))?;
-        writeln!(f, "  namespace: {}", encode(self.namespace.0))?;
+        writeln!(f, "  namespace: {}", encode(self.namespace))?;
         writeln!(f, "  public_key: {}", encode(self.public_key))?;
         writeln!(f, "}}")
     }
