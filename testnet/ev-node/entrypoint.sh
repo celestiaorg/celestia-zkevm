@@ -26,7 +26,7 @@ fi
 # Conditionally add --evnode.da.header_namespace and --evnode.da.data_namespace if set
 da_header_namespace_flag=""
 if [ -n "$DA_HEADER_NAMESPACE" ]; then
-  da_header_namespace_flag="--evnode.da.header_namespace $DA_HEADER_NAMESPACE"
+  da_header_namespace_flag="--evnode.da.namespace $DA_HEADER_NAMESPACE"
 fi
 
 da_data_namespace_flag=""
