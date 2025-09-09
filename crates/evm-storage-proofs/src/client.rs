@@ -33,17 +33,28 @@ impl EvmClient {
         &self,
         keys: &[&str],
         contract: Address,
-        height: u64,
+        height: Option<u64>,
     ) -> Result<EIP1186AccountProofResponse> {
-        let proof: EIP1186AccountProofResponse = self
-            .provider
-            .get_proof(
-                contract,
-                keys.iter().map(|k| FixedBytes::from_hex(k).unwrap()).collect(),
-            )
-            .block_id(height.into())
-            .await?;
-        Ok(proof)
+        if height.is_some() {
+            let proof: EIP1186AccountProofResponse = self
+                .provider
+                .get_proof(
+                    contract,
+                    keys.iter().map(|k| FixedBytes::from_hex(k).unwrap()).collect(),
+                )
+                .block_id(height.expect("height must be provided").into())
+                .await?;
+            Ok(proof)
+        } else {
+            let proof: EIP1186AccountProofResponse = self
+                .provider
+                .get_proof(
+                    contract,
+                    keys.iter().map(|k| FixedBytes::from_hex(k).unwrap()).collect(),
+                )
+                .await?;
+            Ok(proof)
+        }
     }
 
     pub async fn get_state_root(&self, height: u64) -> Result<String> {
@@ -74,7 +85,6 @@ mod tests {
         let provider: DefaultProvider =
             ProviderBuilder::new().connect_http(Url::from_str("http://127.0.0.1:8545").unwrap());
         let client = EvmClient::new(provider);
-        let height = 200;
 
         let key = "0x0000000000000000000000000000000000000000000000000000000000000097";
 
@@ -84,7 +94,7 @@ mod tests {
                 // get the first one to check against off-chain tree
                 &[key],
                 contract,
-                height,
+                None,
             )
             .await
             .unwrap();
@@ -109,7 +119,7 @@ mod tests {
                 // get the first one to check against off-chain tree
                 &HYPERLANE_MERKLE_TREE_KEYS,
                 contract,
-                height,
+                None,
             )
             .await
             .unwrap();

@@ -125,7 +125,7 @@ async fn write_proof_inputs(stdin: &mut SP1Stdin, args: &Args) -> Result<()> {
         .get_proof(
             &HYPERLANE_MERKLE_TREE_KEYS,
             Address::from_str(&args.contract).unwrap(),
-            args.target_height.into(),
+            Some(args.target_height.into()),
         )
         .await
         .unwrap();
