@@ -76,7 +76,11 @@ mod tests {
         client::{DefaultProvider, EvmClient},
         types::{HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof},
     };
-    use alloy::{hex::FromHex, providers::ProviderBuilder, transports::http::reqwest::Url};
+    use alloy::{
+        hex::FromHex,
+        providers::{Provider, ProviderBuilder},
+        transports::http::reqwest::Url,
+    };
     use alloy_primitives::Address;
 
     #[tokio::test]
@@ -84,8 +88,8 @@ mod tests {
         let contract = Address::from_hex("0xfcb1d485ef46344029d9e8a7925925e146b3430e").unwrap();
         let provider: DefaultProvider =
             ProviderBuilder::new().connect_http(Url::from_str("http://127.0.0.1:8545").unwrap());
+        let height = provider.get_block_number().await.unwrap();
         let client = EvmClient::new(provider);
-
         let key = "0x0000000000000000000000000000000000000000000000000000000000000097";
 
         let proof = client
@@ -94,7 +98,7 @@ mod tests {
                 // get the first one to check against off-chain tree
                 &[key],
                 contract,
-                None,
+                Some(height),
             )
             .await
             .unwrap();
@@ -110,8 +114,8 @@ mod tests {
         let contract = Address::from_hex("0xfcb1d485ef46344029d9e8a7925925e146b3430e").unwrap();
         let provider: DefaultProvider =
             ProviderBuilder::new().connect_http(Url::from_str("http://127.0.0.1:8545").unwrap());
+        let height = provider.get_block_number().await.unwrap();
         let client = EvmClient::new(provider);
-        let height = 570;
 
         let proof = client
             .get_proof(
@@ -119,7 +123,7 @@ mod tests {
                 // get the first one to check against off-chain tree
                 &HYPERLANE_MERKLE_TREE_KEYS,
                 contract,
-                None,
+                Some(height),
             )
             .await
             .unwrap();
