@@ -20,7 +20,7 @@ use evm_storage_proofs::{
     types::{HyperlaneBranchProof, HyperlaneBranchProofInputs, HYPERLANE_MERKLE_TREE_KEYS},
 };
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
-use std::{env, path::PathBuf, str::FromStr, time::Instant};
+use std::{env, str::FromStr, time::Instant};
 use storage::{hyperlane_messages::storage::HyperlaneMessageStore, Storage};
 use url::Url;
 
@@ -98,20 +98,7 @@ async fn main() {
 }
 
 async fn write_proof_inputs(stdin: &mut SP1Stdin, args: &Args) -> Result<()> {
-    dotenv::dotenv().ok();
-    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let workspace_path = manifest_dir
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap();
-    let relative = env::var("HYPERLANE_MESSAGE_STORE").expect("HYPERLANE_MESSAGE_STORE must be set");
-    let path = workspace_path.join(relative);
-    let message_db = HyperlaneMessageStore::from_path_relative(&path).unwrap();
+    let message_db = HyperlaneMessageStore::from_path_relative(4).unwrap();
 
     let mut messages = Vec::new();
     for height in args.start_idx..=args.end_idx {

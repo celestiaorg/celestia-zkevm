@@ -6,7 +6,7 @@ mod tests {
     use alloy_provider::ProviderBuilder;
     use alloy_rpc_types::Filter;
     use evm_state_types::events::Dispatch;
-    use std::{env, path::PathBuf, sync::Arc};
+    use std::sync::Arc;
     use storage::{Storage, hyperlane_messages::storage::HyperlaneMessageStore};
 
     #[tokio::test]
@@ -23,19 +23,13 @@ mod tests {
         if a new block was posted in the meantime.
     */
     async fn test_run_indexer() {
-        dotenvy::dotenv().ok();
-        let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-        let workspace_path = manifest_dir.parent().unwrap().parent().unwrap();
-        let relative = env::var("HYPERLANE_MESSAGE_STORE").expect("HYPERLANE_MESSAGE_STORE must be set");
-        let path = workspace_path.join(relative);
         let indexer = HyperlaneIndexer::default();
 
-        let message_store = Arc::new(HyperlaneMessageStore::from_path_relative(&path).unwrap());
+        let message_store = Arc::new(HyperlaneMessageStore::from_path_relative(2).unwrap());
         message_store.prune_all().unwrap();
 
         let start_height = 0;
         let end_height = 10000;
-
         let provider = Arc::new(ProviderBuilder::new().connect_ws(indexer.socket.clone()).await.unwrap());
         let filter = Filter::new()
             .address(indexer.contract_address)

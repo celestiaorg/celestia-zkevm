@@ -6,7 +6,8 @@ use anyhow::{Context, Result};
 use dotenvy::dotenv;
 use evm_state_types::StoredHyperlaneMessage;
 use rocksdb::{ColumnFamilyDescriptor, DB, IteratorMode, Options};
-use std::path::Path;
+use std::env;
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 pub struct HyperlaneMessageStore {
@@ -14,8 +15,14 @@ pub struct HyperlaneMessageStore {
 }
 
 impl Storage for HyperlaneMessageStore {
-    fn from_path_relative(path: &Path) -> Result<Self> {
+    fn from_path_relative(crate_depth: usize) -> Result<Self> {
         dotenv().ok();
+        let mut workspace_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+        for _ in 0..crate_depth {
+            workspace_path = workspace_path.parent().unwrap().to_path_buf();
+        }
+        let relative = env::var("HYPERLANE_MESSAGE_STORE").expect("HYPERLANE_MESSAGE_STORE must be set");
+        let path = workspace_path.join(relative);
         let opts = HyperlaneMessageStore::get_opts()?;
         let cfs = HyperlaneMessageStore::get_cfs()?;
         let db = DB::open_cf_descriptors(&opts, path, cfs)?;
