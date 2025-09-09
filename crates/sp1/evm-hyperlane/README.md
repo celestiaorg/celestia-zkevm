@@ -58,7 +58,7 @@ Run the `evm-exec` binary in execution mode.
 RUST_LOG=info cargo run -p evm-hyperlane-script --release -- --execute --contract 0xFCb1d485ef46344029D9E8A7925925e146B3430E --start-idx 0 --end-idx 23 --target-height 268 --rpc-url http://127.0.0.1:8545
 ```
 
-Run the `evm-exec` binary in proving mode.
+Run the `evm-hyperlane` binary in proving mode.
 
 ```shell
 RUST_LOG=info cargo run -p evm-hyperlane-script -release -- --prove ...
