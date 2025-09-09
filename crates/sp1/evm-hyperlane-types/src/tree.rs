@@ -1,6 +1,6 @@
 //! Implements Hyperlane's incremental merkle tree.
 //!
-//! This is translated from the implementation from cw-hyperlane:
+//! This is adapted from the implementation from cw-hyperlane:
 //! <https://github.com/many-things/cw-hyperlane/blob/7573576c97fe9ee9a91c3e4557ff5a32bfbcee40/packages/interface/src/types/merkle.rs#L11>
 
 use anyhow::Result;
