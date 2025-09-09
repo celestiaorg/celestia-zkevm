@@ -35,14 +35,14 @@ impl EvmClient {
         contract: Address,
         height: Option<u64>,
     ) -> Result<EIP1186AccountProofResponse> {
-        if height.is_some() {
+        if let Some(height) = height {
             let proof: EIP1186AccountProofResponse = self
                 .provider
                 .get_proof(
                     contract,
                     keys.iter().map(|k| FixedBytes::from_hex(k).unwrap()).collect(),
                 )
-                .block_id(height.expect("height must be provided").into())
+                .block_id(height.into())
                 .await?;
             Ok(proof)
         } else {
