@@ -211,10 +211,8 @@ impl HyperlaneBranchProofInputs {
             Nibbles::unpack(digest_keccak(&contract.0.0)),
             Some(self.get_stored_account()?),
             &proof_vec,
-        ).is_ok() {
-            // do nothing
-        } else {
-            return Ok(false)
+        ).is_err(){
+            return Ok(false);
         }
         let storage_root = self.get_state_root()?;
 
@@ -226,17 +224,13 @@ impl HyperlaneBranchProofInputs {
             if value.as_slice() == Uint::<256, 4>::from(0).to_be_bytes::<32>().as_slice() {
                 continue;
             }
-            match verify_proof(
+            if verify_proof(
                 storage_root,
                 Nibbles::unpack(digest_keccak(&alloy_primitives::hex::decode(key).unwrap())),
                 Some(encode(Uint::from_be_bytes::<32>(value.as_slice().try_into().unwrap()))),
                 &proof.iter().map(|b| Bytes::from(b.to_vec())).collect::<Vec<Bytes>>(),
-            ) {
-                Ok(_) => {}
-                Err(_) => {
-                    println!("Failed to verify proof for key: {key}");
-                    return Ok(false);
-                }
+            ).is_err(){
+                return Ok(false);
             }
         }
         Ok(true)
