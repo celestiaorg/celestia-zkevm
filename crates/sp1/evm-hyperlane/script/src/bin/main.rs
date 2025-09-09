@@ -13,15 +13,15 @@
 use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
 use anyhow::Result;
-use clap::{Parser, command};
-use evm_hyperlane_types_sp1::{HyperlaneMessageInputs, HyperlaneMessageOutputs, tree::MerkleTree};
+use clap::{command, Parser};
+use evm_hyperlane_types_sp1::{tree::MerkleTree, HyperlaneMessageInputs, HyperlaneMessageOutputs};
 use evm_storage_proofs::{
     client::EvmClient,
-    types::{HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof, HyperlaneBranchProofInputs},
+    types::{HyperlaneBranchProof, HyperlaneBranchProofInputs, HYPERLANE_MERKLE_TREE_KEYS},
 };
-use sp1_sdk::{ProverClient, SP1Stdin, include_elf};
+use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 use std::{str::FromStr, time::Instant};
-use storage::{Storage, hyperlane_messages::storage::HyperlaneMessageStore};
+use storage::{hyperlane_messages::storage::HyperlaneMessageStore, Storage};
 use url::Url;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
