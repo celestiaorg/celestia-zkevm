@@ -206,14 +206,15 @@ impl HyperlaneBranchProofInputs {
 
     pub fn verify(&self, keys: &[&str], contract: Address, root: &str) -> Result<bool> {
         let proof_vec: Vec<Bytes> = self.account_proof.iter().map(|b| Bytes::from(b.to_vec())).collect();
-        match verify_proof(
+        if verify_proof(
             FixedBytes::from_hex(root).unwrap(),
             Nibbles::unpack(digest_keccak(&contract.0.0)),
             Some(self.get_stored_account()?),
             &proof_vec,
-        ) {
-            Ok(_) => {}
-            Err(_) => return Ok(false),
+        ).is_ok() {
+            // do nothing
+        } else {
+            return Ok(false)
         }
         let storage_root = self.get_state_root()?;
 
