@@ -9,9 +9,9 @@
 //! ```shell
 //! RUST_LOG=info cargo run -p evm-range-exec-script --release -- --prove
 //! ```
-use std::error::Error;
 use std::fs;
 use std::path::Path;
+use std::{error::Error, time::Instant};
 
 use clap::Parser;
 use evm_exec_types::{BlockRangeExecInput, BlockRangeExecOutput};
@@ -93,24 +93,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     } else {
         // Setup the program for proving.
-        let (pk, vk) = client.setup(EVM_RANGE_EXEC_ELF);
-
+        let (pk, _vk) = client.setup(EVM_RANGE_EXEC_ELF);
+        let start_time = Instant::now();
         // Generate the proof.
-        let proof = client
+        let _proof = client
             .prove(&pk, &stdin)
             .groth16()
             .run()
             .expect("failed to generate proof");
-
+        println!("Proof generation time: {:?}", Instant::now() - start_time);
         println!("Successfully generated proof!");
-
-        // Save the proof and reload.
-        proof.save("testdata/groth16-proof.bin")?;
-        let deserialized_proof = SP1ProofWithPublicValues::load("testdata/groth16-proof.bin")?;
-
-        // Verify the proof.
-        client.verify(&deserialized_proof, &vk).expect("failed to verify proof");
-        println!("Successfully verified proof!");
     }
 
     Ok(())
@@ -134,6 +126,12 @@ fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<usize, Box<dyn Error>> {
 
     let vk: SP1VerifyingKey = bincode::deserialize(&fs::read("testdata/vkeys/evm-exec-vkey.bin")?)?;
     let vkeys = vec![vk.hash_u32(); proofs.len()];
+
+    let mut proofs_batch: Vec<SP1ProofWithPublicValues> = Vec::new();
+    // push  5 proofs for verification
+    for _ in 0..5 {
+        proofs_batch.push(proofs.first().unwrap().clone());
+    }
 
     let public_inputs = proofs
         .iter()

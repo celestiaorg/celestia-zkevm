@@ -85,7 +85,7 @@ async fn main() {
         .get_proof(
             &HYPERLANE_MERKLE_TREE_KEYS,
             Address::from_str(&args.contract).unwrap(),
-            args.target_height.into(),
+            args.target_height as u64,
         )
         .await
         .unwrap();
