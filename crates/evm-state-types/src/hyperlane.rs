@@ -55,6 +55,8 @@ pub fn decode_hyperlane_message(message: &[u8]) -> Result<HyperlaneMessage> {
     })
 }
 
+/// Encodes the HyperlaneMessage as per the protocol specification:
+/// https://docs.hyperlane.xyz/docs/reference/developer-tools/libraries/message
 pub fn encode_hyperlane_message(message: &HyperlaneMessage) -> Result<Vec<u8>> {
     let mut encoded = Vec::new();
     encoded.extend_from_slice(&message.version.to_be_bytes());
