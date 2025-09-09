@@ -13,6 +13,7 @@ name = "vkey-evm-hyperlane"
 path = "src/bin/vkey.rs"
 
 [dependencies]
+anyhow = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 bincode = { workspace = true }
