@@ -112,43 +112,39 @@ impl HyperlaneBranchProof {
             if proof.value == Uint::from(0) {
                 continue;
             }
-            match verify_proof(
+            if verify_proof(
                 storage_root,
                 Nibbles::unpack(digest_keccak(&alloy_primitives::hex::decode(key)?)),
                 Some(encode(proof.value)),
                 &proof.proof,
-            ) {
-                Ok(_) => {}
-                Err(_) => {
+            ).is_err(){
                     println!("Failed to verify proof for key: {key}");
                     return Ok(false);
-                }
             }
         }
+
         Ok(true)
     }
 
     pub fn verify_single(&self, key: &str, contract: Address, root: &str) -> Result<bool> {
         // verify the account proof against the execution state root
-        match verify_proof(
+        if verify_proof(
             FixedBytes::from_hex(root).unwrap(),
             Nibbles::unpack(digest_keccak(&contract.0.0)),
             Some(self.get_stored_account()?),
             &self.proof.account_proof,
-        ) {
-            Ok(_) => {}
-            Err(_) => return Ok(false),
+        ).is_err(){
+            return Ok(false)
         }
         let account: TrieAccount = alloy_rlp::decode_exact(self.get_stored_account()?)?;
         // verify the storage proof against the account root
-        match verify_proof(
+        if verify_proof(
             account.storage_root,
             Nibbles::unpack(digest_keccak(&alloy_primitives::hex::decode(key)?)),
             Some(encode(self.proof.storage_proof.first().unwrap().value)),
             &self.proof.storage_proof.first().unwrap().proof,
-        ) {
-            Ok(_) => {}
-            Err(_) => return Ok(false),
+        ).is_err(){
+            return Ok(false)
         }
         Ok(true)
     }
