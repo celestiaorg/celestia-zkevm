@@ -125,7 +125,7 @@ fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<usize, Box<dyn Error>> {
         .collect::<Result<_, _>>()?;
 
     let vk: SP1VerifyingKey = bincode::deserialize(&fs::read("testdata/vkeys/evm-exec-vkey.bin")?)?;
-    let vkeys = vec![vk.hash_u32(); proofs.len()];
+    let vkeys = vec![vk.hash_u32(); 5];
 
     let mut proofs_batch: Vec<SP1ProofWithPublicValues> = Vec::new();
     // push  5 proofs for verification
@@ -133,7 +133,7 @@ fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<usize, Box<dyn Error>> {
         proofs_batch.push(proofs.first().unwrap().clone());
     }
 
-    let public_inputs = proofs
+    let public_inputs = proofs_batch
         .iter()
         .map(|proof| proof.public_values.to_vec())
         .collect::<Vec<_>>();
@@ -142,14 +142,15 @@ fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<usize, Box<dyn Error>> {
         vkeys,
         public_values: public_inputs,
     };
+
     stdin.write(&input);
 
-    for proof in &proofs {
+    for proof in &proofs_batch {
         let SP1Proof::Compressed(ref proof) = proof.proof else {
             panic!()
         };
         stdin.write_proof(*proof.clone(), vk.vk.clone());
     }
 
-    Ok(proofs.len())
+    Ok(proofs_batch.len())
 }
