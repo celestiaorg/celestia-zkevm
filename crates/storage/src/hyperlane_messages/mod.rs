@@ -2,11 +2,9 @@ pub mod storage;
 
 #[cfg(test)]
 mod tests {
-    use std::{env, path::PathBuf};
-
+    use crate::{Storage, hyperlane_messages::storage::HyperlaneMessageStore};
     use evm_state_types::{StoredHyperlaneMessage, hyperlane::decode_hyperlane_message};
-
-    use crate::hyperlane_messages::storage::HyperlaneMessageStore;
+    use std::{env, path::PathBuf};
 
     #[test]
     fn test_insert_message() {

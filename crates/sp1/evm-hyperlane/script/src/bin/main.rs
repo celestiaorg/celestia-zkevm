@@ -100,7 +100,15 @@ async fn main() {
 async fn write_proof_inputs(stdin: &mut SP1Stdin, args: &Args) -> Result<()> {
     dotenv::dotenv().ok();
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let workspace_path = manifest_dir.parent().unwrap().parent().unwrap().parent().unwrap();
+    let workspace_path = manifest_dir
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap();
     let relative = env::var("HYPERLANE_MESSAGE_STORE").expect("HYPERLANE_MESSAGE_STORE must be set");
     let path = workspace_path.join(relative);
     let message_db = HyperlaneMessageStore::from_path_relative(&path).unwrap();
