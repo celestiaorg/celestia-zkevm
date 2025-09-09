@@ -3,25 +3,25 @@
 //!
 //! You can run this script using the following command:
 //! ```shell
-//! RUST_LOG=info cargo run --release -- --execute
+//! RUST_LOG=info cargo run -p evm-hyperlane-script --release -- --execute --contract 0xFCb1d485ef46344029D9E8A7925925e146B3430E --start-idx 0 --end-idx 23 --target-height 268 --rpc-url http://127.0.0.1:8545
 //! ```
 //! or
 //! ```shell
-//! RUST_LOG=info cargo run --release -- --prove
+//! RUST_LOG=info cargo run -p evm-hyperlane-script --release -- --prove --contract 0xFCb1d485ef46344029D9E8A7925925e146B3430E --start-idx 0 --end-idx 23 --target-height 268 --rpc-url http://127.0.0.1:8545
 //! ```
 
 use std::{str::FromStr, time::Instant};
 
 use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
-use clap::{command, Parser};
-use evm_hyperlane_types_sp1::{tree::MerkleTree, HyperlaneMessageInputs, HyperlaneMessageOutputs};
+use clap::{Parser, command};
+use evm_hyperlane_types_sp1::{HyperlaneMessageInputs, HyperlaneMessageOutputs, tree::MerkleTree};
 use evm_storage_proofs::{
     client::EvmClient,
-    types::{HyperlaneBranchProof, HyperlaneBranchProofInputs, HYPERLANE_MERKLE_TREE_KEYS},
+    types::{HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof, HyperlaneBranchProofInputs},
 };
-use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
-use storage::{hyperlane_messages::storage::HyperlaneMessageStore, Storage};
+use sp1_sdk::{ProverClient, SP1Stdin, include_elf};
+use storage::{Storage, hyperlane_messages::storage::HyperlaneMessageStore};
 use url::Url;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
