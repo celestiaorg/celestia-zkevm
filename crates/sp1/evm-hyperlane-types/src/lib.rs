@@ -35,6 +35,7 @@ impl HyperlaneMessageInputs {
         }
     }
 
+    /// Verify the hyperlane message inputs against the branch proof and snapshot.
     pub fn verify(&mut self) {
         let message_ids: Vec<String> = self.messages.iter().map(|m| m.id()).collect();
         for message_id in message_ids {
