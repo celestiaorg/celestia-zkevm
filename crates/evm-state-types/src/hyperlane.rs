@@ -11,7 +11,14 @@ pub struct HyperlaneMessage {
     pub destination: u32,
     pub recipient: [u8; 32],
     pub body: Vec<u8>,
-    pub id: String,
+}
+
+impl HyperlaneMessage {
+    pub fn id(&self) -> String {
+        hex::encode(keccak256(
+            encode_hyperlane_message(self).expect("failed to encode message"),
+        ))
+    }
 }
 
 pub fn decode_hyperlane_message(message: &[u8]) -> Result<HyperlaneMessage> {
@@ -36,7 +43,6 @@ pub fn decode_hyperlane_message(message: &[u8]) -> Result<HyperlaneMessage> {
     let mut recipient = [0u8; 32];
     recipient.copy_from_slice(&message[RECIPIENT_OFFSET..BODY_OFFSET]);
     let body = message[BODY_OFFSET..].to_vec();
-    let id = hex::encode(keccak256(message));
 
     Ok(HyperlaneMessage {
         version,
@@ -46,8 +52,21 @@ pub fn decode_hyperlane_message(message: &[u8]) -> Result<HyperlaneMessage> {
         destination,
         recipient,
         body,
-        id,
     })
+}
+
+/// Encodes the HyperlaneMessage as per the protocol specification:
+/// https://docs.hyperlane.xyz/docs/reference/developer-tools/libraries/message
+pub fn encode_hyperlane_message(message: &HyperlaneMessage) -> Result<Vec<u8>> {
+    let mut encoded = Vec::new();
+    encoded.extend_from_slice(&message.version.to_be_bytes());
+    encoded.extend_from_slice(&message.nonce.to_be_bytes());
+    encoded.extend_from_slice(&message.origin.to_be_bytes());
+    encoded.extend_from_slice(&message.sender);
+    encoded.extend_from_slice(&message.destination.to_be_bytes());
+    encoded.extend_from_slice(&message.recipient);
+    encoded.extend_from_slice(&message.body);
+    Ok(encoded)
 }
 
 #[derive(Debug)]

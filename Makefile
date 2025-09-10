@@ -49,7 +49,7 @@ transfer:
   		--network celestia-zkevm-hl-testnet_celestia-zkevm-net \
   		--volume celestia-zkevm-hl-testnet_celestia-app:/home/celestia/.celestia-app \
   		ghcr.io/celestiaorg/celestia-app-standalone:feature-zk-execution-ism \
-  		tx warp transfer 0x726f757465725f61707000000000000000000000000000010000000000000000 1234 0x000000000000000000000000aF9053bB6c4346381C77C2FeD279B17ABAfCDf4d "1000" \
+  		tx warp transfer 0x726f757465725f61707000000000000000000000000000010000000000000000 1234 0x000000000000000000000000aF9053bB6c4346381C77C2FeD279B17ABAfCDf4d "100000" \
   		--from default --fees 400utia --max-hyperlane-fee 100utia --node http://celestia-validator:26657 --yes
 .PHONY: transfer
 

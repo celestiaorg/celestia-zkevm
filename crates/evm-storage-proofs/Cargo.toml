@@ -10,9 +10,12 @@ alloy = ["dep:alloy", "dep:tokio"]
 alloy = { version = "1.0.27", features = ["full"], optional = true }
 alloy-primitives = { workspace = true }
 alloy-rlp = { version = "0.3.12", default-features = false }
-alloy-rpc-types = { version = "1.0.27", default-features = false }
-alloy-trie = { version = "0.9.1", default-features = false }
+alloy-rpc-types = "1.0.27"
+alloy-trie = { version = "0.9.1", default-features = false, features = [
+    "ethereum",
+] }
 anyhow = "1"
+serde = { workspace = true }
 tokio = { version = "1.45.0", features = [
     "sync",
     "macros",
