@@ -39,10 +39,10 @@ This program contains a `script` crate for convenience and to demonstrate how th
 
 The `script` crate contains three binaries and depends on the `testdata` directory maintained at the root of the repository, thus all `cargo` commands should be run from there.
 
-1. Run the `vkey` binary to output the verifier key for the `evm-exec` program.
+1. Run the `vkey` binary to output the verifier key for the `evm-hyperlane` program.
 
     ```shell
-    cargo run -p evm-exec-script --bin vkey-evm-exec --release
+    cargo run -p evm-exec-script --bin vkey-evm-hyperlane --release
     ```
 
 2. The `evm-hyperlane` binary can be run in both `--execute` and `--prove` mode. Execution mode will run the program without generating a proof.
@@ -63,14 +63,3 @@ Run the `evm-hyperlane` binary in proving mode.
 ```shell
 RUST_LOG=info cargo run -p evm-hyperlane-script -release -- --prove ...
 ```
-
-4. When running the program in `--execute` mode, the user can also optionally provide the `--output-file` flag.
-For example:
-```shell
-RUST_LOG=info cargo run -p evm-hyperlane-script --release -- --execute ... output.json
-```
-
-This will write a `BenchmarkReport` JSON object containing the results of the program execution to: `testdata/benchmarks/output.json`.
-This includes total gas, total instruction count, total syscall count as well as a breakdown of cycle trackers used within the program.
-
-Please refer to https://docs.succinct.xyz/docs/sp1/introduction for more comprehensive documentation on Succinct SP1.

@@ -43,6 +43,11 @@ impl HyperlaneMessageInputs {
                 .insert(message_id)
                 .expect("Failed to insert message id into snapshot");
         }
+        for idx in 0..HYPERLANE_MERKLE_TREE_KEYS.len() {
+            // The branch nodes of the snapshot after insert must match the branch nodes of the incremental
+            // tree on the EVM chain.
+            assert_eq!(self.snapshot.branch[idx], self.branch_proof.get_branch_node(idx));
+        }
         let verified = self
             .branch_proof
             .verify(
@@ -50,14 +55,8 @@ impl HyperlaneMessageInputs {
                 Address::from_str(&self.contract).unwrap(),
                 &self.state_root,
             )
-            .unwrap();
+            .expect("Failed to verify branch proof");
         assert!(verified);
-
-        for idx in 0..HYPERLANE_MERKLE_TREE_KEYS.len() {
-            // The branch nodes of the snapshot after insert must match the branch nodes of the incremental
-            // tree on the EVM chain.
-            assert_eq!(self.snapshot.branch[idx], self.branch_proof.get_branch_node(idx));
-        }
     }
 }
 
