@@ -166,6 +166,8 @@ services:
     container_name: evm-prover
     ports:
       - "50051:50051"
+    environment:
+      - SP1_PROVER=mock
     volumes:
       - ./testnet/evm-prover/docker-entrypoint.sh:/app/docker-entrypoint.sh:ro
       - ./testnet/evm-prover/config.yaml:/home/evm-prover/.evm-prover/config/config.yaml:ro
