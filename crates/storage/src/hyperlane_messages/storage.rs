@@ -1,7 +1,6 @@
 /// This module contains the implementation of the HyperlaneMessageStore, which is a wrapper around the RocksDB database.
 /// It is used to store and retrieve Hyperlane messages.
 /// The messages are stored in a column family called "messages".
-use crate::Storage;
 use anyhow::{Context, Result};
 use dotenvy::dotenv;
 use evm_state_types::StoredHyperlaneMessage;
@@ -14,8 +13,8 @@ pub struct HyperlaneMessageStore {
     pub db: Arc<RwLock<DB>>,
 }
 
-impl Storage for HyperlaneMessageStore {
-    fn from_path_relative(crate_depth: usize) -> Result<Self> {
+impl HyperlaneMessageStore {
+    pub fn from_path_relative(crate_depth: usize) -> Result<Self> {
         dotenv().ok();
         let mut workspace_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
         for _ in 0..crate_depth {
@@ -31,14 +30,14 @@ impl Storage for HyperlaneMessageStore {
         })
     }
 
-    fn get_opts() -> Result<Options> {
+    pub fn get_opts() -> Result<Options> {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
         Ok(opts)
     }
 
-    fn get_cfs() -> Result<Vec<ColumnFamilyDescriptor>> {
+    pub fn get_cfs() -> Result<Vec<ColumnFamilyDescriptor>> {
         Ok(vec![ColumnFamilyDescriptor::new("messages", Options::default())])
     }
 }

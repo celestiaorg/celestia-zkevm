@@ -7,7 +7,7 @@ mod tests {
     use alloy_rpc_types::Filter;
     use evm_state_types::events::Dispatch;
     use std::sync::Arc;
-    use storage::{Storage, hyperlane_messages::storage::HyperlaneMessageStore};
+    use storage::hyperlane_messages::storage::HyperlaneMessageStore;
 
     #[tokio::test]
     /* Context
