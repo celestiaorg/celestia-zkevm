@@ -13,13 +13,18 @@ RUN apt-get update && apt-get install -y \
     curl \
     bash \
     git \
+    clang \
+    libclang-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install SP1 toolchain
 RUN curl -L https://sp1up.succinct.xyz | bash \
-    && export PATH="$HOME/.sp1/bin:$PATH" \
-    && sp1up --version 5.2.1 \
-    && sp1up --c-toolchain --arch amd64
+    && /root/.sp1/bin/sp1up --version 5.2.1 \
+    && /root/.sp1/bin/sp1up --c-toolchain --arch amd64
+
+# Set environment variables for SP1
+ENV PATH="/root/.sp1/bin:$PATH"
+ENV SP1_TOOLCHAIN_PATH="/root/.sp1"
 
 # Copy the workspace Cargo files
 COPY Cargo.toml Cargo.lock ./
