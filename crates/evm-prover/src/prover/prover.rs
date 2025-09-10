@@ -517,7 +517,7 @@ pub struct BlockRangeExecProver {
     prover: EnvProver,
 }
 
-/// ProofInput is a convienience type used for proof aggregation inputs within the BlockRangeExecProver program.
+/// ProofInput is a convenience type used for proof aggregation inputs within the BlockRangeExecProver program.
 pub struct ProofInput {
     proof: SP1Proof,
     vkey: SP1VerifyingKey,
