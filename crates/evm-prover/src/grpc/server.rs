@@ -9,7 +9,7 @@ use tonic_reflection::server::Builder as ReflectionBuilder;
 
 use crate::config::config::Config;
 use crate::proto::celestia::prover::v1::prover_server::ProverServer;
-use crate::prover::prover::{AppContext, BlockExecProver};
+use crate::prover::block::{AppContext, BlockExecProver};
 use crate::prover::service::ProverService;
 
 pub async fn create_grpc_server(config: Config) -> Result<()> {

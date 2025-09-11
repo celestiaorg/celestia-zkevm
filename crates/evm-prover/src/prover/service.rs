@@ -8,7 +8,7 @@ use crate::proto::celestia::prover::v1::{
     InfoRequest, InfoResponse, ProveStateMembershipRequest, ProveStateMembershipResponse, ProveStateTransitionRequest,
     ProveStateTransitionResponse,
 };
-use crate::prover::prover::BlockRangeExecProver;
+use crate::prover::BlockRangeExecProver;
 
 pub struct ProverService {
     block_range_prover: BlockRangeExecProver,
