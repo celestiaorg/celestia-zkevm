@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::{
-        prover::block::EVM_EXEC_ELF,
+        prover::programs::block::EVM_EXEC_ELF,
         storage::{
             proof_storage::{ProofStorageError, RocksDbProofStorage},
             ProofStorage,
