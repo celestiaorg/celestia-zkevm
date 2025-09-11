@@ -44,7 +44,7 @@ impl HyperlaneSnapshotStore {
         Ok(vec![ColumnFamilyDescriptor::new("snapshots", Options::default())])
     }
 
-    pub fn insert_snapshot(&self, index: u32, snapshot: HyperlaneSnapshot) -> Result<()> {
+    pub fn insert_snapshot(&self, index: u64, snapshot: HyperlaneSnapshot) -> Result<()> {
         // Serialize outside the lock to minimize lock duration
         let serialized = bincode::serialize(&snapshot).context("Failed to serialize snapshot")?;
 
@@ -61,7 +61,7 @@ impl HyperlaneSnapshotStore {
         Ok(())
     }
 
-    pub fn get_snapshot(&self, index: u32) -> Result<HyperlaneSnapshot> {
+    pub fn get_snapshot(&self, index: u64) -> Result<HyperlaneSnapshot> {
         let read_lock = self
             .db
             .read()
@@ -73,7 +73,7 @@ impl HyperlaneSnapshotStore {
         bincode::deserialize(&snapshot).context("Failed to deserialize snapshot")
     }
 
-    pub fn current_index(&self) -> Result<u32> {
+    pub fn current_index(&self) -> Result<u64> {
         let read_lock = self
             .db
             .read()
@@ -81,9 +81,9 @@ impl HyperlaneSnapshotStore {
         let cf = read_lock.cf_handle("snapshots").context("Missing CF")?;
         let mut iter = read_lock.iterator_cf(cf, IteratorMode::End);
         if let Some(Ok((k, _))) = iter.next() {
-            let mut buf = [0u8; 4];
+            let mut buf = [0u8; 8];
             buf.copy_from_slice(&k); // safe since key is always 4 bytes
-            Ok(u32::from_be_bytes(buf) + 1)
+            Ok(u64::from_be_bytes(buf) + 1)
         } else {
             Ok(0)
         }

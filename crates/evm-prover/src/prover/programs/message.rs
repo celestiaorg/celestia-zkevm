@@ -15,7 +15,10 @@ use anyhow::Result;
 use evm_hyperlane_types_sp1::{HyperlaneMessageInputs, HyperlaneMessageOutputs};
 use evm_state_queries::hyperlane::indexer::HyperlaneIndexer;
 use evm_state_types::events::Dispatch;
-use evm_storage_proofs::client::EvmClient;
+use evm_storage_proofs::{
+    client::EvmClient,
+    types::{HyperlaneBranchProof, HyperlaneBranchProofInputs, HYPERLANE_MERKLE_TREE_KEYS},
+};
 use reqwest::Url;
 use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
@@ -158,13 +161,40 @@ impl HyperlaneMessageProver {
             indexer
                 .index(self.message_store.clone(), Arc::new(evm_provider.clone()))
                 .await
-                .unwrap();
+                .expect("Failed to index messages");
 
             // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
             // then save new snapshot
             // todo: store the proof or directly send it to celestia for verification
+            let snapshot = self
+                .snapshot_store
+                .get_snapshot(self.app.trusted_state.read().unwrap().snapshot_index)
+                .expect("Failed to get snapshot");
+
+            let messages = self
+                .message_store
+                .get_by_block(self.app.trusted_state.read().unwrap().height)
+                .expect("Failed to get messages");
+
+            let proof = evm_client
+                .get_proof(
+                    &HYPERLANE_MERKLE_TREE_KEYS,
+                    Address::from_str("0xFCb1d485ef46344029D9E8A7925925e146B3430E").unwrap(),
+                    Some(height_on_chain.into()),
+                )
+                .await
+                .unwrap();
+            let branch_proof = HyperlaneBranchProof::new(proof);
+
+            let input = HyperlaneMessageInputs::new(
+                state_root_on_chain.to_string(),
+                contract_address.to_string(),
+                messages.into_iter().map(|m| m.message).collect(),
+                HyperlaneBranchProofInputs::from(branch_proof),
+                snapshot,
+            );
+            let _proof = self.prove(input).await.expect("Failed to prove");
         }
-        Ok(())
     }
 }
 
