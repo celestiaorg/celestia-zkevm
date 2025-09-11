@@ -43,6 +43,7 @@ tonic = { version = "0.10", features = ["transport"] }
 tonic-reflection = "0.10"
 storage = { workspace = true }
 evm-hyperlane-types-sp1 = { workspace = true }
+evm-storage-proofs = { workspace = true, features = ["alloy"] }
 
 [dev-dependencies]
 tempfile = "3.8"

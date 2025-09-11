@@ -2,15 +2,38 @@
 //! two given heights against a given EVM block height.
 
 #![allow(dead_code)]
-use std::sync::{Arc, RwLock};
+use std::{
+    str::FromStr,
+    sync::{Arc, RwLock},
+};
 
-use alloy_primitives::FixedBytes;
+use alloy_primitives::{hex::FromHex, FixedBytes};
+use alloy_provider::{fillers::FillProvider, Provider, ProviderBuilder};
 use anyhow::Result;
 use evm_hyperlane_types_sp1::{HyperlaneMessageInputs, HyperlaneMessageOutputs};
+use evm_storage_proofs::client::EvmClient;
+use reqwest::Url;
 use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 
 use crate::prover::{ProgramProver, ProverConfig};
+
+pub type DefaultProvider = FillProvider<
+    alloy_provider::fillers::JoinFill<
+        alloy_provider::Identity,
+        alloy_provider::fillers::JoinFill<
+            alloy_provider::fillers::GasFiller,
+            alloy_provider::fillers::JoinFill<
+                alloy_provider::fillers::BlobGasFiller,
+                alloy_provider::fillers::JoinFill<
+                    alloy_provider::fillers::NonceFiller,
+                    alloy_provider::fillers::ChainIdFiller,
+                >,
+            >,
+        >,
+    >,
+    alloy_provider::RootProvider,
+>;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_HYPERLANE_ELF: &[u8] = include_elf!("evm-hyperlane-program");
@@ -101,7 +124,20 @@ impl HyperlaneMessageProver {
         }
     }
 
-    pub fn run(self: Arc<Self>) -> Result<()> {
+    pub async fn run(self: Arc<Self>) -> Result<()> {
+        let evm_provider: DefaultProvider =
+            ProviderBuilder::new().connect_http(Url::from_str(&self.app.evm_rpc).unwrap());
+        let evm_client = EvmClient::new(evm_provider.clone());
+        let (state_root_on_chain, height_on_chain) =
+            simulate_get_root_and_height(&evm_provider, &evm_client).await.unwrap();
+        // todo: get the root and height from celestia
         Ok(())
     }
+}
+
+async fn simulate_get_root_and_height(provider: &DefaultProvider, client: &EvmClient) -> Result<(FixedBytes<32>, u64)> {
+    // todo: instead query celestia for a recent state root and height provided by our light client
+    let height = provider.get_block_number().await.unwrap();
+    let root = client.get_state_root(height).await.unwrap();
+    Ok((FixedBytes::from_hex(&root).unwrap(), height))
 }

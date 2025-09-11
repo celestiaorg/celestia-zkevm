@@ -3472,6 +3472,7 @@ dependencies = [
  "ev-types",
  "evm-exec-types",
  "evm-hyperlane-types",
+ "evm-storage-proofs",
  "hex",
  "jsonrpsee-core",
  "nmt-rs",

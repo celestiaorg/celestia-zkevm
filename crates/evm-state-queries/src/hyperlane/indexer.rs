@@ -14,7 +14,7 @@ use evm_state_types::{
 use std::{env, str::FromStr, sync::Arc};
 use storage::hyperlane::message::HyperlaneMessageStore;
 
-pub type DefaultProvider = FillProvider<
+type DefaultProvider = FillProvider<
     alloy_provider::fillers::JoinFill<
         alloy_provider::Identity,
         alloy_provider::fillers::JoinFill<
