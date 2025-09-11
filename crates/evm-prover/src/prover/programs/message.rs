@@ -155,8 +155,12 @@ impl HyperlaneMessageProver {
 
             println!("[INFO] state_root_on_chain: {state_root_on_chain}, height_on_chain: {height_on_chain}");
 
-            if self.app.trusted_state.read().unwrap().height + FREQUENCY > height_on_chain {
-                println!("[INFO] Waiting for more blocks to occur...");
+            if self.app.trusted_state.read().unwrap().height <= height_on_chain {
+                println!(
+                    "[INFO] Waiting for more blocks to occur {}/{}...",
+                    height_on_chain,
+                    self.app.trusted_state.read().unwrap().height + DISTANCE_TO_HEAD
+                );
                 sleep(Duration::from_secs(TIMEOUT)).await;
                 continue;
             }
@@ -217,6 +221,7 @@ impl HyperlaneMessageProver {
                 )
                 .await
                 .expect("Failed to get merkle proof");
+
             let branch_proof = HyperlaneBranchProof::new(proof);
 
             let input = HyperlaneMessageInputs::new(

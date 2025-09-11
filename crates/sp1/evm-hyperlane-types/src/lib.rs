@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 pub mod tree;
 use tree::MerkleTree;
 
+use crate::tree::ZERO_BYTES;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// Inputs for the hyperlane message circuit.
 pub struct HyperlaneMessageInputs {
@@ -44,19 +46,21 @@ impl HyperlaneMessageInputs {
                 .expect("Failed to insert message id into snapshot");
         }
 
-        let mut zero_nodes = 0;
+        // sanity check, we can't prove an empty hyperlane tree against state_root
+        if self
+            .snapshot
+            .branch
+            .iter()
+            .all(|_| self.snapshot.branch.iter().all(|b| b == ZERO_BYTES))
+        {
+            panic!("Snapshot branch is empty (all zero bytes) before proof verification");
+        }
+
         for idx in 0..HYPERLANE_MERKLE_TREE_KEYS.len() {
             // The branch nodes of the snapshot after insert must match the branch nodes of the incremental
             // tree on the EVM chain.
             assert_eq!(self.snapshot.branch[idx], self.branch_proof.get_branch_node(idx));
-            if self.snapshot.branch[idx] == MerkleTree::zero_bytes() {
-                zero_nodes += 1;
-            }
         }
-        assert_ne!(
-            zero_nodes, self.snapshot.count,
-            "User Error: Snapshot has zero nodes, can't prove an empty hyperlane tree against state_root"
-        );
 
         let verified = self
             .branch_proof

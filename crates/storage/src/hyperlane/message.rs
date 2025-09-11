@@ -51,6 +51,7 @@ impl HyperlaneMessageStore {
         ])
     }
 
+    /// Insert a serialized hyperlane message into the database
     pub fn insert_message(&self, index: u64, message: StoredHyperlaneMessage) -> Result<()> {
         let serialized = bincode::serialize(&message)?;
         let write_lock = self.db.write().map_err(|e| anyhow::anyhow!("lock error: {}", e))?;
@@ -75,6 +76,7 @@ impl HyperlaneMessageStore {
         Ok(())
     }
 
+    /// Get all stored Hyperlane messages for a given block height (requires IndexMode::Block)
     pub fn get_by_block(&self, block: u64) -> Result<Vec<StoredHyperlaneMessage>> {
         let db = self.db.read().map_err(|e| anyhow::anyhow!("lock error: {e}"))?;
         let cf_blk = db.cf_handle("messages_by_block").context("Missing CF")?;
@@ -90,6 +92,7 @@ impl HyperlaneMessageStore {
         Ok(result)
     }
 
+    /// Get a single Hyperlane message by index (requires IndexMode::Message)
     pub fn get_message(&self, index: u64) -> Result<StoredHyperlaneMessage> {
         let read_lock = self
             .db
@@ -102,27 +105,58 @@ impl HyperlaneMessageStore {
         bincode::deserialize(&message).context("Failed to deserialize message")
     }
 
+    /// Get the next index to use for insertion.
+    /// - In Message mode, looks at the last key in the "messages" CF.
+    /// - In Block mode, looks at the last key in the "messages_by_block" CF.
     pub fn current_index(&self) -> Result<u64> {
         let db = self.db.read().map_err(|e| anyhow::anyhow!("lock error: {e}"))?;
-        let cf_msg = db.cf_handle("messages").context("Missing messages CF")?;
-        let mut iter = db.iterator_cf(cf_msg, IteratorMode::End);
-        if let Some(Ok((k, _))) = iter.next() {
-            let mut buf = [0u8; 8];
-            buf.copy_from_slice(&k); // now safe, because keys are always 8 bytes here
-            Ok(u64::from_be_bytes(buf) + 1)
-        } else {
-            Ok(0)
+
+        match self.index_mode {
+            IndexMode::Message => {
+                let cf = db.cf_handle("messages").context("Missing messages CF")?;
+                let mut iter = db.iterator_cf(cf, IteratorMode::End);
+                if let Some(Ok((k, _))) = iter.next() {
+                    if k.len() != 8 {
+                        anyhow::bail!("messages CF key length != 8 (got {})", k.len());
+                    }
+                    let mut buf = [0u8; 8];
+                    buf.copy_from_slice(&k);
+                    Ok(u64::from_be_bytes(buf) + 1)
+                } else {
+                    Ok(0)
+                }
+            }
+            IndexMode::Block => {
+                let cf = db
+                    .cf_handle("messages_by_block")
+                    .context("Missing messages_by_block CF")?;
+                let mut iter = db.iterator_cf(cf, IteratorMode::End);
+                if let Some(Ok((k, _))) = iter.next() {
+                    if k.len() != 16 {
+                        anyhow::bail!("messages_by_block CF key length != 16 (got {})", k.len());
+                    }
+                    // key = block(8) || index(8)
+                    let mut buf = [0u8; 8];
+                    buf.copy_from_slice(&k[8..16]);
+                    Ok(u64::from_be_bytes(buf) + 1)
+                } else {
+                    Ok(0)
+                }
+            }
         }
     }
 
+    /// Prune all Hyperlane messages from the database
     pub fn prune_all(&self) -> Result<()> {
         let mut write_lock = self
             .db
             .write()
             .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
         write_lock.drop_cf("messages")?;
+        write_lock.drop_cf("messages_by_block")?;
         let opts = Options::default();
         write_lock.create_cf("messages", &opts)?;
+        write_lock.create_cf("messages_by_block", &opts)?;
         Ok(())
     }
 }
