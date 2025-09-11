@@ -3,7 +3,10 @@ pub mod snapshot;
 
 #[cfg(test)]
 mod tests {
-    use crate::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
+    use crate::hyperlane::{
+        message::{HyperlaneMessageStore, IndexMode},
+        snapshot::HyperlaneSnapshotStore,
+    };
     use evm_hyperlane_types_sp1::tree::MerkleTree;
     use evm_state_types::{StoredHyperlaneMessage, hyperlane::decode_hyperlane_message};
 
@@ -11,7 +14,7 @@ mod tests {
     fn test_insert_message() {
         dotenvy::dotenv().ok();
 
-        let store = HyperlaneMessageStore::from_path_relative(2).unwrap();
+        let store = HyperlaneMessageStore::from_path_relative(2, IndexMode::Message).unwrap();
         let message = hex::decode("0300000009000004d2000000000000000000000000a7578551bae89a96c3365b93493ad2d4ebcbae9700010f2c726f757465725f617070000000000000000000000000000100000000000000000000000000000000000000006a809b36caf0d46a935ee76835065ec5a8b3cea700000000000000000000000000000000000000000000000000000000000003e8").unwrap();
         let current_index = store.current_index().unwrap();
         let message = decode_hyperlane_message(&message).unwrap();
@@ -26,7 +29,7 @@ mod tests {
     fn test_insert_message_by_block() {
         dotenvy::dotenv().ok();
         let message = hex::decode("0300000009000004d2000000000000000000000000a7578551bae89a96c3365b93493ad2d4ebcbae9700010f2c726f757465725f617070000000000000000000000000000100000000000000000000000000000000000000006a809b36caf0d46a935ee76835065ec5a8b3cea700000000000000000000000000000000000000000000000000000000000003e8").unwrap();
-        let store = HyperlaneMessageStore::from_path_relative(2).unwrap();
+        let store = HyperlaneMessageStore::from_path_relative(2, IndexMode::Block).unwrap();
         let message = decode_hyperlane_message(&message).unwrap();
         let message = StoredHyperlaneMessage::new(message, Some(100));
         let current_index = store.current_index().unwrap();

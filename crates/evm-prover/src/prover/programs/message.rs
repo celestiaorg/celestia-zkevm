@@ -21,7 +21,10 @@ use evm_storage_proofs::{
 };
 use reqwest::Url;
 use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
-use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
+use storage::hyperlane::{
+    message::{HyperlaneMessageStore, IndexMode},
+    snapshot::HyperlaneSnapshotStore,
+};
 use tokio::time::sleep;
 
 use crate::prover::{ProgramProver, ProverConfig};
@@ -264,7 +267,7 @@ async fn test_run_prover() {
         trusted_state: RwLock::new(TrustedState::new(0, 0)),
     };
 
-    let hyperlane_message_store = Arc::new(HyperlaneMessageStore::from_path_relative(2).unwrap());
+    let hyperlane_message_store = Arc::new(HyperlaneMessageStore::from_path_relative(2, IndexMode::Block).unwrap());
     let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::from_path_relative(2).unwrap());
     hyperlane_message_store.prune_all().unwrap();
     hyperlane_snapshot_store.prune_all().unwrap();

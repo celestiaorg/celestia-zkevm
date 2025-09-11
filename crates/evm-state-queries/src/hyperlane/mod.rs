@@ -22,7 +22,7 @@ mod tests {
     */
     async fn test_run_indexer() {
         let indexer = HyperlaneIndexer::default();
-        let message_store = Arc::new(HyperlaneMessageStore::from_path_relative(2).unwrap());
+        let message_store = Arc::new(HyperlaneMessageStore::from_path_relative(2, IndexMode::Message).unwrap());
         message_store.prune_all().unwrap();
         let provider = Arc::new(ProviderBuilder::new().connect_ws(indexer.socket.clone()).await.unwrap());
         indexer.index(message_store, provider).await.unwrap();

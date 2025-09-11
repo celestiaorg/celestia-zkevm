@@ -98,7 +98,7 @@ async fn main() {
 }
 
 async fn write_proof_inputs(stdin: &mut SP1Stdin, args: &Args) -> Result<()> {
-    let message_db = HyperlaneMessageStore::from_path_relative(4).unwrap();
+    let message_db = HyperlaneMessageStore::from_path_relative(4, IndexMode::Message).unwrap();
 
     let mut messages = Vec::new();
     for height in args.start_idx..=args.end_idx {

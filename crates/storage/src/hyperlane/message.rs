@@ -9,12 +9,18 @@ use std::env;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
+pub enum IndexMode {
+    Block,
+    Message,
+}
+
 pub struct HyperlaneMessageStore {
     pub db: Arc<RwLock<DB>>,
+    pub index_mode: IndexMode,
 }
 
 impl HyperlaneMessageStore {
-    pub fn from_path_relative(crate_depth: usize) -> Result<Self> {
+    pub fn from_path_relative(crate_depth: usize, index_mode: IndexMode) -> Result<Self> {
         dotenv().ok();
         let mut workspace_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
         for _ in 0..crate_depth {
@@ -27,6 +33,7 @@ impl HyperlaneMessageStore {
         let db = DB::open_cf_descriptors(&opts, path, cfs)?;
         Ok(Self {
             db: Arc::new(RwLock::new(db)),
+            index_mode,
         })
     }
 
@@ -48,17 +55,23 @@ impl HyperlaneMessageStore {
         let serialized = bincode::serialize(&message)?;
 
         let write_lock = self.db.write().map_err(|e| anyhow::anyhow!("lock error: {}", e))?;
-        //let cf_msg = write_lock.cf_handle("messages").context("Missing messages CF")?;
-        //write_lock.put_cf(cf_msg, index.to_be_bytes(), &serialized)?;
+        let cf_msg = write_lock.cf_handle("messages").context("Missing messages CF")?;
 
-        if let Some(block) = message.block_number {
-            let cf_blk = write_lock
-                .cf_handle("messages_by_block")
-                .context("Missing by_block CF")?;
-            // allow multiple per block: key = (block, index)
-            let mut key = block.to_be_bytes().to_vec();
-            key.extend_from_slice(&index.to_be_bytes());
-            write_lock.put_cf(cf_blk, key, &serialized)?;
+        match self.index_mode {
+            IndexMode::Block => {
+                if let Some(block) = message.block_number {
+                    let cf_blk = write_lock
+                        .cf_handle("messages_by_block")
+                        .context("Missing by_block CF")?;
+                    // allow multiple per block: key = (block, index)
+                    let mut key = block.to_be_bytes().to_vec();
+                    key.extend_from_slice(&index.to_be_bytes());
+                    write_lock.put_cf(cf_blk, key, &serialized)?;
+                }
+            }
+            IndexMode::Message => {
+                write_lock.put_cf(cf_msg, index.to_be_bytes(), &serialized)?;
+            }
         }
 
         Ok(())
