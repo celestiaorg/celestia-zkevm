@@ -1,5 +1,5 @@
-# Use the official Rust image as a builder
-FROM rust:1.88-slim as builder
+# Use the official Rust image as a builder - force linux/amd64 for SP1 compatibility
+FROM --platform=linux/amd64 rust:1.88-slim as builder
 
 # Set the working directory
 WORKDIR /app
@@ -17,12 +17,12 @@ RUN apt-get update && apt-get install -y \
     libclang-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install SP1 toolchain
-RUN curl -L https://sp1up.succinct.xyz | bash \
-    && /root/.sp1/bin/sp1up --version 5.2.1 \
-    && /root/.sp1/bin/sp1up --c-toolchain --arch amd64
+# Install SP1 toolchain 
+RUN curl -L https://sp1up.succinct.xyz | bash
+RUN /root/.sp1/bin/sp1up --version 5.2.1
+RUN /root/.sp1/bin/sp1up --c-toolchain --arch amd64
 
-# Set environment variables for SP1
+# Set SP1 environment
 ENV PATH="/root/.sp1/bin:$PATH"
 ENV SP1_TOOLCHAIN_PATH="/root/.sp1"
 

@@ -163,6 +163,7 @@ services:
     build:
       context: .
       dockerfile: crates/evm-prover/Dockerfile
+    platform: linux/amd64
     container_name: evm-prover
     ports:
       - "50051:50051"
