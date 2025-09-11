@@ -45,6 +45,7 @@ pub type DefaultProvider = FillProvider<
 
 const FREQUENCY: u64 = 50; // in blocks
 const TIMEOUT: u64 = 6; // in seconds
+const DISTANCE_TO_HEAD: u64 = 32; // in blocks
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_HYPERLANE_ELF: &[u8] = include_elf!("evm-hyperlane-program");
@@ -151,7 +152,10 @@ impl HyperlaneMessageProver {
             let (state_root_on_chain, height_on_chain) =
                 simulate_get_root_and_height(&evm_provider, &evm_client).await.unwrap();
 
+            println!("[INFO] state_root_on_chain: {state_root_on_chain}, height_on_chain: {height_on_chain}");
+
             if self.app.trusted_state.read().unwrap().height + FREQUENCY > height_on_chain {
+                println!("[INFO] Waiting for more blocks to occur...");
                 sleep(Duration::from_secs(TIMEOUT)).await;
                 continue;
             }
@@ -167,6 +171,11 @@ impl HyperlaneMessageProver {
                 .index(self.message_store.clone(), Arc::new(evm_provider.clone()))
                 .await
                 .expect("Failed to index messages");
+
+            println!(
+                "[INFO] Indexed messages, new height {}",
+                self.message_store.current_index().unwrap()
+            );
 
             // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
             // then save new snapshot
@@ -209,7 +218,30 @@ impl HyperlaneMessageProver {
 
 async fn simulate_get_root_and_height(provider: &DefaultProvider, client: &EvmClient) -> Result<(FixedBytes<32>, u64)> {
     // todo: instead query celestia for a recent state root and height provided by our light client
-    let height = provider.get_block_number().await.unwrap();
+    let height = provider.get_block_number().await.unwrap() - DISTANCE_TO_HEAD;
     let root = client.get_state_root(height).await.unwrap();
     Ok((FixedBytes::from_hex(&root).unwrap(), height))
+}
+
+#[tokio::test]
+async fn test_run_prover() {
+    #[allow(unused_imports)]
+    use super::*;
+
+    let app = AppContext {
+        celestia_rpc: "http://127.0.0.1:26657".to_string(),
+        evm_rpc: "http://127.0.0.1:8545".to_string(),
+        evm_ws: "ws://127.0.0.1:8546".to_string(),
+        mailbox_address: Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap(),
+        merkle_tree_address: Address::from_str("0xFCb1d485ef46344029D9E8A7925925e146B3430E").unwrap(),
+        trusted_state: RwLock::new(TrustedState::new(0, 0)),
+    };
+
+    let prover = HyperlaneMessageProver::new(
+        app,
+        Arc::new(HyperlaneMessageStore::from_path_relative(2).unwrap()),
+        Arc::new(HyperlaneSnapshotStore::from_path_relative(2).unwrap()),
+    )
+    .unwrap();
+    prover.run().await.unwrap();
 }
