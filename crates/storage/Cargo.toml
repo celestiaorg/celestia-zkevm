@@ -11,6 +11,8 @@ anyhow = { workspace = true }
 bincode = { workspace = true }
 dotenvy = "0.15.7"
 evm-state-types = { workspace = true }
+evm-hyperlane-types-sp1 = { workspace = true }
 hex = { workspace = true }
 rocksdb = "0.24.0"
 tokio = { workspace = true }
+serde = { workspace = true }

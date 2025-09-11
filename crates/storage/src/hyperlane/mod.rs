@@ -1,8 +1,10 @@
-pub mod storage;
+pub mod message;
+pub mod snapshot;
 
 #[cfg(test)]
 mod tests {
-    use crate::hyperlane_messages::storage::HyperlaneMessageStore;
+    use crate::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
+    use evm_hyperlane_types_sp1::tree::MerkleTree;
     use evm_state_types::{StoredHyperlaneMessage, hyperlane::decode_hyperlane_message};
 
     #[test]
@@ -17,5 +19,17 @@ mod tests {
         store.insert_message(current_index, message.clone()).unwrap();
         let retrieved_message = store.get_message(current_index).unwrap();
         assert_eq!(retrieved_message.message, message.message);
+    }
+
+    #[test]
+    fn test_insert_snapshot() {
+        dotenvy::dotenv().ok();
+
+        let store = HyperlaneSnapshotStore::from_path_relative(2).unwrap();
+        let snapshot = MerkleTree::default();
+        let current_index = store.current_index().unwrap();
+        store.insert_snapshot(current_index, snapshot.clone()).unwrap();
+        let retrieved_snapshot = store.get_snapshot(current_index).unwrap();
+        assert_eq!(retrieved_snapshot, snapshot);
     }
 }

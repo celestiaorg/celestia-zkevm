@@ -21,7 +21,6 @@ use evm_storage_proofs::{
 };
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 use std::{env, str::FromStr, time::Instant};
-use storage::hyperlane_messages::storage::HyperlaneMessageStore;
 use url::Url;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.

@@ -9003,9 +9003,11 @@ dependencies = [
  "anyhow",
  "bincode",
  "dotenvy",
+ "evm-hyperlane-types",
  "evm-state-types",
  "hex",
  "rocksdb",
+ "serde",
  "tokio",
 ]
 

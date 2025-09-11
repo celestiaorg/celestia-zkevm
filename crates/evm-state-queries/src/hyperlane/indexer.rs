@@ -12,7 +12,7 @@ use evm_state_types::{
     hyperlane::decode_hyperlane_message,
 };
 use std::{env, str::FromStr, sync::Arc};
-use storage::hyperlane_messages::storage::HyperlaneMessageStore;
+use storage::hyperlane::message::HyperlaneMessageStore;
 
 pub type DefaultProvider = FillProvider<
     alloy_provider::fillers::JoinFill<
