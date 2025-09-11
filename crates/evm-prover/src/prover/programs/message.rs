@@ -149,8 +149,9 @@ impl HyperlaneMessageProver {
 
         loop {
             // todo: get the root and height from celestia instead of directly from reth
-            let (state_root_on_chain, height_on_chain) =
-                simulate_get_root_and_height(&evm_provider, &evm_client).await.unwrap();
+            let (state_root_on_chain, height_on_chain) = simulate_get_root_and_height(&evm_provider, &evm_client)
+                .await
+                .expect("Failed to get root and height");
 
             println!("[INFO] state_root_on_chain: {state_root_on_chain}, height_on_chain: {height_on_chain}");
 
@@ -163,7 +164,13 @@ impl HyperlaneMessageProver {
             indexer.filter = Filter::new()
                 .address(indexer.contract_address)
                 .event(&Dispatch::id())
-                .from_block(self.app.trusted_state.read().unwrap().height)
+                .from_block(
+                    self.app
+                        .trusted_state
+                        .read()
+                        .expect("Failed to read trusted state")
+                        .height,
+                )
                 .to_block(height_on_chain);
 
             // run the indexer to get all messages that occurred since the last trusted height
@@ -174,7 +181,7 @@ impl HyperlaneMessageProver {
 
             println!(
                 "[INFO] Indexed messages, new height {}",
-                self.message_store.current_index().unwrap()
+                self.message_store.current_index().expect("Failed to get current index")
             );
 
             // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
@@ -182,12 +189,24 @@ impl HyperlaneMessageProver {
             // todo: store the proof or directly send it to celestia for verification
             let snapshot = self
                 .snapshot_store
-                .get_snapshot(self.app.trusted_state.read().unwrap().snapshot_index)
+                .get_snapshot(
+                    self.app
+                        .trusted_state
+                        .read()
+                        .expect("Failed to read trusted state")
+                        .snapshot_index,
+                )
                 .expect("Failed to get snapshot");
 
             let messages = self
                 .message_store
-                .get_by_block(self.app.trusted_state.read().unwrap().height)
+                .get_by_block(
+                    self.app
+                        .trusted_state
+                        .read()
+                        .expect("Failed to read trusted state")
+                        .height,
+                )
                 .expect("Failed to get messages");
 
             let proof = evm_client
@@ -197,7 +216,7 @@ impl HyperlaneMessageProver {
                     Some(height_on_chain.into()),
                 )
                 .await
-                .unwrap();
+                .expect("Failed to get merkle proof");
             let branch_proof = HyperlaneBranchProof::new(proof);
 
             let input = HyperlaneMessageInputs::new(
@@ -210,8 +229,16 @@ impl HyperlaneMessageProver {
             let _proof = self.prove(input).await.expect("Failed to prove");
 
             // update trusted state
-            self.app.trusted_state.write().unwrap().height = height_on_chain;
-            self.app.trusted_state.write().unwrap().snapshot_index += 1;
+            self.app
+                .trusted_state
+                .write()
+                .expect("Failed to write trusted state")
+                .height = height_on_chain;
+            self.app
+                .trusted_state
+                .write()
+                .expect("Failed to write trusted state")
+                .snapshot_index += 1;
         }
     }
 }
