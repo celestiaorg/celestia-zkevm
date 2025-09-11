@@ -221,7 +221,7 @@ impl HyperlaneMessageProver {
 
             let input = HyperlaneMessageInputs::new(
                 state_root_on_chain.to_string(),
-                contract_address.to_string(),
+                self.app.merkle_tree_address.to_string(),
                 messages.into_iter().map(|m| m.message).collect(),
                 HyperlaneBranchProofInputs::from(branch_proof),
                 snapshot,
@@ -234,6 +234,7 @@ impl HyperlaneMessageProver {
                 .write()
                 .expect("Failed to write trusted state")
                 .height = height_on_chain;
+
             self.app
                 .trusted_state
                 .write()

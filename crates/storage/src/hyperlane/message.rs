@@ -53,9 +53,7 @@ impl HyperlaneMessageStore {
 
     pub fn insert_message(&self, index: u64, message: StoredHyperlaneMessage) -> Result<()> {
         let serialized = bincode::serialize(&message)?;
-
         let write_lock = self.db.write().map_err(|e| anyhow::anyhow!("lock error: {}", e))?;
-        let cf_msg = write_lock.cf_handle("messages").context("Missing messages CF")?;
 
         match self.index_mode {
             IndexMode::Block => {
