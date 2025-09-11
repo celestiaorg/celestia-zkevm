@@ -32,7 +32,7 @@ A Byzantine or malicious sequencer node may **equivocate**—that is, submit mul
 
 The proof system cannot prevent this behavior, but it can be designed to **tolerate** it. Celestia not only provides data availability for applications, it also enforces an **ordering mechanism** (see the [Data Square Layout specification](https://celestiaorg.github.io/celestia-app/data_square_layout.html#ordering)).  
 
-In the event of equivocation, the proof system accepts the payload according to the **first-come, first-served (FCFS)** ordering principle defined by Celestia's priority based ordering mechanism.
+In the event of equivocation, the proof system accepts the payload according to the first-come, first-served (FCFS) rule enforced by Celestia’s priority-based ordering. This ensures that proof generation remains deterministic and avoids divergent execution paths that could otherwise arise without a clear fork-choice policy.
 
 ## Usage
 
