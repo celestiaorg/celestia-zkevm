@@ -51,7 +51,12 @@ pub const EVM_HYPERLANE_ELF: &[u8] = include_elf!("evm-hyperlane-program");
 
 pub struct AppContext {
     pub celestia_rpc: String,
+    // reth http, for example http://127.0.0.1:8545
     pub evm_rpc: String,
+    // reth websocket, for example ws://127.0.0.1:8546
+    pub evm_ws: String,
+    pub mailbox_address: Address,
+    pub merkle_tree_address: Address,
     pub trusted_state: RwLock<TrustedState>,
 }
 
@@ -136,8 +141,8 @@ impl HyperlaneMessageProver {
         let evm_provider: DefaultProvider =
             ProviderBuilder::new().connect_http(Url::from_str(&self.app.evm_rpc).unwrap());
         let evm_client = EvmClient::new(evm_provider.clone());
-        let socket = WsConnect::new("ws://127.0.0.1:8546");
-        let contract_address = Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap();
+        let socket = WsConnect::new(&self.app.evm_ws);
+        let contract_address = self.app.mailbox_address;
         let filter = Filter::new().address(contract_address).event(&Dispatch::id());
         let mut indexer = HyperlaneIndexer::new(socket, contract_address, filter.clone());
 
@@ -179,7 +184,7 @@ impl HyperlaneMessageProver {
             let proof = evm_client
                 .get_proof(
                     &HYPERLANE_MERKLE_TREE_KEYS,
-                    Address::from_str("0xFCb1d485ef46344029D9E8A7925925e146B3430E").unwrap(),
+                    self.app.merkle_tree_address,
                     Some(height_on_chain.into()),
                 )
                 .await
