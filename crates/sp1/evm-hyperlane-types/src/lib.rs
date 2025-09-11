@@ -43,11 +43,21 @@ impl HyperlaneMessageInputs {
                 .insert(message_id)
                 .expect("Failed to insert message id into snapshot");
         }
+
+        let mut zero_nodes = 0;
         for idx in 0..HYPERLANE_MERKLE_TREE_KEYS.len() {
             // The branch nodes of the snapshot after insert must match the branch nodes of the incremental
             // tree on the EVM chain.
             assert_eq!(self.snapshot.branch[idx], self.branch_proof.get_branch_node(idx));
+            if self.snapshot.branch[idx] == MerkleTree::zero_bytes() {
+                zero_nodes += 1;
+            }
         }
+        assert_ne!(
+            zero_nodes, self.snapshot.count,
+            "User Error: Snapshot has zero nodes, can't prove an empty hyperlane tree against state_root"
+        );
+
         let verified = self
             .branch_proof
             .verify(

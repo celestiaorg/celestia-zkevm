@@ -45,10 +45,13 @@ impl HyperlaneMessageStore {
     }
 
     pub fn get_cfs() -> Result<Vec<ColumnFamilyDescriptor>> {
-        Ok(vec![ColumnFamilyDescriptor::new("messages", Options::default())])
+        Ok(vec![
+            ColumnFamilyDescriptor::new("messages", Options::default()), // index → payload
+            ColumnFamilyDescriptor::new("messages_by_block", Options::default()), // (block||index) → payload
+        ])
     }
 
-    pub fn insert_message(&self, index: u32, message: StoredHyperlaneMessage) -> Result<()> {
+    pub fn insert_message(&self, index: u64, message: StoredHyperlaneMessage) -> Result<()> {
         let serialized = bincode::serialize(&message)?;
 
         let write_lock = self.db.write().map_err(|e| anyhow::anyhow!("lock error: {}", e))?;
@@ -57,15 +60,17 @@ impl HyperlaneMessageStore {
         match self.index_mode {
             IndexMode::Block => {
                 if let Some(block) = message.block_number {
-                    let cf_blk = write_lock.cf_handle("messages").context("Missing by_block CF")?;
-                    // allow multiple per block: key = (block, index)
+                    let cf_blk = write_lock
+                        .cf_handle("messages_by_block")
+                        .expect("Missing messages_by_block CF");
                     let mut key = block.to_be_bytes().to_vec();
-                    key.extend_from_slice(&index.to_be_bytes());
+                    key.extend_from_slice(&index.to_be_bytes()); // 16-byte key
                     write_lock.put_cf(cf_blk, key, &serialized)?;
                 }
             }
             IndexMode::Message => {
-                write_lock.put_cf(cf_msg, index.to_be_bytes(), &serialized)?;
+                let cf_msg = write_lock.cf_handle("messages").expect("Missing messages CF");
+                write_lock.put_cf(cf_msg, index.to_be_bytes(), &serialized)?; // 8-byte key
             }
         }
 
@@ -73,14 +78,13 @@ impl HyperlaneMessageStore {
     }
 
     pub fn get_by_block(&self, block: u64) -> Result<Vec<StoredHyperlaneMessage>> {
-        let read_lock = self.db.read().map_err(|e| anyhow::anyhow!("lock error: {}", e))?;
-        let cf = read_lock.cf_handle("messages").context("Missing CF")?;
+        let db = self.db.read().map_err(|e| anyhow::anyhow!("lock error: {e}"))?;
+        let cf_blk = db.cf_handle("messages_by_block").context("Missing CF")?;
 
         let mut result = Vec::new();
         let prefix = block.to_be_bytes();
 
-        // Iterate only keys that start with `block`
-        let iter = read_lock.prefix_iterator_cf(cf, prefix);
+        let iter = db.prefix_iterator_cf(cf_blk, prefix);
         for kv in iter {
             let (_k, v) = kv?;
             result.push(bincode::deserialize(&v)?);
@@ -88,7 +92,7 @@ impl HyperlaneMessageStore {
         Ok(result)
     }
 
-    pub fn get_message(&self, index: u32) -> Result<StoredHyperlaneMessage> {
+    pub fn get_message(&self, index: u64) -> Result<StoredHyperlaneMessage> {
         let read_lock = self
             .db
             .read()
@@ -100,17 +104,14 @@ impl HyperlaneMessageStore {
         bincode::deserialize(&message).context("Failed to deserialize message")
     }
 
-    pub fn current_index(&self) -> Result<u32> {
-        let read_lock = self
-            .db
-            .read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-        let cf = read_lock.cf_handle("messages").context("Missing CF")?;
-        let mut iter = read_lock.iterator_cf(cf, IteratorMode::End);
+    pub fn current_index(&self) -> Result<u64> {
+        let db = self.db.read().map_err(|e| anyhow::anyhow!("lock error: {e}"))?;
+        let cf_msg = db.cf_handle("messages").context("Missing messages CF")?;
+        let mut iter = db.iterator_cf(cf_msg, IteratorMode::End);
         if let Some(Ok((k, _))) = iter.next() {
-            let mut buf = [0u8; 4];
-            buf.copy_from_slice(&k); // safe since key is always 4 bytes
-            Ok(u32::from_be_bytes(buf) + 1)
+            let mut buf = [0u8; 8];
+            buf.copy_from_slice(&k); // now safe, because keys are always 8 bytes here
+            Ok(u64::from_be_bytes(buf) + 1)
         } else {
             Ok(0)
         }

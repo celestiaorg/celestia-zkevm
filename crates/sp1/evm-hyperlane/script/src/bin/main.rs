@@ -102,7 +102,7 @@ async fn write_proof_inputs(stdin: &mut SP1Stdin, args: &Args) -> Result<()> {
 
     let mut messages = Vec::new();
     for height in args.start_idx..=args.end_idx {
-        let message = message_db.get_message(height).unwrap();
+        let message = message_db.get_message(height as u64).unwrap();
         messages.push(message);
     }
 
