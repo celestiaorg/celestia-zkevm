@@ -187,7 +187,7 @@ impl HyperlaneMessageProver {
             // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
             // then save new snapshot
             // todo: store the proof or directly send it to celestia for verification
-            let snapshot = self
+            let mut snapshot = self
                 .snapshot_store
                 .get_snapshot(
                     self.app
@@ -222,11 +222,28 @@ impl HyperlaneMessageProver {
             let input = HyperlaneMessageInputs::new(
                 state_root_on_chain.to_string(),
                 self.app.merkle_tree_address.to_string(),
-                messages.into_iter().map(|m| m.message).collect(),
+                messages.clone().into_iter().map(|m| m.message).collect(),
                 HyperlaneBranchProofInputs::from(branch_proof),
-                snapshot,
+                snapshot.clone(),
             );
             let _proof = self.prove(input).await.expect("Failed to prove");
+
+            // insert messages into snapshot to get new snapshot for next proof
+            snapshot
+                .insert(messages.iter().map(|m| m.message.id()).collect())
+                .expect("Failed to insert messages into snapshot");
+            // store snapshot
+            self.snapshot_store
+                .insert_snapshot(
+                    self.app
+                        .trusted_state
+                        .read()
+                        .expect("Failed to read trusted state")
+                        .snapshot_index
+                        + 1,
+                    snapshot,
+                )
+                .expect("Failed to insert snapshot into snapshot store");
 
             // update trusted state
             self.app
