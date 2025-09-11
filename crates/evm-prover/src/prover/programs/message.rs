@@ -264,11 +264,11 @@ async fn test_run_prover() {
         trusted_state: RwLock::new(TrustedState::new(0, 0)),
     };
 
-    let prover = HyperlaneMessageProver::new(
-        app,
-        Arc::new(HyperlaneMessageStore::from_path_relative(2).unwrap()),
-        Arc::new(HyperlaneSnapshotStore::from_path_relative(2).unwrap()),
-    )
-    .unwrap();
+    let hyperlane_message_store = Arc::new(HyperlaneMessageStore::from_path_relative(2).unwrap());
+    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::from_path_relative(2).unwrap());
+    hyperlane_message_store.prune_all().unwrap();
+    hyperlane_snapshot_store.prune_all().unwrap();
+
+    let prover = HyperlaneMessageProver::new(app, hyperlane_message_store, hyperlane_snapshot_store).unwrap();
     prover.run().await.unwrap();
 }

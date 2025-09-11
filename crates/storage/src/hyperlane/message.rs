@@ -48,8 +48,8 @@ impl HyperlaneMessageStore {
         let serialized = bincode::serialize(&message)?;
 
         let write_lock = self.db.write().map_err(|e| anyhow::anyhow!("lock error: {}", e))?;
-        let cf_msg = write_lock.cf_handle("messages").context("Missing messages CF")?;
-        write_lock.put_cf(cf_msg, index.to_be_bytes(), &serialized)?;
+        //let cf_msg = write_lock.cf_handle("messages").context("Missing messages CF")?;
+        //write_lock.put_cf(cf_msg, index.to_be_bytes(), &serialized)?;
 
         if let Some(block) = message.block_number {
             let cf_blk = write_lock
@@ -66,7 +66,7 @@ impl HyperlaneMessageStore {
 
     pub fn get_by_block(&self, block: u64) -> Result<Vec<StoredHyperlaneMessage>> {
         let read_lock = self.db.read().map_err(|e| anyhow::anyhow!("lock error: {}", e))?;
-        let cf = read_lock.cf_handle("messages_by_block").context("Missing CF")?;
+        let cf = read_lock.cf_handle("message_by_block").context("Missing CF")?;
 
         let mut result = Vec::new();
         let prefix = block.to_be_bytes();
