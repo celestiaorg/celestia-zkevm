@@ -5,6 +5,7 @@
 use std::{
     str::FromStr,
     sync::{Arc, RwLock},
+    time::Duration,
 };
 
 use alloy_primitives::{hex::FromHex, FixedBytes};
@@ -15,6 +16,7 @@ use evm_storage_proofs::client::EvmClient;
 use reqwest::Url;
 use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
+use tokio::time::sleep;
 
 use crate::prover::{ProgramProver, ProverConfig};
 
@@ -35,6 +37,9 @@ pub type DefaultProvider = FillProvider<
     alloy_provider::RootProvider,
 >;
 
+const FREQUENCY: u64 = 50; // in blocks
+const TIMEOUT: u64 = 6; // in seconds
+
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_HYPERLANE_ELF: &[u8] = include_elf!("evm-hyperlane-program");
 
@@ -48,15 +53,12 @@ pub struct TrustedState {
     // the index of the snapshot that we will load from the db, initially 0 (empty by default)
     snapshot_index: u64,
     // the index of the last message we proofed successfully, initially 0
-    message_index: u64,
+    height: u64,
 }
 
 impl TrustedState {
-    pub fn new(snapshot_index: u64, message_index: u64) -> Self {
-        Self {
-            snapshot_index,
-            message_index,
-        }
+    pub fn new(snapshot_index: u64, height: u64) -> Self {
+        Self { snapshot_index, height }
     }
 }
 
@@ -128,9 +130,21 @@ impl HyperlaneMessageProver {
         let evm_provider: DefaultProvider =
             ProviderBuilder::new().connect_http(Url::from_str(&self.app.evm_rpc).unwrap());
         let evm_client = EvmClient::new(evm_provider.clone());
-        let (state_root_on_chain, height_on_chain) =
-            simulate_get_root_and_height(&evm_provider, &evm_client).await.unwrap();
-        // todo: get the root and height from celestia
+
+        loop {
+            // todo: get the root and height from celestia instead of directly from reth
+            let (state_root_on_chain, height_on_chain) =
+                simulate_get_root_and_height(&evm_provider, &evm_client).await.unwrap();
+
+            if self.app.trusted_state.read().unwrap().height + FREQUENCY > height_on_chain {
+                sleep(Duration::from_secs(TIMEOUT)).await;
+                continue;
+            }
+
+            // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
+            // then save new snapshot
+            // todo: store the proof or directly send it to celestia for verification
+        }
         Ok(())
     }
 }
