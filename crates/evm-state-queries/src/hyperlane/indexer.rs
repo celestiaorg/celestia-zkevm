@@ -63,13 +63,8 @@ impl HyperlaneIndexer {
         Ok(Self::new(socket, contract_address, filter))
     }
 
-    pub async fn index(
-        &self,
-        message_store: Arc<HyperlaneMessageStore>,
-        filter: Filter,
-        provider: Arc<DefaultProvider>,
-    ) -> Result<()> {
-        let logs = provider.get_logs(&filter).await?;
+    pub async fn index(&self, message_store: Arc<HyperlaneMessageStore>, provider: Arc<DefaultProvider>) -> Result<()> {
+        let logs = provider.get_logs(&self.filter).await?;
         for log in logs {
             match Dispatch::decode_log_data(log.data()) {
                 Ok(event) => {
@@ -115,7 +110,11 @@ impl Default for HyperlaneIndexer {
     fn default() -> Self {
         let socket = WsConnect::new("ws://127.0.0.1:8546");
         let contract_address = Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap();
-        let filter = Filter::new().address(contract_address).event(&Dispatch::id());
+        let filter = Filter::new()
+            .address(contract_address)
+            .event(&Dispatch::id())
+            .from_block(0)
+            .to_block(10000);
         Self {
             socket,
             contract_address,

@@ -10,9 +10,7 @@ alloy-provider = { version = "1.0.2", default-features = false, features = [
     "ws",
 ] }
 alloy-rlp = { workspace = true }
-alloy-rpc-types = { version = "1.0.27", default-features = false, features = [
-    "eth",
-] }
+alloy-rpc-types = { workspace = true }
 alloy-sol-types = "1.3"
 alloy-trie = { version = "0.7.9", default-features = false }
 anyhow = { workspace = true }

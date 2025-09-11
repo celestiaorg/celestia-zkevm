@@ -41,6 +41,7 @@ ev-types = { version = "0.0.1", default-features = false }
 evm-hyperlane-types-sp1 = { package = "evm-hyperlane-types", path = "crates/sp1/evm-hyperlane-types" }
 evm-state-types = { path = "crates/evm-state-types" }
 evm-storage-proofs = { path = "crates/evm-storage-proofs" }
+evm-state-queries = { path = "crates/evm-state-queries" }
 hex = "0.4.3"
 jsonrpsee-core = "0.25.1"
 nmt-rs = "*"
@@ -71,6 +72,9 @@ tokio = { version = "1.45.0", features = [
     "time",
     "rt-multi-thread",
 ], default-features = false }
+alloy-rpc-types = { version = "1.0.27", default-features = false, features = [
+    "eth",
+] }
 
 [patch.crates-io]
 # Add support for precompiles: https://docs.succinct.xyz/docs/sp1/optimizing-programs/precompiles

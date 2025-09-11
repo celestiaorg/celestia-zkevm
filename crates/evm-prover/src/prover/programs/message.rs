@@ -8,10 +8,13 @@ use std::{
     time::Duration,
 };
 
-use alloy_primitives::{hex::FromHex, FixedBytes};
-use alloy_provider::{fillers::FillProvider, Provider, ProviderBuilder};
+use alloy_primitives::{hex::FromHex, Address, FixedBytes};
+use alloy_provider::{fillers::FillProvider, Provider, ProviderBuilder, WsConnect};
+use alloy_rpc_types::Filter;
 use anyhow::Result;
 use evm_hyperlane_types_sp1::{HyperlaneMessageInputs, HyperlaneMessageOutputs};
+use evm_state_queries::hyperlane::indexer::HyperlaneIndexer;
+use evm_state_types::events::Dispatch;
 use evm_storage_proofs::client::EvmClient;
 use reqwest::Url;
 use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
@@ -66,8 +69,8 @@ pub struct HyperlaneMessageProver {
     pub app: AppContext,
     pub config: ProverConfig,
     pub prover: EnvProver,
-    pub message_store: HyperlaneMessageStore,
-    pub snapshot_store: HyperlaneSnapshotStore,
+    pub message_store: Arc<HyperlaneMessageStore>,
+    pub snapshot_store: Arc<HyperlaneSnapshotStore>,
 }
 
 impl ProgramProver for HyperlaneMessageProver {
@@ -103,8 +106,8 @@ struct ScheduledProofJob {
 impl HyperlaneMessageProver {
     pub fn new(
         app: AppContext,
-        message_store: HyperlaneMessageStore,
-        snapshot_store: HyperlaneSnapshotStore,
+        message_store: Arc<HyperlaneMessageStore>,
+        snapshot_store: Arc<HyperlaneSnapshotStore>,
     ) -> Result<Arc<Self>> {
         let config = HyperlaneMessageProver::default_config();
         let prover = ProverClient::from_env();
@@ -130,6 +133,10 @@ impl HyperlaneMessageProver {
         let evm_provider: DefaultProvider =
             ProviderBuilder::new().connect_http(Url::from_str(&self.app.evm_rpc).unwrap());
         let evm_client = EvmClient::new(evm_provider.clone());
+        let socket = WsConnect::new("ws://127.0.0.1:8546");
+        let contract_address = Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap();
+        let filter = Filter::new().address(contract_address).event(&Dispatch::id());
+        let mut indexer = HyperlaneIndexer::new(socket, contract_address, filter.clone());
 
         loop {
             // todo: get the root and height from celestia instead of directly from reth
@@ -140,6 +147,18 @@ impl HyperlaneMessageProver {
                 sleep(Duration::from_secs(TIMEOUT)).await;
                 continue;
             }
+
+            indexer.filter = Filter::new()
+                .address(indexer.contract_address)
+                .event(&Dispatch::id())
+                .from_block(self.app.trusted_state.read().unwrap().height)
+                .to_block(height_on_chain);
+
+            // run the indexer to get all messages that occurred since the last trusted height
+            indexer
+                .index(self.message_store.clone(), Arc::new(evm_provider.clone()))
+                .await
+                .unwrap();
 
             // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
             // then save new snapshot
