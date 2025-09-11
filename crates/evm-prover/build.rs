@@ -26,6 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     build_program_with_args("../sp1/evm-exec/program", Default::default());
     build_program_with_args("../sp1/evm-range-exec/program", Default::default());
+    build_program_with_args("../sp1/evm-hyperlane/program", Default::default());
 
     Ok(())
 }

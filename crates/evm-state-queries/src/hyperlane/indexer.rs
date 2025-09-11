@@ -1,5 +1,3 @@
-use std::{env, str::FromStr, sync::Arc};
-
 /// This service listens for Dispatch events emitted from the Mailbox contract
 /// using the reth websocket.
 /// Events are then processed and inserted into the storage (rocksDB)
@@ -13,6 +11,7 @@ use evm_state_types::{
     events::{Dispatch, DispatchEvent},
     hyperlane::decode_hyperlane_message,
 };
+use std::{env, str::FromStr, sync::Arc};
 use storage::hyperlane_messages::storage::HyperlaneMessageStore;
 
 pub type DefaultProvider = FillProvider<

@@ -1,0 +1,37 @@
+[package]
+version = "0.1.0"
+name = "evm-hyperlane-script"
+edition = "2021"
+default-run = "evm-hyperlane"
+
+[[bin]]
+name = "evm-hyperlane"
+path = "src/bin/main.rs"
+
+[[bin]]
+name = "vkey-evm-hyperlane"
+path = "src/bin/vkey.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+alloy-primitives = { workspace = true }
+alloy-provider = { workspace = true }
+bincode = { workspace = true }
+clap = { version = "4.0", features = ["cargo", "derive", "env"] }
+dotenv = "0.15.0"
+evm-hyperlane-types-sp1 = { workspace = true }
+evm-storage-proofs = { workspace = true, features = ["alloy"] }
+sp1-sdk = { workspace = true }
+storage = { workspace = true }
+tokio = { version = "1.45.0", features = [
+    "sync",
+    "macros",
+    "io-util",
+    "rt",
+    "time",
+    "rt-multi-thread",
+], default-features = false }
+url = { version = "2.5", default-features = false }
+
+[build-dependencies]
+sp1-build = "5.0.8"

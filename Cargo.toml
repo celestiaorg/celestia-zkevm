@@ -4,9 +4,13 @@ members = [
     "crates/evm-state-queries",
     "crates/evm-state-types",
     "crates/evm-storage-proofs",
+    "crates/evm-storage-proofs",
     "crates/sp1/evm-exec-types",
     "crates/sp1/evm-exec/program",
     "crates/sp1/evm-exec/script",
+    "crates/sp1/evm-hyperlane-types",
+    "crates/sp1/evm-hyperlane/program",
+    "crates/sp1/evm-hyperlane/script",
     "crates/sp1/evm-range-exec/program",
     "crates/sp1/evm-range-exec/script",
     "crates/storage",
@@ -34,7 +38,9 @@ celestia-types = "=0.11.2"
 ed25519-dalek = { version = "2.1.0", features = ["alloc", "serde"] }
 ethers = { version = "2.0", features = ["ws", "rustls"] }
 ev-types = { version = "0.0.1", default-features = false }
+evm-hyperlane-types-sp1 = { package = "evm-hyperlane-types", path = "crates/sp1/evm-hyperlane-types" }
 evm-state-types = { path = "crates/evm-state-types" }
+evm-storage-proofs = { path = "crates/evm-storage-proofs" }
 hex = "0.4.3"
 jsonrpsee-core = "0.25.1"
 nmt-rs = "*"
@@ -52,7 +58,7 @@ serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 sha3 = "0.10"
 sp1-build = "=5.2.1"
 sp1-core-executor = { version = "=5.2.1", features = ["bigint-rug"] }
-sp1-sdk = "=5.2.1"
+sp1-sdk = { version = "=5.2.1", features = ["native-gnark"] }
 sp1-zkvm = "=5.2.1"
 storage = { path = "crates/storage" }
 tendermint = "0.40.1"

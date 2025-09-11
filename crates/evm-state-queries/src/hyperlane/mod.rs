@@ -7,7 +7,7 @@ mod tests {
     use alloy_rpc_types::Filter;
     use evm_state_types::events::Dispatch;
     use std::sync::Arc;
-    use storage::{Storage, hyperlane_messages::storage::HyperlaneMessageStore};
+    use storage::hyperlane_messages::storage::HyperlaneMessageStore;
 
     #[tokio::test]
     /* Context
@@ -24,18 +24,18 @@ mod tests {
     */
     async fn test_run_indexer() {
         let indexer = HyperlaneIndexer::default();
-        let message_store = Arc::new(HyperlaneMessageStore::from_env().unwrap());
+
+        let message_store = Arc::new(HyperlaneMessageStore::from_path_relative(2).unwrap());
         message_store.prune_all().unwrap();
 
-        let from_block = 0;
-        let to_block = 10000;
-
+        let start_height = 0;
+        let end_height = 10000;
         let provider = Arc::new(ProviderBuilder::new().connect_ws(indexer.socket.clone()).await.unwrap());
         let filter = Filter::new()
             .address(indexer.contract_address)
             .event(&Dispatch::id())
-            .from_block(from_block)
-            .to_block(to_block);
+            .from_block(start_height)
+            .to_block(end_height);
         indexer.index(message_store, filter, provider).await.unwrap();
     }
 }

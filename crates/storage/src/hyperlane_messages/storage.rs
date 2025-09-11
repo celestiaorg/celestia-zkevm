@@ -1,7 +1,6 @@
 /// This module contains the implementation of the HyperlaneMessageStore, which is a wrapper around the RocksDB database.
 /// It is used to store and retrieve Hyperlane messages.
 /// The messages are stored in a column family called "messages".
-use crate::Storage;
 use anyhow::{Context, Result};
 use dotenvy::dotenv;
 use evm_state_types::StoredHyperlaneMessage;
@@ -14,49 +13,31 @@ pub struct HyperlaneMessageStore {
     pub db: Arc<RwLock<DB>>,
 }
 
-impl Storage for HyperlaneMessageStore {
-    fn default() -> Result<Self> {
+impl HyperlaneMessageStore {
+    pub fn from_path_relative(crate_depth: usize) -> Result<Self> {
         dotenv().ok();
+        let mut workspace_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+        for _ in 0..crate_depth {
+            workspace_path = workspace_path.parent().unwrap().to_path_buf();
+        }
+        let relative = env::var("HYPERLANE_MESSAGE_STORE").expect("HYPERLANE_MESSAGE_STORE must be set");
+        let path = workspace_path.join(relative);
         let opts = HyperlaneMessageStore::get_opts()?;
         let cfs = HyperlaneMessageStore::get_cfs()?;
-        let relative = ".db/messages/hyperlane".to_string();
-        let db_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join(relative);
-        let db = DB::open_cf_descriptors(&opts, &db_path, cfs)?;
+        let db = DB::open_cf_descriptors(&opts, path, cfs)?;
         Ok(Self {
             db: Arc::new(RwLock::new(db)),
         })
     }
 
-    fn from_env() -> Result<Self> {
-        dotenv().ok();
-        let opts = HyperlaneMessageStore::get_opts()?;
-        let cfs = HyperlaneMessageStore::get_cfs()?;
-        let relative = env::var("HYPERLANE_MESSAGE_STORE").unwrap_or(".db/messages/hyperlane".to_string());
-        let db_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join(relative);
-        let db = DB::open_cf_descriptors(&opts, &db_path, cfs)?;
-        Ok(Self {
-            db: Arc::new(RwLock::new(db)),
-        })
-    }
-
-    fn get_opts() -> Result<Options> {
+    pub fn get_opts() -> Result<Options> {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
         Ok(opts)
     }
 
-    fn get_cfs() -> Result<Vec<ColumnFamilyDescriptor>> {
+    pub fn get_cfs() -> Result<Vec<ColumnFamilyDescriptor>> {
         Ok(vec![ColumnFamilyDescriptor::new("messages", Options::default())])
     }
 }
