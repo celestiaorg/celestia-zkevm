@@ -5,7 +5,7 @@ mod tests {
     use crate::hyperlane::indexer::HyperlaneIndexer;
     use alloy_provider::ProviderBuilder;
     use std::sync::Arc;
-    use storage::hyperlane::message::HyperlaneMessageStore;
+    use storage::hyperlane::message::{HyperlaneMessageStore, IndexMode};
 
     #[tokio::test]
     /* Context

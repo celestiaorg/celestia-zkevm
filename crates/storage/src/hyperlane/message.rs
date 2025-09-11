@@ -45,10 +45,7 @@ impl HyperlaneMessageStore {
     }
 
     pub fn get_cfs() -> Result<Vec<ColumnFamilyDescriptor>> {
-        Ok(vec![
-            ColumnFamilyDescriptor::new("messages", Options::default()),
-            ColumnFamilyDescriptor::new("messages_by_block", Options::default()),
-        ])
+        Ok(vec![ColumnFamilyDescriptor::new("messages", Options::default())])
     }
 
     pub fn insert_message(&self, index: u32, message: StoredHyperlaneMessage) -> Result<()> {
@@ -60,9 +57,7 @@ impl HyperlaneMessageStore {
         match self.index_mode {
             IndexMode::Block => {
                 if let Some(block) = message.block_number {
-                    let cf_blk = write_lock
-                        .cf_handle("messages_by_block")
-                        .context("Missing by_block CF")?;
+                    let cf_blk = write_lock.cf_handle("messages").context("Missing by_block CF")?;
                     // allow multiple per block: key = (block, index)
                     let mut key = block.to_be_bytes().to_vec();
                     key.extend_from_slice(&index.to_be_bytes());
@@ -79,7 +74,7 @@ impl HyperlaneMessageStore {
 
     pub fn get_by_block(&self, block: u64) -> Result<Vec<StoredHyperlaneMessage>> {
         let read_lock = self.db.read().map_err(|e| anyhow::anyhow!("lock error: {}", e))?;
-        let cf = read_lock.cf_handle("message_by_block").context("Missing CF")?;
+        let cf = read_lock.cf_handle("messages").context("Missing CF")?;
 
         let mut result = Vec::new();
         let prefix = block.to_be_bytes();
