@@ -234,9 +234,12 @@ impl HyperlaneMessageProver {
             let _proof = self.prove(input).await.expect("Failed to prove");
 
             // insert messages into snapshot to get new snapshot for next proof
-            snapshot
-                .insert(messages.iter().map(|m| m.message.id()).collect())
-                .expect("Failed to insert messages into snapshot");
+            for message in messages {
+                snapshot
+                    .insert(message.message.id())
+                    .expect("Failed to insert messages into snapshot");
+            }
+
             // store snapshot
             self.snapshot_store
                 .insert_snapshot(

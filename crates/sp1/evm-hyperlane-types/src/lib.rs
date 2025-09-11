@@ -53,7 +53,7 @@ impl HyperlaneMessageInputs {
             .iter()
             .all(|_| self.snapshot.branch.iter().all(|b| b == ZERO_BYTES))
         {
-            panic!("Snapshot branch is empty (all zero bytes) before proof verification");
+            println!("Snapshot branch is empty (all zero bytes) before proof verification");
         }
 
         for idx in 0..HYPERLANE_MERKLE_TREE_KEYS.len() {

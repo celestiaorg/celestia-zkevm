@@ -4,7 +4,7 @@
 
 use anyhow::{Context, Result};
 use dotenvy::dotenv;
-use evm_hyperlane_types_sp1::tree::MerkleTree;
+use evm_hyperlane_types_sp1::tree::{MerkleTree, ZERO_BYTES};
 use rocksdb::{ColumnFamilyDescriptor, DB, IteratorMode, Options};
 use std::env;
 use std::path::PathBuf;
@@ -63,18 +63,23 @@ impl HyperlaneSnapshotStore {
 
     pub fn get_snapshot(&self, index: u64) -> Result<HyperlaneSnapshot> {
         if index == 0 {
-            // the merkle tree checkpoint for proving (inserting) the first batch of messages
             return Ok(MerkleTree::default());
         }
-        let read_lock = self
-            .db
-            .read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+        let read_lock = self.db.read().map_err(|e| anyhow::anyhow!("lock error: {e}"))?;
         let cf = read_lock.cf_handle("snapshots").context("Missing CF")?;
-        let snapshot = read_lock
+        let snapshot_bytes = read_lock
             .get_cf(cf, index.to_be_bytes())?
             .context("Failed to get snapshot")?;
-        bincode::deserialize(&snapshot).context("Failed to deserialize snapshot")
+        let mut snapshot: MerkleTree = bincode::deserialize(&snapshot_bytes)?;
+
+        // normalize: replace "" with ZERO_BYTES
+        for h in snapshot.branch.iter_mut() {
+            if h.is_empty() {
+                *h = ZERO_BYTES.to_string();
+            }
+        }
+
+        Ok(snapshot)
     }
 
     pub fn current_index(&self) -> Result<u64> {
