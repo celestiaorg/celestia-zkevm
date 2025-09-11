@@ -194,6 +194,10 @@ impl HyperlaneMessageProver {
                 snapshot,
             );
             let _proof = self.prove(input).await.expect("Failed to prove");
+
+            // update trusted state
+            self.app.trusted_state.write().unwrap().height = height_on_chain;
+            self.app.trusted_state.write().unwrap().snapshot_index += 1;
         }
     }
 }

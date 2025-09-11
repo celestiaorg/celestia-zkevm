@@ -62,6 +62,10 @@ impl HyperlaneSnapshotStore {
     }
 
     pub fn get_snapshot(&self, index: u64) -> Result<HyperlaneSnapshot> {
+        if index == 0 {
+            // the merkle tree checkpoint for proving (inserting) the first batch of messages
+            return Ok(MerkleTree::default());
+        }
         let read_lock = self
             .db
             .read()
