@@ -173,7 +173,8 @@ impl HyperlaneMessageProver {
                         .trusted_state
                         .read()
                         .expect("Failed to read trusted state")
-                        .height,
+                        .height
+                        + 1,
                 )
                 .to_block(height_on_chain);
 
@@ -209,7 +210,8 @@ impl HyperlaneMessageProver {
                         .trusted_state
                         .read()
                         .expect("Failed to read trusted state")
-                        .height,
+                        .height
+                        + 1,
                 )
                 .expect("Failed to get messages");
 
@@ -231,7 +233,13 @@ impl HyperlaneMessageProver {
                 HyperlaneBranchProofInputs::from(branch_proof),
                 snapshot.clone(),
             );
+
+            println!(
+                "[INFO] Proving messages with ids: {:?}",
+                messages.iter().map(|m| m.message.id()).collect::<Vec<String>>()
+            );
             let _proof = self.prove(input).await.expect("Failed to prove");
+            println!("[Success] Proof was generated successfully!");
 
             // insert messages into snapshot to get new snapshot for next proof
             for message in messages {
@@ -286,7 +294,7 @@ async fn test_run_prover() {
         evm_rpc: "http://127.0.0.1:8545".to_string(),
         evm_ws: "ws://127.0.0.1:8546".to_string(),
         mailbox_address: Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap(),
-        merkle_tree_address: Address::from_str("0xFCb1d485ef46344029D9E8A7925925e146B3430E").unwrap(),
+        merkle_tree_address: Address::from_str("0xfcb1d485ef46344029d9e8a7925925e146b3430e").unwrap(),
         trusted_state: RwLock::new(TrustedState::new(0, 0)),
     };
 

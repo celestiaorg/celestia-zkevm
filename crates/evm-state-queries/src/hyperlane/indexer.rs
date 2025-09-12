@@ -73,25 +73,6 @@ impl HyperlaneIndexer {
                     let next_index = current_index;
                     let hyperlane_message =
                         decode_hyperlane_message(&dispatch_event.message).expect("Failed to decode Hyperlane message");
-
-                    // It is up to the user to set the starting block of the first hyperlane message,
-                    // if the user fails to do so, the indexer will still assume that the first message in that block
-                    // is the first message that ever occurred.
-                    if current_index > 1 {
-                        let previous_hyperlane_message = message_store.get_message(current_index - 1).unwrap();
-                        if hyperlane_message.nonce != previous_hyperlane_message.message.nonce + 1
-                            && hyperlane_message.nonce != 0
-                        {
-                            // Only the next message can be successfully indexed, if there is a mismatch,
-                            // make sure to use the correct block range starting from the last indexed block + 1
-                            eprintln!(
-                                "Nonce mismatch: {} != {}, try a different block range.",
-                                hyperlane_message.nonce,
-                                previous_hyperlane_message.message.nonce + 1
-                            );
-                            continue;
-                        }
-                    }
                     let stored_message = StoredHyperlaneMessage::new(hyperlane_message, log.block_number);
                     message_store.insert_message(next_index, stored_message).unwrap();
                     println!("Inserted Hyperlane Message at index: {next_index}");
