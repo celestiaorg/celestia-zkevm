@@ -26,6 +26,14 @@ and executes their state transition functions.
 - `Namespace`: The namespace containing blob data.
 - `PublicKey`: The public key of the sequencer signing blob data.
 
+### Equivocation Tolerance
+
+A Byzantine or malicious sequencer node may **equivocate**—that is, submit multiple `SignedData` payloads for the same block height to the Celestia data availability network.  
+
+The proof system cannot prevent this behavior, but it can be designed to **tolerate** it. Celestia not only provides data availability for applications, it also enforces an **ordering mechanism** (see the [Data Square Layout specification](https://celestiaorg.github.io/celestia-app/data_square_layout.html#ordering)).  
+
+In the event of equivocation, the proof system accepts the payload according to the first-come, first-served (FCFS) rule enforced by Celestia’s priority-based ordering. This ensures that proof generation remains deterministic and avoids divergent execution paths that could otherwise arise without a clear fork-choice policy.
+
 ## Usage
 
 The SP1 program can be compiled and used within any application binary by providing a custom `build.rs` which employs the `sp1-build` system:
