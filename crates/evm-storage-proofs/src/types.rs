@@ -218,6 +218,7 @@ impl HyperlaneBranchProofInputs {
         )
         .is_err()
         {
+            println!("Failed to verify account proof");
             return Ok(false);
         }
         let storage_root = self.get_state_root()?;
@@ -239,6 +240,7 @@ impl HyperlaneBranchProofInputs {
             )
             .is_err()
             {
+                println!("Failed to verify storage proof for key: {key}");
                 return Ok(false);
             }
         }
