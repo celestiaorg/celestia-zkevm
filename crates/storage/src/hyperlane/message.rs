@@ -9,6 +9,7 @@ use std::env;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IndexMode {
     Block,
     Message,
@@ -78,6 +79,9 @@ impl HyperlaneMessageStore {
 
     /// Get all stored Hyperlane messages for a given block height (requires IndexMode::Block)
     pub fn get_by_block(&self, block: u64) -> Result<Vec<StoredHyperlaneMessage>> {
+        if self.index_mode == IndexMode::Message {
+            anyhow::bail!("get_by_block is not supported in Message mode");
+        }
         let db = self.db.read().map_err(|e| anyhow::anyhow!("lock error: {e}"))?;
         let cf_blk = db.cf_handle("messages_by_block").context("Missing CF")?;
 
@@ -94,6 +98,9 @@ impl HyperlaneMessageStore {
 
     /// Get a single Hyperlane message by index (requires IndexMode::Message)
     pub fn get_message(&self, index: u64) -> Result<StoredHyperlaneMessage> {
+        if self.index_mode == IndexMode::Block {
+            anyhow::bail!("get_message is not supported in Block mode");
+        }
         let read_lock = self
             .db
             .read()
