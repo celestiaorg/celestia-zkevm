@@ -50,6 +50,11 @@ const DISTANCE_TO_HEAD: u64 = 32; // in blocks
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_HYPERLANE_ELF: &[u8] = include_elf!("evm-hyperlane-program");
 
+/// AppContext encapsulates the full set of RPC endpoints and configuration
+/// needed to fetch input data for execution and data availability proofs.
+///
+/// This separates RPC concerns from the proving logic, allowing `AppContext`
+/// to be responsible for gathering the data required for the proof system inputs.
 pub struct AppContext {
     pub celestia_rpc: String,
     // reth http, for example http://127.0.0.1:8545
@@ -61,6 +66,7 @@ pub struct AppContext {
     pub trusted_state: RwLock<TrustedState>,
 }
 
+/// TrustedState encapsulates the trusted state of the prover
 pub struct TrustedState {
     // the index of the snapshot that we will load from the db, initially 0 (empty by default)
     snapshot_index: u64,
@@ -74,6 +80,7 @@ impl TrustedState {
     }
 }
 
+/// HyperlaneMessageProver is a prover for generating SP1 proofs for Hyperlane message inclusion in EVM blocks.
 pub struct HyperlaneMessageProver {
     pub app: AppContext,
     pub config: ProverConfig,
@@ -107,11 +114,6 @@ impl ProgramProver for HyperlaneMessageProver {
     }
 }
 
-struct ScheduledProofJob {
-    height_on_chain: u64,
-    state_root_on_chain: FixedBytes<32>,
-}
-
 impl HyperlaneMessageProver {
     pub fn new(
         app: AppContext,
@@ -138,6 +140,7 @@ impl HyperlaneMessageProver {
         }
     }
 
+    /// Run the message prover with indexer
     pub async fn run(self: Arc<Self>) -> Result<()> {
         let evm_provider: DefaultProvider =
             ProviderBuilder::new().connect_http(Url::from_str(&self.app.evm_rpc).unwrap());
@@ -219,7 +222,7 @@ impl HyperlaneMessageProver {
                 .get_proof(
                     &HYPERLANE_MERKLE_TREE_KEYS,
                     self.app.merkle_tree_address,
-                    Some(height_on_chain.into()),
+                    Some(height_on_chain),
                 )
                 .await
                 .expect("Failed to get merkle proof");
@@ -277,6 +280,7 @@ impl HyperlaneMessageProver {
     }
 }
 
+/// Simulate getting the state root and height from Celestia
 async fn simulate_get_root_and_height(provider: &DefaultProvider, client: &EvmClient) -> Result<(FixedBytes<32>, u64)> {
     // todo: instead query celestia for a recent state root and height provided by our light client
     let height = provider.get_block_number().await.unwrap() - DISTANCE_TO_HEAD;
