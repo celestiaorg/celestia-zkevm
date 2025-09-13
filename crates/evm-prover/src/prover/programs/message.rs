@@ -45,7 +45,7 @@ pub type DefaultProvider = FillProvider<
 
 const FREQUENCY: u64 = 50; // in blocks
 const TIMEOUT: u64 = 6; // in seconds
-const DISTANCE_TO_HEAD: u64 = 64; // in blocks
+const DISTANCE_TO_HEAD: u64 = 65; // in blocks
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_HYPERLANE_ELF: &[u8] = include_elf!("evm-hyperlane-program");
