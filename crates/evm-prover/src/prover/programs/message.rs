@@ -44,7 +44,7 @@ pub type DefaultProvider = FillProvider<
 >;
 
 const TIMEOUT: u64 = 6; // in seconds
-const DISTANCE_TO_HEAD: u64 = 65; // in blocks
+const DISTANCE_TO_HEAD: u64 = 32; // in blocks
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EVM_HYPERLANE_ELF: &[u8] = include_elf!("evm-hyperlane-program");
@@ -185,8 +185,9 @@ impl HyperlaneMessageProver {
                 )
                 .await
             {
-                eprintln!("[ERROR] Failed to generate proof: {e:?}");
-                sleep(Duration::from_secs(TIMEOUT)).await;
+                println!("[ERROR] Failed to generate proof: {e:?}");
+                let new_root_on_chain = evm_client.get_state_root(height_on_chain).await.unwrap();
+                panic!("Did the root change?: {} == {}", state_root_on_chain, new_root_on_chain);
             }
         }
     }
