@@ -180,8 +180,7 @@ impl HyperlaneMessageProver {
             let new_root_on_chain = evm_client.get_state_root(height_on_chain).await.unwrap();
             if new_root_on_chain != hex::encode(state_root_on_chain) {
                 panic!(
-                    "The state root has changed at depth HEAD-{}, this should not happen! Expected: {}, Got: {}",
-                    DISTANCE_TO_HEAD, state_root_on_chain, new_root_on_chain
+                    "The state root has changed at depth HEAD-{DISTANCE_TO_HEAD}, this should not happen! Expected: {state_root_on_chain}, Got: {new_root_on_chain}",
                 );
             }
 
