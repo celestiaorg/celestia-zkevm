@@ -194,6 +194,10 @@ impl HyperlaneMessageProver {
                 )
                 .await
             {
+                println!(
+                    "Failed to generate proof, Stored Value: {}",
+                    hex::encode(proof.storage_proof.last().unwrap().value.to_be_bytes::<32>())
+                );
                 panic!("[ERROR] Failed to generate proof: {e:?}");
             }
         }
