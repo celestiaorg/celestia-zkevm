@@ -176,6 +176,15 @@ impl HyperlaneMessageProver {
                 continue;
             }
 
+            // Check if the root has changed for our height, if so panic
+            let new_root_on_chain = evm_client.get_state_root(height_on_chain).await.unwrap();
+            if new_root_on_chain != new_root_on_chain {
+                panic!(
+                    "The state root has changed at depth HEAD-{}, this should not happen! Expected: {}, Got: {}",
+                    DISTANCE_TO_HEAD, state_root_on_chain, new_root_on_chain
+                );
+            }
+
             if let Err(e) = self
                 .run_inner(
                     &evm_provider,
@@ -186,16 +195,7 @@ impl HyperlaneMessageProver {
                 )
                 .await
             {
-                println!("[ERROR] Failed to generate proof: {e:?}");
-            }
-
-            // Check if the root has changed for our height, if so panic
-            let new_root_on_chain = evm_client.get_state_root(height_on_chain).await.unwrap();
-            if new_root_on_chain != new_root_on_chain {
-                panic!(
-                    "The state root has changed at depth HEAD-{}, this should not happen! Expected: {}, Got: {}",
-                    DISTANCE_TO_HEAD, state_root_on_chain, new_root_on_chain
-                );
+                panic!("[ERROR] Failed to generate proof: {e:?}");
             }
         }
     }
