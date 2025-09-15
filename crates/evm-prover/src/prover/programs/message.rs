@@ -165,6 +165,7 @@ impl HyperlaneMessageProver {
                 .expect("Failed to get merkle proof");
 
             println!("[INFO] state_root_on_chain: {state_root_on_chain}, height_on_chain: {height_on_chain}, trusted height: {}", self.app.trusted_state.read().unwrap().height + 1);
+
             if self.app.trusted_state.read().unwrap().height >= height_on_chain {
                 println!(
                     "[INFO] Waiting for more blocks to occur {}/{}...",
@@ -316,7 +317,6 @@ async fn simulate_get_root_and_height(provider: &DefaultProvider, client: &EvmCl
     // todo: instead query celestia for a recent state root and height provided by our light client
     let height = provider.get_block_number().await.unwrap() - DISTANCE_TO_HEAD;
     let root = client.get_state_root(height).await.unwrap();
-    println!("Block Height Provider: {}", provider.get_block_number().await.unwrap());
     Ok((FixedBytes::from_hex(&root).unwrap(), height))
 }
 

@@ -70,6 +70,7 @@ impl HyperlaneBranchProof {
         Self { proof }
     }
 
+    /// Get the branch node at the given index.
     pub fn get_branch_node(&self, index: usize) -> Result<String> {
         Ok(self
             .proof
@@ -81,16 +82,19 @@ impl HyperlaneBranchProof {
             .encode_hex())
     }
 
+    /// Get the stored account.
     pub fn get_stored_account(&self) -> Result<Vec<u8>> {
         let leaf_node: Vec<Bytes> = alloy_rlp::decode_exact(self.proof.account_proof.last().unwrap())?;
         Ok(leaf_node.last().expect("Failed to get stored account").to_vec())
     }
 
+    /// Get the state root.
     pub fn get_state_root(&self) -> Result<FixedBytes<32>> {
         let account: TrieAccount = alloy_rlp::decode_exact(self.get_stored_account()?).unwrap();
         Ok(account.storage_root)
     }
 
+    /// Verify the branch proof against the execution state root.
     pub fn verify(&self, keys: &[&str], contract: Address, root: &str) -> Result<bool> {
         // verify the account proof against the execution state root
         if verify_proof(
@@ -105,7 +109,6 @@ impl HyperlaneBranchProof {
         } else {
             return Ok(false);
         }
-
         let storage_root = self.get_state_root()?;
         for (key, proof) in keys.iter().zip(self.proof.storage_proof.iter()) {
             // Skip empty branch nodes as those don't have storage proofs
@@ -124,7 +127,6 @@ impl HyperlaneBranchProof {
                 return Ok(false);
             }
         }
-
         Ok(true)
     }
 
@@ -140,7 +142,6 @@ impl HyperlaneBranchProof {
         {
             return Ok(false);
         }
-
         let account: TrieAccount = alloy_rlp::decode_exact(self.get_stored_account()?)?;
         // verify the storage proof against the account root
         if verify_proof(
@@ -153,7 +154,6 @@ impl HyperlaneBranchProof {
         {
             return Ok(false);
         }
-
         Ok(true)
     }
 }
@@ -191,6 +191,7 @@ impl HyperlaneBranchProofInputs {
         Self::from(proof)
     }
 
+    /// Get the branch node at the given index.
     pub fn get_branch_node(&self, index: usize) -> String {
         self.storage_values
             .get(index)
@@ -198,16 +199,19 @@ impl HyperlaneBranchProofInputs {
             .encode_hex()
     }
 
+    /// Get the stored account.
     pub fn get_stored_account(&self) -> Result<Vec<u8>> {
         let leaf_node: Vec<Bytes> = alloy_rlp::decode_exact(self.account_value.as_slice())?;
         Ok(leaf_node.last().context("Failed to get stored account")?.to_vec())
     }
 
+    /// Get the state root.
     pub fn get_state_root(&self) -> Result<FixedBytes<32>> {
         let account: TrieAccount = alloy_rlp::decode_exact(self.get_stored_account()?).unwrap();
         Ok(account.storage_root)
     }
 
+    /// Verify the branch proof against the execution state root.
     pub fn verify(&self, keys: &[&str], contract: Address, root: &str) -> Result<bool> {
         let proof_vec: Vec<Bytes> = self.account_proof.iter().map(|b| Bytes::from(b.to_vec())).collect();
         if verify_proof(
@@ -222,7 +226,6 @@ impl HyperlaneBranchProofInputs {
             return Ok(false);
         }
         let storage_root = self.get_state_root()?;
-
         for (key, (proof, value)) in keys
             .iter()
             .zip(self.storage_proofs.iter().zip(self.storage_values.iter()))
