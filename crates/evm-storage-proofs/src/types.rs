@@ -103,10 +103,8 @@ impl HyperlaneBranchProof {
             Some(self.get_stored_account()?),
             &self.proof.account_proof,
         )
-        .is_ok()
+        .is_err()
         {
-            // do nothing
-        } else {
             return Ok(false);
         }
         let storage_root = self.get_state_root()?;
@@ -130,6 +128,7 @@ impl HyperlaneBranchProof {
         Ok(true)
     }
 
+    /// Verify a single branch node against the execution state root.
     pub fn verify_single(&self, key: &str, contract: Address, root: &str) -> Result<bool> {
         // verify the account proof against the execution state root
         if verify_proof(
