@@ -100,7 +100,7 @@ impl HyperlaneBranchProof {
         // verify the account proof against the execution state root
         if verify_proof(
             FixedBytes::from_hex(root).unwrap(),
-            Nibbles::unpack(digest_keccak(&contract.as_slice())),
+            Nibbles::unpack(digest_keccak(contract.as_slice())),
             Some(self.get_stored_account()?),
             &self.proof.account_proof,
         )
@@ -134,7 +134,7 @@ impl HyperlaneBranchProof {
         // verify the account proof against the execution state root
         if verify_proof(
             FixedBytes::from_hex(root).unwrap(),
-            Nibbles::unpack(digest_keccak(&contract.as_slice())),
+            Nibbles::unpack(digest_keccak(contract.as_slice())),
             Some(self.get_stored_account()?),
             &self.proof.account_proof,
         )
@@ -210,7 +210,7 @@ impl HyperlaneBranchProofInputs {
         let proof_vec: Vec<Bytes> = self.account_proof.iter().map(|b| Bytes::from(b.to_vec())).collect();
         if verify_proof(
             FixedBytes::from_hex(root).unwrap(),
-            Nibbles::unpack(digest_keccak(&contract.as_slice())),
+            Nibbles::unpack(digest_keccak(contract.as_slice())),
             Some(self.get_stored_account()?),
             &proof_vec,
         )
