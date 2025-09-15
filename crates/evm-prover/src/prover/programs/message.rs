@@ -43,7 +43,6 @@ pub type DefaultProvider = FillProvider<
     alloy_provider::RootProvider,
 >;
 
-const FREQUENCY: u64 = 50; // in blocks
 const TIMEOUT: u64 = 6; // in seconds
 const DISTANCE_TO_HEAD: u64 = 65; // in blocks
 
