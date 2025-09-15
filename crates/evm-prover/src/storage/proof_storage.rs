@@ -141,7 +141,7 @@ impl ProofStorage for RocksDbProofStorage {
 
         let stored_proof = StoredBlockProof {
             celestia_height,
-            proof_data: proof.bytes(),
+            proof_data: bincode::serialize(&proof.proof)?,
             public_values: proof.public_values.to_vec(),
             created_at: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
