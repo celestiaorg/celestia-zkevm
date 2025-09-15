@@ -190,10 +190,10 @@ impl HyperlaneMessageProver {
 
             // Check if the root has changed for our height, if so panic
             let new_root_on_chain = evm_client.get_state_root(height_on_chain).await.unwrap();
-            if hex::encode(&new_root_on_chain) != new_root_on_chain {
+            if new_root_on_chain != new_root_on_chain {
                 panic!(
-                    "The state root has changed at depth HEAD-{}, this should not happen!",
-                    DISTANCE_TO_HEAD
+                    "The state root has changed at depth HEAD-{}, this should not happen! Expected: {}, Got: {}",
+                    DISTANCE_TO_HEAD, state_root_on_chain, new_root_on_chain
                 );
             }
         }
@@ -316,6 +316,7 @@ async fn simulate_get_root_and_height(provider: &DefaultProvider, client: &EvmCl
     // todo: instead query celestia for a recent state root and height provided by our light client
     let height = provider.get_block_number().await.unwrap() - DISTANCE_TO_HEAD;
     let root = client.get_state_root(height).await.unwrap();
+    println!("Block Height Provider: {}", provider.get_block_number().await.unwrap());
     Ok((FixedBytes::from_hex(&root).unwrap(), height))
 }
 
