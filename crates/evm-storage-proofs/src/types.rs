@@ -1,7 +1,8 @@
 use alloy_primitives::{
-    Address, Bytes, FixedBytes, Uint,
+    Address, Bytes, FixedBytes, U256, Uint,
     hex::{FromHex, ToHexExt},
 };
+use alloy_rlp::encode;
 use alloy_rpc_types::EIP1186AccountProofResponse;
 use alloy_trie::{Nibbles, TrieAccount, proof::verify_proof};
 use anyhow::{Context, Result};
@@ -99,7 +100,7 @@ impl HyperlaneBranchProof {
         // verify the account proof against the execution state root
         if verify_proof(
             FixedBytes::from_hex(root).unwrap(),
-            Nibbles::unpack(digest_keccak(&contract.0.0)),
+            Nibbles::unpack(digest_keccak(&contract.as_slice())),
             Some(self.get_stored_account()?),
             &self.proof.account_proof,
         )
@@ -133,7 +134,7 @@ impl HyperlaneBranchProof {
         // verify the account proof against the execution state root
         if verify_proof(
             FixedBytes::from_hex(root).unwrap(),
-            Nibbles::unpack(digest_keccak(&contract.0.0)),
+            Nibbles::unpack(digest_keccak(&contract.as_slice())),
             Some(self.get_stored_account()?),
             &self.proof.account_proof,
         )
@@ -155,12 +156,6 @@ impl HyperlaneBranchProof {
         }
         Ok(true)
     }
-}
-
-fn encode(value: Uint<256, 4>) -> Vec<u8> {
-    let raw32 = value.to_be_bytes::<32>();
-    let encoded: Vec<u8> = alloy_rlp::encode(raw32.as_slice());
-    encoded
 }
 
 impl From<HyperlaneBranchProof> for HyperlaneBranchProofInputs {
@@ -215,7 +210,7 @@ impl HyperlaneBranchProofInputs {
         let proof_vec: Vec<Bytes> = self.account_proof.iter().map(|b| Bytes::from(b.to_vec())).collect();
         if verify_proof(
             FixedBytes::from_hex(root).unwrap(),
-            Nibbles::unpack(digest_keccak(&contract.0.0)),
+            Nibbles::unpack(digest_keccak(&contract.as_slice())),
             Some(self.get_stored_account()?),
             &proof_vec,
         )
@@ -230,14 +225,13 @@ impl HyperlaneBranchProofInputs {
             .zip(self.storage_proofs.iter().zip(self.storage_values.iter()))
         {
             // Skip empty branch nodes as those don't have storage proofs
-            if value.as_slice() == Uint::<256, 4>::from(0).to_be_bytes::<32>().as_slice() {
+            if value.as_slice() == U256::from(0).to_be_bytes::<32>().as_slice() {
                 continue;
             }
-
             if verify_proof(
                 storage_root,
                 Nibbles::unpack(digest_keccak(&alloy_primitives::hex::decode(key).unwrap())),
-                Some(encode(Uint::from_be_bytes::<32>(value.as_slice().try_into().unwrap()))),
+                Some(encode(U256::from_be_bytes::<32>(value.as_slice().try_into().unwrap()))),
                 &proof.iter().map(|b| Bytes::from(b.to_vec())).collect::<Vec<Bytes>>(),
             )
             .is_err()
