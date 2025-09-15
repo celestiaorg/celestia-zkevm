@@ -10,7 +10,7 @@ use std::{
 
 use alloy_primitives::{hex::FromHex, Address, FixedBytes};
 use alloy_provider::{fillers::FillProvider, Provider, ProviderBuilder, WsConnect};
-use alloy_rpc_types::Filter;
+use alloy_rpc_types::{EIP1186AccountProofResponse, Filter};
 use anyhow::Result;
 use evm_hyperlane_types_sp1::{HyperlaneMessageInputs, HyperlaneMessageOutputs};
 use evm_state_queries::hyperlane::indexer::HyperlaneIndexer;
@@ -156,8 +156,16 @@ impl HyperlaneMessageProver {
                 .await
                 .expect("Failed to get root and height");
 
-            println!("[INFO] state_root_on_chain: {state_root_on_chain}, height_on_chain: {height_on_chain}");
+            let proof = evm_client
+                .get_proof(
+                    &HYPERLANE_MERKLE_TREE_KEYS,
+                    self.app.merkle_tree_address,
+                    Some(height_on_chain),
+                )
+                .await
+                .expect("Failed to get merkle proof");
 
+            println!("[INFO] state_root_on_chain: {state_root_on_chain}, height_on_chain: {height_on_chain}, trusted height: {}", self.app.trusted_state.read().unwrap().height + 1);
             if self.app.trusted_state.read().unwrap().height >= height_on_chain {
                 println!(
                     "[INFO] Waiting for more blocks to occur {}/{}...",
@@ -168,115 +176,131 @@ impl HyperlaneMessageProver {
                 continue;
             }
 
-            indexer.filter = Filter::new()
-                .address(indexer.contract_address)
-                .event(&Dispatch::id())
-                .from_block(
-                    self.app
-                        .trusted_state
-                        .read()
-                        .expect("Failed to read trusted state")
-                        .height
-                        + 1,
-                )
-                .to_block(height_on_chain);
-
-            // run the indexer to get all messages that occurred since the last trusted height
-            indexer
-                .index(self.message_store.clone(), Arc::new(evm_provider.clone()))
-                .await
-                .expect("Failed to index messages");
-
-            println!(
-                "[INFO] Indexed messages, new height {}",
-                self.message_store.current_index().expect("Failed to get current index")
-            );
-
-            // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
-            // then save new snapshot
-            // todo: store the proof or directly send it to celestia for verification
-            let mut snapshot = self
-                .snapshot_store
-                .get_snapshot(
-                    self.app
-                        .trusted_state
-                        .read()
-                        .expect("Failed to read trusted state")
-                        .snapshot_index,
-                )
-                .expect("Failed to get snapshot");
-
-            let messages = self
-                .message_store
-                .get_by_block(
-                    self.app
-                        .trusted_state
-                        .read()
-                        .expect("Failed to read trusted state")
-                        .height
-                        + 1,
-                )
-                .expect("Failed to get messages");
-
-            let proof = evm_client
-                .get_proof(
-                    &HYPERLANE_MERKLE_TREE_KEYS,
-                    self.app.merkle_tree_address,
-                    Some(height_on_chain),
+            if let Err(e) = self
+                .run_inner(
+                    &evm_provider,
+                    &mut indexer,
+                    height_on_chain,
+                    proof.clone(),
+                    state_root_on_chain,
                 )
                 .await
-                .expect("Failed to get merkle proof");
-
-            let branch_proof = HyperlaneBranchProof::new(proof);
-
-            let input = HyperlaneMessageInputs::new(
-                state_root_on_chain.to_string(),
-                self.app.merkle_tree_address.to_string(),
-                messages.clone().into_iter().map(|m| m.message).collect(),
-                HyperlaneBranchProofInputs::from(branch_proof),
-                snapshot.clone(),
-            );
-
-            println!(
-                "[INFO] Proving messages with ids: {:?}",
-                messages.iter().map(|m| m.message.id()).collect::<Vec<String>>()
-            );
-            let _proof = self.prove(input).await.expect("Failed to prove");
-            println!("[Success] Proof was generated successfully!");
-
-            // insert messages into snapshot to get new snapshot for next proof
-            for message in messages {
-                snapshot
-                    .insert(message.message.id())
-                    .expect("Failed to insert messages into snapshot");
+            {
+                eprintln!("[ERROR] Failed to generate proof: {e:?}");
+                sleep(Duration::from_secs(TIMEOUT)).await;
             }
-
-            // store snapshot
-            self.snapshot_store
-                .insert_snapshot(
-                    self.app
-                        .trusted_state
-                        .read()
-                        .expect("Failed to read trusted state")
-                        .snapshot_index
-                        + 1,
-                    snapshot,
-                )
-                .expect("Failed to insert snapshot into snapshot store");
-
-            // update trusted state
-            self.app
-                .trusted_state
-                .write()
-                .expect("Failed to write trusted state")
-                .height = height_on_chain;
-
-            self.app
-                .trusted_state
-                .write()
-                .expect("Failed to write trusted state")
-                .snapshot_index += 1;
         }
+    }
+
+    async fn run_inner(
+        self: &Arc<Self>,
+        evm_provider: &DefaultProvider,
+        indexer: &mut HyperlaneIndexer,
+        height_on_chain: u64,
+        proof: EIP1186AccountProofResponse,
+        state_root_on_chain: FixedBytes<32>,
+    ) -> Result<()> {
+        indexer.filter = Filter::new()
+            .address(indexer.contract_address)
+            .event(&Dispatch::id())
+            .from_block(
+                self.app
+                    .trusted_state
+                    .read()
+                    .expect("Failed to read trusted state")
+                    .height
+                    + 1,
+            )
+            .to_block(height_on_chain);
+
+        // run the indexer to get all messages that occurred since the last trusted height
+        indexer
+            .index(self.message_store.clone(), Arc::new(evm_provider.clone()))
+            .await
+            .expect("Failed to index messages");
+
+        println!(
+            "[INFO] Indexed messages, new height {}",
+            self.message_store.current_index().expect("Failed to get current index")
+        );
+
+        // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
+        // then save new snapshot
+        // todo: store the proof or directly send it to celestia for verification
+        let mut snapshot = self
+            .snapshot_store
+            .get_snapshot(
+                self.app
+                    .trusted_state
+                    .read()
+                    .expect("Failed to read trusted state")
+                    .snapshot_index,
+            )
+            .expect("Failed to get snapshot");
+
+        let messages = self
+            .message_store
+            .get_by_block(
+                self.app
+                    .trusted_state
+                    .read()
+                    .expect("Failed to read trusted state")
+                    .height
+                    + 1,
+            )
+            .expect("Failed to get messages");
+
+        let branch_proof = HyperlaneBranchProof::new(proof);
+
+        let input = HyperlaneMessageInputs::new(
+            state_root_on_chain.to_string(),
+            self.app.merkle_tree_address.to_string(),
+            messages.clone().into_iter().map(|m| m.message).collect(),
+            HyperlaneBranchProofInputs::from(branch_proof),
+            snapshot.clone(),
+        );
+
+        println!(
+            "[INFO] Proving messages with ids: {:?}",
+            messages.iter().map(|m| m.message.id()).collect::<Vec<String>>()
+        );
+        let _proof = self.prove(input).await.expect("Failed to prove");
+        println!("[Success] Proof was generated successfully!");
+
+        // insert messages into snapshot to get new snapshot for next proof
+        for message in messages {
+            snapshot
+                .insert(message.message.id())
+                .expect("Failed to insert messages into snapshot");
+        }
+
+        // store snapshot
+        self.snapshot_store
+            .insert_snapshot(
+                self.app
+                    .trusted_state
+                    .read()
+                    .expect("Failed to read trusted state")
+                    .snapshot_index
+                    + 1,
+                snapshot,
+            )
+            .expect("Failed to insert snapshot into snapshot store");
+
+        // update trusted state
+        self.app
+            .trusted_state
+            .write()
+            .expect("Failed to write trusted state")
+            .height = height_on_chain;
+
+        self.app
+            .trusted_state
+            .write()
+            .expect("Failed to write trusted state")
+            .snapshot_index += 1;
+
+        Ok(())
     }
 }
 
@@ -293,6 +317,12 @@ async fn test_run_prover() {
     #[allow(unused_imports)]
     use super::*;
 
+    let hyperlane_message_store =
+        Arc::new(HyperlaneMessageStore::from_path_relative(2, storage::hyperlane::message::IndexMode::Block).unwrap());
+    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::from_path_relative(2).unwrap());
+    hyperlane_message_store.prune_all().unwrap();
+    hyperlane_snapshot_store.prune_all().unwrap();
+
     let app = AppContext {
         celestia_rpc: "http://127.0.0.1:26657".to_string(),
         evm_rpc: "http://127.0.0.1:8545".to_string(),
@@ -301,12 +331,6 @@ async fn test_run_prover() {
         merkle_tree_address: Address::from_str("0xfcb1d485ef46344029d9e8a7925925e146b3430e").unwrap(),
         trusted_state: RwLock::new(TrustedState::new(0, 0)),
     };
-
-    let hyperlane_message_store =
-        Arc::new(HyperlaneMessageStore::from_path_relative(2, storage::hyperlane::message::IndexMode::Block).unwrap());
-    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::from_path_relative(2).unwrap());
-    hyperlane_message_store.prune_all().unwrap();
-    hyperlane_snapshot_store.prune_all().unwrap();
 
     let prover = HyperlaneMessageProver::new(app, hyperlane_message_store, hyperlane_snapshot_store).unwrap();
     prover.run().await.unwrap();
