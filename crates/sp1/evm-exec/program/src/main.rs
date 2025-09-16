@@ -106,6 +106,8 @@ pub fn main() {
 
     let mut cursor = 0;
     for (proof, root) in inputs.proofs.iter().zip(roots) {
+        assert!(proof.is_of_presence(), "NamespaceProof must be of presence");
+
         let share_count = (proof.end_idx() - proof.start_idx()) as usize;
         let end = cursor + share_count;
 
