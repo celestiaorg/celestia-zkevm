@@ -4,7 +4,7 @@ FROM --platform=linux/amd64 rust:1.88-slim as builder
 # Set the working directory
 WORKDIR /app
 
-# Install build dependencies
+# Install build dependencies including Go
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
@@ -15,7 +15,17 @@ RUN apt-get update && apt-get install -y \
     git \
     clang \
     libclang-dev \
+    wget \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Go (required for SP1 gnark FFI)
+RUN wget https://go.dev/dl/go1.21.6.linux-amd64.tar.gz \
+    && tar -C /usr/local -xzf go1.21.6.linux-amd64.tar.gz \
+    && rm go1.21.6.linux-amd64.tar.gz
+
+# Set Go environment
+ENV PATH="/usr/local/go/bin:$PATH"
+ENV GOROOT="/usr/local/go"
 
 # Install SP1 toolchain 
 RUN curl -L https://sp1up.succinct.xyz | bash
@@ -26,42 +36,9 @@ RUN /root/.sp1/bin/sp1up --c-toolchain --arch amd64
 ENV PATH="/root/.sp1/bin:$PATH"
 ENV SP1_TOOLCHAIN_PATH="/root/.sp1"
 
-# Copy the workspace Cargo files
+# Copy the workspace files and source code
 COPY Cargo.toml Cargo.lock ./
-COPY crates/evm-prover/Cargo.toml ./crates/evm-prover/
-COPY crates/sp1/evm-exec-types/Cargo.toml ./crates/sp1/evm-exec-types/
-COPY crates/evm-state-queries/Cargo.toml ./crates/evm-state-queries/
-COPY crates/evm-state-types/Cargo.toml ./crates/evm-state-types/
-COPY crates/evm-storage-proofs/Cargo.toml ./crates/evm-storage-proofs/
-COPY crates/storage/Cargo.toml ./crates/storage/
-COPY crates/sp1/evm-exec/program/Cargo.toml ./crates/sp1/evm-exec/program/
-COPY crates/sp1/evm-range-exec/program/Cargo.toml ./crates/sp1/evm-range-exec/program/
-COPY crates/sp1/evm-exec/script/Cargo.toml ./crates/sp1/evm-exec/script/
-COPY crates/sp1/evm-range-exec/script/Cargo.toml ./crates/sp1/evm-range-exec/script/
-
-# Create dummy source files to build dependencies
-RUN mkdir -p crates/evm-prover/src crates/sp1/evm-exec-types/src crates/evm-state-queries/src crates/evm-state-types/src crates/evm-storage-proofs/src crates/storage/src crates/sp1/evm-exec/program/src crates/sp1/evm-range-exec/program/src crates/sp1/evm-exec/script/src crates/sp1/evm-range-exec/script/src
-RUN echo "fn main() {}" > crates/evm-prover/src/main.rs
-RUN echo "fn main() {}" > crates/sp1/evm-exec-types/src/lib.rs
-RUN echo "fn main() {}" > crates/evm-state-queries/src/lib.rs
-RUN echo "fn main() {}" > crates/evm-state-types/src/lib.rs
-RUN echo "fn main() {}" > crates/evm-storage-proofs/src/lib.rs
-RUN echo "fn main() {}" > crates/storage/src/lib.rs
-RUN echo "fn main() {}" > crates/sp1/evm-exec/program/src/main.rs
-RUN echo "fn main() {}" > crates/sp1/evm-range-exec/program/src/main.rs
-RUN echo "fn main() {}" > crates/sp1/evm-exec/script/src/main.rs
-RUN echo "fn main() {}" > crates/sp1/evm-range-exec/script/src/main.rs
-
-# Build dependencies
-RUN cargo build --release --bin evm-prover
-
-# Remove dummy files and copy real source
-RUN rm -rf crates/evm-prover/src crates/sp1/evm-exec-types/src crates/evm-state-queries/src crates/evm-state-types/src crates/evm-storage-proofs/src crates/storage/src crates/sp1/evm-exec/program/src crates/sp1/evm-range-exec/program/src crates/sp1/evm-exec/script/src crates/sp1/evm-range-exec/script/src
-
-# Copy the actual source code
 COPY crates/ ./crates/
-
-# Copy the proto directory
 COPY proto/ ./proto/
 
 # Build the application
