@@ -139,28 +139,27 @@ impl HyperlaneMessageProver {
 
         loop {
             // get the trusted height and state root from the state query provider
-            let height_on_chain = self.state_query_provider.get_height().await;
-            let state_root_on_chain = self
+            let height = self.state_query_provider.get_height().await;
+            let state_root = self
                 .state_query_provider
-                .get_state_root(height_on_chain)
+                .get_state_root(height)
                 .await
                 .expect("Failed to get state root");
 
             let proof = evm_client
-                .get_proof(
-                    &HYPERLANE_MERKLE_TREE_KEYS,
-                    self.app.merkle_tree_address,
-                    Some(height_on_chain),
-                )
+                .get_proof(&HYPERLANE_MERKLE_TREE_KEYS, self.app.merkle_tree_address, Some(height))
                 .await
                 .expect("Failed to get merkle proof");
 
-            println!("[INFO] state_root_on_chain: {state_root_on_chain}, height_on_chain: {height_on_chain}, trusted height: {}", self.app.merkle_tree_state.read().unwrap().height + 1);
+            println!(
+                "[INFO] state_root: {state_root}, height: {height}, trusted height: {}",
+                self.app.merkle_tree_state.read().unwrap().height + 1
+            );
 
-            if self.app.merkle_tree_state.read().unwrap().height >= height_on_chain {
+            if self.app.merkle_tree_state.read().unwrap().height >= height {
                 println!(
                     "[INFO] Waiting for more blocks to occur {}/{}...",
-                    height_on_chain,
+                    height,
                     self.app.merkle_tree_state.read().unwrap().height + DISTANCE_TO_HEAD
                 );
                 sleep(Duration::from_secs(TIMEOUT)).await;
@@ -168,21 +167,15 @@ impl HyperlaneMessageProver {
             }
 
             // Check if the root has changed for our height, if so panic
-            let new_root_on_chain = evm_client.get_state_root(height_on_chain).await.unwrap();
-            if new_root_on_chain != hex::encode(state_root_on_chain) {
+            let new_root = evm_client.get_state_root(height).await.unwrap();
+            if new_root != hex::encode(state_root) {
                 panic!(
-                    "The state root has changed at depth HEAD-{DISTANCE_TO_HEAD}, this should not happen! Expected: {state_root_on_chain}, Got: {new_root_on_chain}",
+                    "The state root has changed at depth HEAD-{DISTANCE_TO_HEAD}, this should not happen! Expected: {state_root}, Got: {new_root}",
                 );
             }
 
             if let Err(e) = self
-                .run_inner(
-                    &evm_provider,
-                    &mut indexer,
-                    height_on_chain,
-                    proof.clone(),
-                    state_root_on_chain,
-                )
+                .run_inner(&evm_provider, &mut indexer, height, proof.clone(), state_root)
                 .await
             {
                 println!(
@@ -198,9 +191,9 @@ impl HyperlaneMessageProver {
         self: &Arc<Self>,
         evm_provider: &DefaultProvider,
         indexer: &mut HyperlaneIndexer,
-        height_on_chain: u64,
+        height: u64,
         proof: EIP1186AccountProofResponse,
-        state_root_on_chain: FixedBytes<32>,
+        state_root: FixedBytes<32>,
     ) -> Result<()> {
         indexer.filter = Filter::new()
             .address(indexer.contract_address)
@@ -213,7 +206,7 @@ impl HyperlaneMessageProver {
                     .height
                     + 1,
             )
-            .to_block(height_on_chain);
+            .to_block(height);
 
         // run the indexer to get all messages that occurred since the last trusted height
         indexer
@@ -254,7 +247,7 @@ impl HyperlaneMessageProver {
         let branch_proof = HyperlaneBranchProof::new(proof);
 
         let input = HyperlaneMessageInputs::new(
-            state_root_on_chain.to_string(),
+            state_root.to_string(),
             self.app.merkle_tree_address.to_string(),
             messages.clone().into_iter().map(|m| m.message).collect(),
             HyperlaneBranchProofInputs::from(branch_proof),
@@ -293,7 +286,7 @@ impl HyperlaneMessageProver {
             .merkle_tree_state
             .write()
             .expect("Failed to write trusted state")
-            .height = height_on_chain;
+            .height = height;
 
         self.app
             .merkle_tree_state
