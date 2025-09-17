@@ -1,4 +1,4 @@
-FROM golang:1.24.3-alpine AS go-builder
+FROM golang:1.24.6-alpine AS go-builder
 
 WORKDIR /home/hyperlane
 

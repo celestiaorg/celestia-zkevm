@@ -125,14 +125,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         println!("Got {} blobs for block: {}", blobs.len(), block_number);
 
         let extended_header = celestia_client.header_get_by_height(block_number).await?;
-
-        // Clone the Header such that we are not writing an incorrect header to testdata files
-        // Required until celestia rust libs support v4
-        let mut modified_header = extended_header.clone();
-        modified_header.header.version.app = 3;
-
         let namespace_data = celestia_client
-            .share_get_namespace_data(&modified_header, namespace)
+            .share_get_namespace_data(&extended_header, namespace)
             .await?;
 
         let mut proofs: Vec<NamespaceProof> = Vec::new();
