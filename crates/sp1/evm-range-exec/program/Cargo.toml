@@ -8,7 +8,7 @@ bincode = { workspace = true }
 
 celestia-types = { workspace = true }
 evm-exec-types = { path = "../../evm-exec-types" }
-hex = "0.4.3"
+hex = { workspace = true }
 hex-literal = "0.4.1"
 nmt-rs = "*"
 reth-primitives = { workspace = true }

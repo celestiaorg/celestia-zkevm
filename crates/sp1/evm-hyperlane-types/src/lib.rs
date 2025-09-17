@@ -76,13 +76,12 @@ impl HyperlaneMessageInputs {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HyperlaneMessageOutputs {
-    pub state_root: String,
-    // todo: output just the id, not the entire message
-    pub message_ids: Vec<String>,
+    pub state_root: [u8; 32],
+    pub message_ids: Vec<Vec<u8>>,
 }
 
 impl HyperlaneMessageOutputs {
-    pub fn new(state_root: String, message_ids: Vec<String>) -> Self {
+    pub fn new(state_root: [u8; 32], message_ids: Vec<Vec<u8>>) -> Self {
         Self {
             state_root,
             message_ids,

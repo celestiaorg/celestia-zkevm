@@ -25,7 +25,14 @@ pub fn main() {
     let mut inputs: HyperlaneMessageInputs = sp1_zkvm::io::read::<HyperlaneMessageInputs>();
     inputs.verify();
     sp1_zkvm::io::commit(&HyperlaneMessageOutputs::new(
-        inputs.state_root,
-        inputs.messages.iter().map(|m| m.id()).collect(),
+        alloy_primitives::hex::decode(inputs.state_root)
+            .unwrap()
+            .try_into()
+            .unwrap(),
+        inputs
+            .messages
+            .iter()
+            .map(|m| m.id().as_bytes().try_into().unwrap())
+            .collect(),
     ));
 }

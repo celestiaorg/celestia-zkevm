@@ -228,7 +228,6 @@ impl HyperlaneMessageProver {
 
         // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
         // then save new snapshot
-        // todo: store the proof or directly send it to celestia for verification
         let mut snapshot = self
             .snapshot_store
             .get_snapshot(
