@@ -1,13 +1,15 @@
-use crate::prover::programs::message::DefaultProvider;
 use alloy_primitives::{hex::FromHex, FixedBytes};
 use alloy_provider::Provider;
 use anyhow::Result;
 use async_trait::async_trait;
 use evm_storage_proofs::client::EvmClient;
 
+use crate::prover::programs::types::DefaultProvider;
+
 pub mod block;
 pub mod message;
 pub mod range;
+pub mod types;
 
 #[async_trait]
 pub trait StateQueryProvider: Send + Sync {

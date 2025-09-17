@@ -6,7 +6,8 @@ use std::{
 use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
 use evm_prover::prover::programs::{
-    message::{AppContext, DefaultProvider, HyperlaneMessageProver, MerkleTreeState},
+    message::{AppContext, HyperlaneMessageProver, MerkleTreeState},
+    types::DefaultProvider,
     MockStateQueryProvider,
 };
 use evm_storage_proofs::client::EvmClient;

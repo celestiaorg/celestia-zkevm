@@ -9,7 +9,7 @@ use std::{
 };
 
 use alloy_primitives::{Address, FixedBytes};
-use alloy_provider::{fillers::FillProvider, ProviderBuilder, WsConnect};
+use alloy_provider::{ProviderBuilder, WsConnect};
 use alloy_rpc_types::{EIP1186AccountProofResponse, Filter};
 use anyhow::Result;
 use evm_hyperlane_types_sp1::{HyperlaneMessageInputs, HyperlaneMessageOutputs};
@@ -24,24 +24,10 @@ use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPu
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use tokio::time::sleep;
 
-use crate::prover::{programs::StateQueryProvider, ProgramProver, ProverConfig};
-
-pub type DefaultProvider = FillProvider<
-    alloy_provider::fillers::JoinFill<
-        alloy_provider::Identity,
-        alloy_provider::fillers::JoinFill<
-            alloy_provider::fillers::GasFiller,
-            alloy_provider::fillers::JoinFill<
-                alloy_provider::fillers::BlobGasFiller,
-                alloy_provider::fillers::JoinFill<
-                    alloy_provider::fillers::NonceFiller,
-                    alloy_provider::fillers::ChainIdFiller,
-                >,
-            >,
-        >,
-    >,
-    alloy_provider::RootProvider,
->;
+use crate::prover::{
+    programs::{types::DefaultProvider, StateQueryProvider},
+    ProgramProver, ProverConfig,
+};
 
 const TIMEOUT: u64 = 6; // in seconds
 const DISTANCE_TO_HEAD: u64 = 32; // in blocks
