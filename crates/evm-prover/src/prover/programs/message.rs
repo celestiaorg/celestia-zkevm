@@ -13,7 +13,7 @@ use alloy_provider::{ProviderBuilder, WsConnect};
 use alloy_rpc_types::{EIP1186AccountProofResponse, Filter};
 use anyhow::Result;
 use evm_hyperlane_types_sp1::{HyperlaneMessageInputs, HyperlaneMessageOutputs};
-use evm_state_queries::hyperlane::{indexer::HyperlaneIndexer, DefaultProvider, StateQueryProvider};
+use evm_state_queries::{hyperlane::indexer::HyperlaneIndexer, DefaultProvider, StateQueryProvider};
 use evm_state_types::events::Dispatch;
 use evm_storage_proofs::{
     client::EvmClient,

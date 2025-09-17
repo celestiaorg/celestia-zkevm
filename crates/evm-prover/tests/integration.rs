@@ -6,7 +6,7 @@ use std::{
 use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
 use evm_prover::prover::programs::message::{AppContext, HyperlaneMessageProver, MerkleTreeState};
-use evm_state_queries::hyperlane::{DefaultProvider, MockStateQueryProvider};
+use evm_state_queries::{DefaultProvider, MockStateQueryProvider};
 use evm_storage_proofs::client::EvmClient;
 use reqwest::Url;
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
