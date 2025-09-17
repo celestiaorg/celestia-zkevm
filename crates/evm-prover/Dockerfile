@@ -36,8 +36,13 @@ RUN /root/.sp1/bin/sp1up --c-toolchain --arch amd64
 ENV PATH="/root/.sp1/bin:$PATH"
 ENV SP1_TOOLCHAIN_PATH="/root/.sp1"
 
-# Copy the workspace files and source code
+# Copy only dependency manifests first for better caching
 COPY Cargo.toml Cargo.lock ./
+
+# Fetch dependencies (this layer gets cached)
+RUN cargo fetch
+
+# Copy the source code
 COPY crates/ ./crates/
 COPY proto/ ./proto/
 
