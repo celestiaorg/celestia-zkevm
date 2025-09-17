@@ -8,8 +8,6 @@ use sp1_sdk::{EnvProver, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 pub mod programs;
 pub mod service;
 
-pub use programs::range::BlockRangeExecProver;
-
 /// ProverConfig defines metadata about the program binary (ELF), proof mode and any static keys.
 pub struct ProverConfig {
     pub elf: &'static [u8],

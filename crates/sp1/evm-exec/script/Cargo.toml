@@ -35,10 +35,8 @@ hashbrown = "0.14.5"
 hex = { workspace = true }
 nmt-rs = { workspace = true }
 prost = { workspace = true }
-regex = "1.11.1"
 reqwest = "0.12.15"
 reth-chainspec = { workspace = true }
-reth-primitives = { workspace = true }
 rsp-client-executor = { workspace = true }
 rsp-host-executor = { workspace = true }
 rsp-primitives = { workspace = true }
@@ -53,8 +51,7 @@ sp1-sdk = { workspace = true }
 tendermint = { workspace = true }
 tendermint-proto = { workspace = true }
 tokio = { version = "1.44", features = ["full"] }
-tokio-retry = "0.3"
-tracing = "0.1.40"
+tracing = { workspace = true }
 
 [build-dependencies]
 sp1-build = { workspace = true }

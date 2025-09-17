@@ -36,6 +36,11 @@ pub async fn create_grpc_server(config: Config) -> Result<()> {
         }
     });
 
+    // Todo: Integrate message prover and supply trusted_root, trusted_height from block prover
+    // First generate the block proof, then generate the message proof inside a joined service.
+    // We have a service implementation for each prover that can run in isolation, but for our ZK ISM
+    // we will want to send both proofs together in a single request.
+
     let prover_serivce = ProverService::new(config)?;
 
     Server::builder()

@@ -63,6 +63,19 @@ transfer-back:
   		--rpc-url http://localhost:8545
 .PHONY: transfer-back
 
+## transfer-back-loop: Loop transfer transactions back every second.
+transfer-back-loop:
+	@echo "--> Looping transfer transactions back every second"
+	@while true; do \
+		cast send 0x345a583028762De4d733852c9D4f419077093A48 \
+  		"transferRemote(uint32, bytes32, uint256)(bytes32)" \
+  		69420 0000000000000000000000006A809B36CAF0D46A935EE76835065EC5A8B3CEA7 1000 \
+		--private-key 0x82bfcfadbf1712f6550d8d2c00a39f05b33ec78939d0167be2a737d691f33a6a \
+  		--rpc-url http://localhost:8545 \
+		sleep 1; \
+	done
+.PHONY: transfer-back-loop
+
 ## query-balance: Query the balance of the receiver in the EVM roll-up.
 query-balance:
 	@echo "--> Querying the balance of the receiver on the EVM roll-up"

@@ -4,5 +4,6 @@ name = "evm-hyperlane-program"
 edition = "2021"
 
 [dependencies]
+alloy-primitives = { workspace = true }
 evm-hyperlane-types-sp1 = { workspace = true }
 sp1-zkvm = { workspace = true }

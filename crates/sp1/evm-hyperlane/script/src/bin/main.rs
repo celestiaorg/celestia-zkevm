@@ -21,7 +21,7 @@ use evm_storage_proofs::{
 };
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 use std::{env, str::FromStr, time::Instant};
-use storage::hyperlane_messages::storage::HyperlaneMessageStore;
+use storage::hyperlane::message::{HyperlaneMessageStore, IndexMode};
 use url::Url;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
@@ -98,14 +98,15 @@ async fn main() {
 }
 
 async fn write_proof_inputs(stdin: &mut SP1Stdin, args: &Args) -> Result<()> {
-    let message_db = HyperlaneMessageStore::from_path_relative(4).unwrap();
-
+    let message_db = HyperlaneMessageStore::from_path_relative(4, IndexMode::Message).unwrap();
     let mut messages = Vec::new();
+    // insert messages into local database
     for height in args.start_idx..=args.end_idx {
-        let message = message_db.get_message(height).unwrap();
+        let message = message_db.get_message(height as u64).unwrap();
         messages.push(message);
     }
 
+    // get the merkle proofs from the EVM execution client
     let provider = ProviderBuilder::new().connect_http(Url::from_str(&args.rpc_url).unwrap());
     let evm_client = EvmClient::new(provider);
     let proof = evm_client
@@ -120,6 +121,7 @@ async fn write_proof_inputs(stdin: &mut SP1Stdin, args: &Args) -> Result<()> {
     let execution_state_root = evm_client.get_state_root(args.target_height.into()).await.unwrap();
     let branch_proof = HyperlaneBranchProof::new(proof);
 
+    // write the inputs to the stdin
     let inputs = HyperlaneMessageInputs::new(
         execution_state_root,
         args.contract.clone(),

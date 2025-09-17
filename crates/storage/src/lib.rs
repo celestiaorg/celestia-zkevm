@@ -1,1 +1,1 @@
-pub mod hyperlane_messages;
+pub mod hyperlane;

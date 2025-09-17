@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 pub mod tree;
 use tree::MerkleTree;
 
+use crate::tree::ZERO_BYTES;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// Inputs for the hyperlane message circuit.
 pub struct HyperlaneMessageInputs {
@@ -43,11 +45,23 @@ impl HyperlaneMessageInputs {
                 .insert(message_id)
                 .expect("Failed to insert message id into snapshot");
         }
+
+        // sanity check, we can't prove an empty hyperlane tree against state_root
+        if self
+            .snapshot
+            .branch
+            .iter()
+            .all(|_| self.snapshot.branch.iter().all(|b| b == ZERO_BYTES))
+        {
+            println!("Snapshot branch is empty (all zero bytes) before proof verification");
+        }
+
         for idx in 0..HYPERLANE_MERKLE_TREE_KEYS.len() {
             // The branch nodes of the snapshot after insert must match the branch nodes of the incremental
             // tree on the EVM chain.
             assert_eq!(self.snapshot.branch[idx], self.branch_proof.get_branch_node(idx));
         }
+
         let verified = self
             .branch_proof
             .verify(
@@ -62,13 +76,12 @@ impl HyperlaneMessageInputs {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HyperlaneMessageOutputs {
-    pub state_root: String,
-    // todo: output just the id, not the entire message
-    pub message_ids: Vec<String>,
+    pub state_root: [u8; 32],
+    pub message_ids: Vec<[u8; 32]>,
 }
 
 impl HyperlaneMessageOutputs {
-    pub fn new(state_root: String, message_ids: Vec<String>) -> Self {
+    pub fn new(state_root: [u8; 32], message_ids: Vec<[u8; 32]>) -> Self {
         Self {
             state_root,
             message_ids,

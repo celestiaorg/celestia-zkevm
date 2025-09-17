@@ -143,17 +143,12 @@ mod tests {
     #[test]
     fn test_insert() {
         let mut tree = MerkleTree::default();
-        let message = [
-            3, 0, 0, 0, 0, 0, 0, 4, 210, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 167, 87, 133, 81, 186, 232, 154, 150, 195,
-            54, 91, 147, 73, 58, 210, 212, 235, 203, 174, 151, 0, 1, 15, 44, 114, 111, 117, 116, 101, 114, 95, 97, 112,
-            112, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            106, 128, 155, 54, 202, 240, 212, 106, 147, 94, 231, 104, 53, 6, 94, 197, 168, 179, 206, 167, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 232,
-        ];
+        let message_hex = "0300000000000004d2000000000000000000000000a7578551bae89a96c3365b93493ad2d4ebcbae9700010f2c726f757465725f617070000000000000000000000000000100000000000000000000000000000000000000006a809b36caf0d46a935ee76835065ec5a8b3cea700000000000000000000000000000000000000000000000000000000000003e8";
+        let message = hex::decode(message_hex).unwrap();
         tree.insert(keccak256_hash(&message).unwrap()).unwrap();
-        println!("{tree:?}");
         let root = tree.root_with_ctx(&ZERO_HASHES.map(|s| s.to_string())).unwrap();
-        println!("root: {root}");
+        let expected_root = "fa252f08612271b1aeff37a319dd0dcee621cd5d52b75b974dbac4062e56a0cc";
+        assert_eq!(root, expected_root);
         /// Hash bytes using Keccak256
         fn keccak256_hash(data: &[u8]) -> Result<String> {
             let mut hasher = Keccak256::new();
