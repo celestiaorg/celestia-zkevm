@@ -16,7 +16,7 @@ pub struct ProverService {
 
 impl ProverService {
     pub fn new(_config: Config) -> Result<Self> {
-        let block_range_prover = BlockRangeExecProver::new();
+        let block_range_prover = BlockRangeExecProver::default();
 
         Ok(ProverService { block_range_prover })
     }

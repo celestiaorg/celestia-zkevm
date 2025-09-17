@@ -97,20 +97,21 @@ impl ProgramProver for BlockRangeExecProver {
 }
 
 impl BlockRangeExecProver {
-    /// Creates a new instance of [`BlockRangeExecProver`] using default configuration
-    /// and prover environment settings.
-    pub fn new() -> Self {
-        let config = BlockRangeExecProver::default_config();
-        let prover = ProverClient::from_env();
-
-        Self { config, prover }
-    }
-
     /// Returns the default prover configuration for the block execution program.
     pub fn default_config() -> ProverConfig {
         ProverConfig {
             elf: EVM_RANGE_EXEC_ELF,
             proof_mode: SP1ProofMode::Groth16,
         }
+    }
+}
+
+impl Default for BlockRangeExecProver {
+    /// Creates a new instance of [`BlockRangeExecProver`] using default configuration
+    /// and prover environment settings.
+    fn default() -> Self {
+        let config = BlockRangeExecProver::default_config();
+        let prover = ProverClient::from_env();
+        Self { config, prover }
     }
 }

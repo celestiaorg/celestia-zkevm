@@ -19,8 +19,8 @@ pub struct Config {
     pub pub_key: String,
 }
 
-impl Config {
-    pub fn default() -> Self {
+impl Default for Config {
+    fn default() -> Self {
         Self {
             grpc_address: "127.0.0.1:50051".to_string(),
             celestia_rpc: "127.0.0.1:26658".to_string(),
