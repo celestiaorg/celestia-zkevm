@@ -152,7 +152,8 @@ mod tests {
         ];
         tree.insert(keccak256_hash(&message).unwrap()).unwrap();
         let root = tree.root_with_ctx(&ZERO_HASHES.map(|s| s.to_string())).unwrap();
-        assert_eq!(root, "fa252f08612271b1aeff37a319dd0dcee621cd5d52b75b974dbac4062e56a0cc");
+        let expected_root = "fa252f08612271b1aeff37a319dd0dcee621cd5d52b75b974dbac4062e56a0cc";
+        assert_eq!(root, expected_root);
         /// Hash bytes using Keccak256
         fn keccak256_hash(data: &[u8]) -> Result<String> {
             let mut hasher = Keccak256::new();
