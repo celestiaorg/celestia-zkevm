@@ -5,12 +5,10 @@ use async_trait::async_trait;
 use sp1_sdk::{EnvProver, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 
 #[allow(clippy::module_inception)]
-pub mod block;
-pub mod message;
-pub mod range;
+pub mod programs;
 pub mod service;
 
-pub use range::BlockRangeExecProver;
+pub use programs::range::BlockRangeExecProver;
 
 /// ProverConfig defines metadata about the program binary (ELF), proof mode and any static keys.
 pub struct ProverConfig {
