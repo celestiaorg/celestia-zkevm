@@ -13,7 +13,7 @@ use alloy_provider::{ProviderBuilder, WsConnect};
 use alloy_rpc_types::{EIP1186AccountProofResponse, Filter};
 use anyhow::Result;
 use evm_hyperlane_types_sp1::{HyperlaneMessageInputs, HyperlaneMessageOutputs};
-use evm_state_queries::hyperlane::indexer::HyperlaneIndexer;
+use evm_state_queries::hyperlane::{indexer::HyperlaneIndexer, DefaultProvider, StateQueryProvider};
 use evm_state_types::events::Dispatch;
 use evm_storage_proofs::{
     client::EvmClient,
@@ -24,10 +24,7 @@ use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPu
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use tokio::time::sleep;
 
-use crate::prover::{
-    programs::{types::DefaultProvider, StateQueryProvider},
-    ProgramProver, ProverConfig,
-};
+use crate::prover::{ProgramProver, ProverConfig};
 
 const TIMEOUT: u64 = 6; // in seconds
 const DISTANCE_TO_HEAD: u64 = 32; // in blocks
@@ -123,7 +120,7 @@ impl HyperlaneMessageProver {
     pub fn default_config() -> ProverConfig {
         ProverConfig {
             elf: EVM_HYPERLANE_ELF,
-            proof_mode: SP1ProofMode::Compressed,
+            proof_mode: SP1ProofMode::Groth16,
         }
     }
 

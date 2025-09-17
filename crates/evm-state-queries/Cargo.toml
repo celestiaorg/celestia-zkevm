@@ -14,8 +14,10 @@ alloy-rpc-types = { workspace = true }
 alloy-sol-types = "1.3"
 alloy-trie = { version = "0.7.9", default-features = false }
 anyhow = { workspace = true }
+async-trait = "0.1.88"
 dotenvy = "0.15.7"
 evm-state-types = { workspace = true }
+evm-storage-proofs = { workspace = true }
 serde_json = { workspace = true }
 storage = { workspace = true }
 tokio = { workspace = true }
