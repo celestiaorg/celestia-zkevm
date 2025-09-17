@@ -8,8 +8,8 @@ use std::{
     time::Duration,
 };
 
-use alloy_primitives::{hex::FromHex, Address, FixedBytes};
-use alloy_provider::{fillers::FillProvider, Provider, ProviderBuilder, WsConnect};
+use alloy_primitives::{Address, FixedBytes};
+use alloy_provider::{fillers::FillProvider, ProviderBuilder, WsConnect};
 use alloy_rpc_types::{EIP1186AccountProofResponse, Filter};
 use anyhow::Result;
 use evm_hyperlane_types_sp1::{HyperlaneMessageInputs, HyperlaneMessageOutputs};
@@ -24,7 +24,7 @@ use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPu
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use tokio::time::sleep;
 
-use crate::prover::{ProgramProver, ProverConfig};
+use crate::prover::{programs::StateQueryProvider, ProgramProver, ProverConfig};
 
 pub type DefaultProvider = FillProvider<
     alloy_provider::fillers::JoinFill<
@@ -62,10 +62,10 @@ pub struct AppContext {
     pub evm_ws: String,
     pub mailbox_address: Address,
     pub merkle_tree_address: Address,
-    pub trusted_state: RwLock<MerkleTreeState>,
+    pub merkle_tree_state: RwLock<MerkleTreeState>,
 }
 
-/// MerkleTreeState encapsulates the trusted state of the prover
+/// MerkleTreeState encapsulates the height of the merkle tree in terms of snapshots and blocks
 pub struct MerkleTreeState {
     // the index of the snapshot that we will load from the db, initially 0 (empty by default)
     snapshot_index: u64,
@@ -86,6 +86,7 @@ pub struct HyperlaneMessageProver {
     pub prover: EnvProver,
     pub message_store: Arc<HyperlaneMessageStore>,
     pub snapshot_store: Arc<HyperlaneSnapshotStore>,
+    pub state_query_provider: Arc<dyn StateQueryProvider>,
 }
 
 impl ProgramProver for HyperlaneMessageProver {
@@ -118,6 +119,7 @@ impl HyperlaneMessageProver {
         app: AppContext,
         message_store: Arc<HyperlaneMessageStore>,
         snapshot_store: Arc<HyperlaneSnapshotStore>,
+        state_query_provider: Arc<dyn StateQueryProvider>,
     ) -> Result<Arc<Self>> {
         let config = HyperlaneMessageProver::default_config();
         let prover = ProverClient::from_env();
@@ -128,6 +130,7 @@ impl HyperlaneMessageProver {
             prover,
             message_store,
             snapshot_store,
+            state_query_provider,
         }))
     }
 
@@ -150,10 +153,13 @@ impl HyperlaneMessageProver {
         let mut indexer = HyperlaneIndexer::new(socket, contract_address, filter.clone());
 
         loop {
-            // todo: get the root and height from celestia instead of directly from reth
-            let (state_root_on_chain, height_on_chain) = simulate_get_root_and_height(&evm_provider, &evm_client)
+            // get the trusted height and state root from the state query provider
+            let height_on_chain = self.state_query_provider.get_height().await;
+            let state_root_on_chain = self
+                .state_query_provider
+                .get_state_root(height_on_chain)
                 .await
-                .expect("Failed to get root and height");
+                .expect("Failed to get state root");
 
             let proof = evm_client
                 .get_proof(
@@ -164,13 +170,13 @@ impl HyperlaneMessageProver {
                 .await
                 .expect("Failed to get merkle proof");
 
-            println!("[INFO] state_root_on_chain: {state_root_on_chain}, height_on_chain: {height_on_chain}, trusted height: {}", self.app.trusted_state.read().unwrap().height + 1);
+            println!("[INFO] state_root_on_chain: {state_root_on_chain}, height_on_chain: {height_on_chain}, trusted height: {}", self.app.merkle_tree_state.read().unwrap().height + 1);
 
-            if self.app.trusted_state.read().unwrap().height >= height_on_chain {
+            if self.app.merkle_tree_state.read().unwrap().height >= height_on_chain {
                 println!(
                     "[INFO] Waiting for more blocks to occur {}/{}...",
                     height_on_chain,
-                    self.app.trusted_state.read().unwrap().height + DISTANCE_TO_HEAD
+                    self.app.merkle_tree_state.read().unwrap().height + DISTANCE_TO_HEAD
                 );
                 sleep(Duration::from_secs(TIMEOUT)).await;
                 continue;
@@ -216,7 +222,7 @@ impl HyperlaneMessageProver {
             .event(&Dispatch::id())
             .from_block(
                 self.app
-                    .trusted_state
+                    .merkle_tree_state
                     .read()
                     .expect("Failed to read trusted state")
                     .height
@@ -242,7 +248,7 @@ impl HyperlaneMessageProver {
             .snapshot_store
             .get_snapshot(
                 self.app
-                    .trusted_state
+                    .merkle_tree_state
                     .read()
                     .expect("Failed to read trusted state")
                     .snapshot_index,
@@ -253,7 +259,7 @@ impl HyperlaneMessageProver {
             .message_store
             .get_by_block(
                 self.app
-                    .trusted_state
+                    .merkle_tree_state
                     .read()
                     .expect("Failed to read trusted state")
                     .height
@@ -289,7 +295,7 @@ impl HyperlaneMessageProver {
         self.snapshot_store
             .insert_snapshot(
                 self.app
-                    .trusted_state
+                    .merkle_tree_state
                     .read()
                     .expect("Failed to read trusted state")
                     .snapshot_index
@@ -300,25 +306,17 @@ impl HyperlaneMessageProver {
 
         // update trusted state
         self.app
-            .trusted_state
+            .merkle_tree_state
             .write()
             .expect("Failed to write trusted state")
             .height = height_on_chain;
 
         self.app
-            .trusted_state
+            .merkle_tree_state
             .write()
             .expect("Failed to write trusted state")
             .snapshot_index += 1;
 
         Ok(())
     }
-}
-
-/// Simulate getting the state root and height from Celestia
-async fn simulate_get_root_and_height(provider: &DefaultProvider, client: &EvmClient) -> Result<(FixedBytes<32>, u64)> {
-    // todo: instead query celestia for a recent state root and height provided by our light client
-    let height = provider.get_block_number().await.unwrap() - DISTANCE_TO_HEAD;
-    let root = client.get_state_root(height).await.unwrap();
-    Ok((FixedBytes::from_hex(&root).unwrap(), height))
 }
