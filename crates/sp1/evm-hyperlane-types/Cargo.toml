@@ -6,7 +6,6 @@ edition = "2024"
 [dependencies]
 alloy-primitives = { workspace = true }
 anyhow = { workspace = true }
-borsh = { version = "1.5.7", features = ["derive"] }
 evm-state-types = { workspace = true }
 evm-storage-proofs = { workspace = true }
 hex = { workspace = true }
