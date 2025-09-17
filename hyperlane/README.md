@@ -136,7 +136,7 @@ Normally this should be possible to configure in a `warp-config.yaml` using the 
 Instead, we attempt to do this manually by invoking the EVM contract directly.
 
 ```
-cast send 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
+cast send 0x345a583028762De4d733852c9D4f419077093A48 \
   "enrollRemoteRouter(uint32,bytes32)" \
   69420 0x726f757465725f61707000000000000000000000000000010000000000000000 \
   --private-key $HYP_KEY \
@@ -146,7 +146,7 @@ cast send 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
 Validate the above tx succeeded by running the following query.
 
 ```
-cast call 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
+cast call 0x345a583028762De4d733852c9D4f419077093A48 \
   "routers(uint32)(bytes32)" 69420 \
   --rpc-url http://localhost:8545
 
@@ -184,7 +184,7 @@ celestia-appd tx warp transfer 0x726f757465725f617070000000000000000000000000000
 Querying ERC20 balanceOf method of synthetic token contract:
 
 ```
-cast call 0xa7578551baE89a96C3365b93493AD2D4EBcbAe97 \
+cast call 0x345a583028762De4d733852c9D4f419077093A48 \
   "balanceOf(address)(uint256)" \
   0xd7958B336f0019081Ad2279B2B7B7c3f744Bce0a \
   --rpc-url http://localhost:8545

@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/celestiaorg/celestia-app/v4/app/encoding"
+	"github.com/celestiaorg/celestia-app/v6/app/encoding"
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
@@ -24,7 +24,7 @@ const (
 	mnemonic  = "sphere exhibit essay fancy okay tuna leaf culture elbow drum trip exchange scorpion excuse parent sun make spot chunk mouse tenant shoe hurt scale"
 	chainID   = "celestia-zkevm-testnet"
 	denom     = "utia"
-	feeAmount = 400
+	feeAmount = 800
 	gasLimit  = 200000
 )
 
@@ -107,6 +107,7 @@ func (b *Broadcaster) BroadcastTx(ctx context.Context, msgs ...sdk.Msg) *sdk.TxR
 
 	res, err := b.txService.BroadcastTx(ctx, broadcastTxReq)
 	if err != nil || res.TxResponse.Code != abci.CodeTypeOK {
+		log.Printf("failed response: %v\n", res.TxResponse)
 		log.Fatalf("broadcast tx failed: %v", err)
 	}
 

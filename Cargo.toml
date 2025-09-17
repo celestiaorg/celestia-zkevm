@@ -36,8 +36,8 @@ anyhow = { version = "1.0", default-features = false }
 base64 = "0.22.1"
 bincode = "1.3.3"
 bytes = "1.10.1"
-celestia-rpc = "=0.11.1"
-celestia-types = "=0.11.2"
+celestia-rpc = "=0.13.0"
+celestia-types = "=0.15.0"
 ed25519-dalek = { version = "2.1.0", features = ["alloc", "serde"] }
 ethers = { version = "2.0", features = ["ws", "rustls"] }
 ev-types = { version = "0.0.1", default-features = false }

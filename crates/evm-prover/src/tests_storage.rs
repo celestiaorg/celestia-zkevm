@@ -18,10 +18,10 @@ mod tests {
         (storage, temp_dir)
     }
 
-    fn create_mock_proof() -> SP1ProofWithPublicValues {
+    fn create_mock_proof(mode: SP1ProofMode) -> SP1ProofWithPublicValues {
         let (pk, _vk) = ProverClient::from_env().setup(EVM_EXEC_ELF);
         let public_values = SP1PublicValues::from(&[10, 20, 30, 40, 50]);
-        SP1ProofWithPublicValues::create_mock_proof(&pk, public_values, SP1ProofMode::Plonk, SP1_CIRCUIT_VERSION)
+        SP1ProofWithPublicValues::create_mock_proof(&pk, public_values, mode, SP1_CIRCUIT_VERSION)
     }
 
     fn create_mock_block_output() -> BlockExecOutput {
@@ -52,7 +52,7 @@ mod tests {
     #[tokio::test]
     async fn test_store_and_retrieve_block_proof() {
         let (storage, _temp_dir) = create_test_storage();
-        let proof = create_mock_proof();
+        let proof = create_mock_proof(SP1ProofMode::Compressed);
         let output = create_mock_block_output();
 
         // Store the proof
@@ -67,7 +67,7 @@ mod tests {
     #[tokio::test]
     async fn test_store_and_retrieve_range_proof() {
         let (storage, _temp_dir) = create_test_storage();
-        let proof = create_mock_proof();
+        let proof = create_mock_proof(SP1ProofMode::Groth16);
         let output = create_mock_range_output();
 
         // Store the range proof
@@ -85,7 +85,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_block_proofs_in_range() {
         let (storage, _temp_dir) = create_test_storage();
-        let proof = create_mock_proof();
+        let proof = create_mock_proof(SP1ProofMode::Compressed);
         let output = create_mock_block_output();
 
         // Store multiple block proofs
@@ -104,7 +104,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_latest_block_proof() {
         let (storage, _temp_dir) = create_test_storage();
-        let proof = create_mock_proof();
+        let proof = create_mock_proof(SP1ProofMode::Compressed);
         let output = create_mock_block_output();
 
         // Initially should return None
