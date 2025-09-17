@@ -23,7 +23,6 @@ async fn test_run_message_prover() {
     hyperlane_snapshot_store.prune_all().unwrap();
 
     let app = AppContext {
-        celestia_rpc: "http://127.0.0.1:26657".to_string(),
         evm_rpc: "http://127.0.0.1:8545".to_string(),
         evm_ws: "ws://127.0.0.1:8546".to_string(),
         mailbox_address: Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap(),

@@ -55,7 +55,6 @@ pub const EVM_HYPERLANE_ELF: &[u8] = include_elf!("evm-hyperlane-program");
 /// This separates RPC concerns from the proving logic, allowing `AppContext`
 /// to be responsible for gathering the data required for the proof system inputs.
 pub struct AppContext {
-    pub celestia_rpc: String,
     // reth http, for example http://127.0.0.1:8545
     pub evm_rpc: String,
     // reth websocket, for example ws://127.0.0.1:8546
