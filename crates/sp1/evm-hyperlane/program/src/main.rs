@@ -18,7 +18,8 @@
 //! - The message ids
 
 #![no_main]
-use evm_hyperlane_types_sp1::{HyperlaneMessageInputs, HyperlaneMessageOutputs, MessageId};
+use alloy_primitives::hex;
+use evm_hyperlane_types_sp1::{HyperlaneMessageInputs, HyperlaneMessageOutputs};
 sp1_zkvm::entrypoint!(main);
 
 pub fn main() {
@@ -32,11 +33,7 @@ pub fn main() {
         inputs
             .messages
             .iter()
-            .map(|m| {
-                let id = MessageId(m.id().as_bytes().to_vec());
-                assert!(id.validate());
-                id
-            })
+            .map(|m| hex::decode(m.id()).unwrap().try_into().unwrap())
             .collect(),
     ));
 }
