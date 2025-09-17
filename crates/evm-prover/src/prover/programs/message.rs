@@ -62,18 +62,18 @@ pub struct AppContext {
     pub evm_ws: String,
     pub mailbox_address: Address,
     pub merkle_tree_address: Address,
-    pub trusted_state: RwLock<TrustedState>,
+    pub trusted_state: RwLock<MerkleTreeState>,
 }
 
-/// TrustedState encapsulates the trusted state of the prover
-pub struct TrustedState {
+/// MerkleTreeState encapsulates the trusted state of the prover
+pub struct MerkleTreeState {
     // the index of the snapshot that we will load from the db, initially 0 (empty by default)
     snapshot_index: u64,
-    // the index of the last message we proofed successfully, initially 0
+    // the index of the last block whose messages were proven, leading up to the snapshot at index snapshot_index
     height: u64,
 }
 
-impl TrustedState {
+impl MerkleTreeState {
     pub fn new(snapshot_index: u64, height: u64) -> Self {
         Self { snapshot_index, height }
     }
@@ -321,28 +321,4 @@ async fn simulate_get_root_and_height(provider: &DefaultProvider, client: &EvmCl
     let height = provider.get_block_number().await.unwrap() - DISTANCE_TO_HEAD;
     let root = client.get_state_root(height).await.unwrap();
     Ok((FixedBytes::from_hex(&root).unwrap(), height))
-}
-
-#[tokio::test]
-async fn test_run_prover() {
-    #[allow(unused_imports)]
-    use super::*;
-
-    let hyperlane_message_store =
-        Arc::new(HyperlaneMessageStore::from_path_relative(2, storage::hyperlane::message::IndexMode::Block).unwrap());
-    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::from_path_relative(2).unwrap());
-    hyperlane_message_store.prune_all().unwrap();
-    hyperlane_snapshot_store.prune_all().unwrap();
-
-    let app = AppContext {
-        celestia_rpc: "http://127.0.0.1:26657".to_string(),
-        evm_rpc: "http://127.0.0.1:8545".to_string(),
-        evm_ws: "ws://127.0.0.1:8546".to_string(),
-        mailbox_address: Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap(),
-        merkle_tree_address: Address::from_str("0xfcb1d485ef46344029d9e8a7925925e146b3430e").unwrap(),
-        trusted_state: RwLock::new(TrustedState::new(0, 0)),
-    };
-
-    let prover = HyperlaneMessageProver::new(app, hyperlane_message_store, hyperlane_snapshot_store).unwrap();
-    prover.run().await.unwrap();
 }
