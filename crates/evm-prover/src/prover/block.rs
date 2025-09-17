@@ -428,8 +428,7 @@ impl BlockExecProver {
         let proofs: Vec<NamespaceProof> = namespace_data
             .rows
             .iter()
-            .filter(|row| row.proof.is_of_presence())
-            .map(|row| row.proof.clone())
+            .filter_map(|row| row.proof.is_of_presence().then(|| row.proof.clone()))
             .collect();
 
         let signed_data: Vec<SignedData> = event
