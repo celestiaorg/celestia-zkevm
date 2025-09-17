@@ -9,6 +9,15 @@ use tree::MerkleTree;
 
 use crate::tree::ZERO_BYTES;
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct MessageId(pub Vec<u8>);
+
+impl MessageId {
+    pub fn validate(&self) -> bool {
+        self.0.len() == 64
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// Inputs for the hyperlane message circuit.
 pub struct HyperlaneMessageInputs {
@@ -77,11 +86,11 @@ impl HyperlaneMessageInputs {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HyperlaneMessageOutputs {
     pub state_root: [u8; 32],
-    pub message_ids: Vec<Vec<u8>>,
+    pub message_ids: Vec<MessageId>,
 }
 
 impl HyperlaneMessageOutputs {
-    pub fn new(state_root: [u8; 32], message_ids: Vec<Vec<u8>>) -> Self {
+    pub fn new(state_root: [u8; 32], message_ids: Vec<MessageId>) -> Self {
         Self {
             state_root,
             message_ids,
