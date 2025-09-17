@@ -416,16 +416,16 @@ impl BlockExecProver {
     /// Retrieves the proof inputs required via RPC calls to the configured celestia and evm nodes.
     async fn prepare_inputs(self: Arc<Self>, client: Arc<Client>, event: BlockEvent) -> Result<ProofJob> {
         let extended_header = client.header_get_by_height(event.height).await?;
-        // TODO: need rs support for newer celestia app versions.
-        // Here we clone and mutate the app version in the header to avoid versioning errors when working with the rs libs.
-        let mut header_clone = extended_header.clone();
-        header_clone.header.version.app = 3;
-
         let namespace_data = client
-            .share_get_namespace_data(&header_clone, self.app.namespace)
+            .share_get_namespace_data(&extended_header, self.app.namespace)
             .await?;
 
-        let proofs: Vec<NamespaceProof> = namespace_data.rows.iter().map(|row| row.proof.clone()).collect();
+        let proofs: Vec<NamespaceProof> = namespace_data
+            .rows
+            .iter()
+            .filter(|row| row.proof.is_of_presence())
+            .map(|row| row.proof.clone())
+            .collect();
 
         let signed_data: Vec<SignedData> = event
             .blobs
