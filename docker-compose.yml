@@ -14,6 +14,7 @@ services:
     ports:
       - "26656:26656"
       - "26657:26657"
+      - "1317:1317"
       - "9090:9090"
     healthcheck:
       test: [
@@ -26,7 +27,7 @@ services:
     volumes:
       - celestia-app:/home/celestia/.celestia-app
     command: >
-      start --force-no-bbr
+      start --force-no-bbr --api.enable true --api.address tcp://0.0.0.0:1317
     depends_on:
       celestia-init:
         condition: service_completed_successfully
