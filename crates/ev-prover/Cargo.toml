@@ -17,7 +17,7 @@ celestia-types = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 dirs = "5"
 ev-exec-types = { path = "../sp1/ev-exec-types" }
-ev-hyperlane-types-sp1 = { workspace = true }
+ev-hyperlane-types = { workspace = true }
 ev-state-queries = { workspace = true }
 ev-state-types = { workspace = true }
 ev-storage-proofs = { workspace = true, features = ["alloy"] }

@@ -10,7 +10,7 @@ test = []
 anyhow = { workspace = true }
 bincode = { workspace = true }
 dotenvy = "0.15.7"
-ev-hyperlane-types-sp1 = { workspace = true }
+ev-hyperlane-types = { workspace = true }
 ev-state-types = { workspace = true }
 hex = { workspace = true }
 rocksdb = "0.24.0"

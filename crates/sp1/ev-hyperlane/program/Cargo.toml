@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 alloy-primitives = { workspace = true }
-ev-hyperlane-types-sp1 = { workspace = true }
+ev-hyperlane-types = { workspace = true }
 sp1-zkvm = { workspace = true }

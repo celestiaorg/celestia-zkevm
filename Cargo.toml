@@ -40,7 +40,7 @@ celestia-rpc = "=0.13.0"
 celestia-types = "=0.15.0"
 ed25519-dalek = { version = "2.1.0", features = ["alloc", "serde"] }
 ethers = { version = "2.0", features = ["ws", "rustls"] }
-ev-hyperlane-types-sp1 = { package = "ev-hyperlane-types", path = "crates/sp1/ev-hyperlane-types" }
+ev-hyperlane-types = { package = "ev-hyperlane-types", path = "crates/sp1/ev-hyperlane-types" }
 ev-state-queries = { path = "crates/ev-state-queries" }
 ev-state-types = { path = "crates/ev-state-types" }
 ev-storage-proofs = { path = "crates/ev-storage-proofs" }

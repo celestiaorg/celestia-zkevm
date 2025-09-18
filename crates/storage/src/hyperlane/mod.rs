@@ -7,7 +7,7 @@ mod tests {
         message::{HyperlaneMessageStore, IndexMode},
         snapshot::HyperlaneSnapshotStore,
     };
-    use ev_hyperlane_types_sp1::tree::MerkleTree;
+    use ev_hyperlane_types::tree::MerkleTree;
     use ev_state_types::{StoredHyperlaneMessage, hyperlane::decode_hyperlane_message};
 
     #[test]

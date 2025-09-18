@@ -14,7 +14,7 @@ use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
 use anyhow::Result;
 use clap::{command, Parser};
-use ev_hyperlane_types_sp1::{tree::MerkleTree, HyperlaneMessageInputs, HyperlaneMessageOutputs};
+use ev_hyperlane_types::{tree::MerkleTree, HyperlaneMessageInputs, HyperlaneMessageOutputs};
 use ev_storage_proofs::{
     client::EvmClient,
     types::{HyperlaneBranchProof, HyperlaneBranchProofInputs, HYPERLANE_MERKLE_TREE_KEYS},

@@ -12,7 +12,7 @@ use alloy_primitives::{Address, FixedBytes};
 use alloy_provider::{ProviderBuilder, WsConnect};
 use alloy_rpc_types::{EIP1186AccountProofResponse, Filter};
 use anyhow::Result;
-use ev_hyperlane_types_sp1::{HyperlaneMessageInputs, HyperlaneMessageOutputs};
+use ev_hyperlane_types::{HyperlaneMessageInputs, HyperlaneMessageOutputs};
 use ev_state_queries::{hyperlane::indexer::HyperlaneIndexer, DefaultProvider, StateQueryProvider};
 use ev_state_types::events::Dispatch;
 use ev_storage_proofs::{
