@@ -1,0 +1,57 @@
+[package]
+version = "0.1.0"
+name = "ev-exec-script"
+edition = "2021"
+default-run = "ev-exec"
+
+[[bin]]
+name = "data-gen"
+path = "src/bin/datagen.rs"
+
+[[bin]]
+name = "ev-exec"
+path = "src/bin/main.rs"
+
+[[bin]]
+name = "vkey-ev-exec"
+path = "src/bin/vkey.rs"
+
+[dependencies]
+
+alloy-genesis = { workspace = true }
+alloy-primitives = { workspace = true }
+alloy-provider = { workspace = true }
+anyhow = "1.0"
+base64 = { workspace = true }
+bincode = { workspace = true }
+celestia-rpc = { workspace = true }
+celestia-types = { workspace = true }
+clap = { version = "4.0", features = ["cargo", "derive", "env"] }
+dotenv = "0.15.0"
+ev-exec-types = { path = "../../ev-exec-types" }
+ev-types = { workspace = true, features = ["grpc"] }
+eyre = "0.6.12"
+hashbrown = "0.14.5"
+hex = { workspace = true }
+nmt-rs = { workspace = true }
+prost = { workspace = true }
+reqwest = "0.12.15"
+reth-chainspec = { workspace = true }
+rsp-client-executor = { workspace = true }
+rsp-host-executor = { workspace = true }
+rsp-primitives = { workspace = true }
+rsp-rpc-db = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_cbor = { workspace = true }
+serde_json = { workspace = true, default-features = false, features = [
+    "alloc",
+] }
+sha3 = { workspace = true }
+sp1-sdk = { workspace = true }
+tendermint = { workspace = true }
+tendermint-proto = { workspace = true }
+tokio = { version = "1.44", features = ["full"] }
+tracing = { workspace = true }
+
+[build-dependencies]
+sp1-build = { workspace = true }

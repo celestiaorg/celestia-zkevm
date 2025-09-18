@@ -3,7 +3,7 @@
 /// The messages are stored in a column family called "messages".
 use anyhow::{Context, Result};
 use dotenvy::dotenv;
-use evm_state_types::StoredHyperlaneMessage;
+use ev_state_types::StoredHyperlaneMessage;
 use rocksdb::{ColumnFamilyDescriptor, DB, IteratorMode, Options};
 use std::env;
 use std::path::PathBuf;

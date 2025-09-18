@@ -1,0 +1,57 @@
+[package]
+name = "ev-prover"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+alloy-genesis = { workspace = true }
+alloy-primitives = { workspace = true }
+alloy-provider = { workspace = true }
+alloy-rpc-types = { workspace = true }
+anyhow = "1.0"
+async-trait = "0.1.88"
+bincode = { workspace = true }
+bytes = { workspace = true }
+celestia-rpc = { workspace = true }
+celestia-types = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+dirs = "5"
+ev-exec-types = { path = "../sp1/ev-exec-types" }
+ev-hyperlane-types-sp1 = { workspace = true }
+ev-state-queries = { workspace = true }
+ev-state-types = { workspace = true }
+ev-storage-proofs = { workspace = true, features = ["alloy"] }
+ev-types = { workspace = true, features = ["grpc"] }
+hex = { workspace = true }
+jsonrpsee-core = { workspace = true }
+nmt-rs = { workspace = true }
+prost = { workspace = true }
+reqwest = { workspace = true }
+reth-chainspec = { workspace = true }
+rocksdb = "0.24"
+rsp-client-executor = { workspace = true }
+rsp-host-executor = { workspace = true }
+rsp-primitives = { workspace = true }
+rsp-rpc-db = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_cbor = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+sha3 = { workspace = true }
+sp1-sdk = { workspace = true }
+storage = { workspace = true }
+tendermint = { workspace = true }
+tendermint-proto = { workspace = true }
+thiserror = "1.0"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
+tonic = { version = "0.10", features = ["transport"] }
+tonic-reflection = "0.10"
+[build-dependencies]
+prost-build = "0.12"
+sp1-build = { workspace = true }
+tonic-build = "0.10"
+walkdir = "2.5.0"
+
+[dev-dependencies]
+tempfile = "3.8"

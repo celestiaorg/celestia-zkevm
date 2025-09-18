@@ -1,18 +1,18 @@
 [workspace]
 members = [
-    "crates/evm-prover",
-    "crates/evm-state-queries",
-    "crates/evm-state-types",
-    "crates/evm-storage-proofs",
-    "crates/evm-storage-proofs",
-    "crates/sp1/evm-exec-types",
-    "crates/sp1/evm-exec/program",
-    "crates/sp1/evm-exec/script",
-    "crates/sp1/evm-hyperlane-types",
-    "crates/sp1/evm-hyperlane/program",
-    "crates/sp1/evm-hyperlane/script",
-    "crates/sp1/evm-range-exec/program",
-    "crates/sp1/evm-range-exec/script",
+    "crates/ev-prover",
+    "crates/ev-state-queries",
+    "crates/ev-state-types",
+    "crates/ev-storage-proofs",
+    "crates/ev-storage-proofs",
+    "crates/sp1/ev-exec-types",
+    "crates/sp1/ev-exec/program",
+    "crates/sp1/ev-exec/script",
+    "crates/sp1/ev-hyperlane-types",
+    "crates/sp1/ev-hyperlane/program",
+    "crates/sp1/ev-hyperlane/script",
+    "crates/sp1/ev-range-exec/program",
+    "crates/sp1/ev-range-exec/script",
     "crates/storage",
 ]
 resolver = "2"
@@ -40,11 +40,11 @@ celestia-rpc = "=0.13.0"
 celestia-types = "=0.15.0"
 ed25519-dalek = { version = "2.1.0", features = ["alloc", "serde"] }
 ethers = { version = "2.0", features = ["ws", "rustls"] }
+ev-hyperlane-types-sp1 = { package = "ev-hyperlane-types", path = "crates/sp1/ev-hyperlane-types" }
+ev-state-queries = { path = "crates/ev-state-queries" }
+ev-state-types = { path = "crates/ev-state-types" }
+ev-storage-proofs = { path = "crates/ev-storage-proofs" }
 ev-types = { version = "0.0.1", default-features = false }
-evm-hyperlane-types-sp1 = { package = "evm-hyperlane-types", path = "crates/sp1/evm-hyperlane-types" }
-evm-state-queries = { path = "crates/evm-state-queries" }
-evm-state-types = { path = "crates/evm-state-types" }
-evm-storage-proofs = { path = "crates/evm-storage-proofs" }
 hex = "0.4.3"
 jsonrpsee-core = "0.25.1"
 nmt-rs = "*"
