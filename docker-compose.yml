@@ -27,7 +27,7 @@ services:
     volumes:
       - celestia-app:/home/celestia/.celestia-app
     command: >
-      start --force-no-bbr --api.enable true --api.address tcp://0.0.0.0:1317
+      start --force-no-bbr
     depends_on:
       celestia-init:
         condition: service_completed_successfully
