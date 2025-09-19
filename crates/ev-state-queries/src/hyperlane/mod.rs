@@ -1,3 +1,4 @@
+#![allow(unused)]
 use alloy_provider::fillers::FillProvider;
 
 pub mod indexer;

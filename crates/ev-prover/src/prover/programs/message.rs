@@ -13,7 +13,9 @@ use alloy_provider::{Provider, ProviderBuilder, WsConnect};
 use alloy_rpc_types::{EIP1186AccountProofResponse, Filter};
 use anyhow::{Context, Result};
 use ev_state_queries::{hyperlane::indexer::HyperlaneIndexer, DefaultProvider, StateQueryProvider};
-use ev_zkevm_types::programs::hyperlane::types::{HyperlaneMessageInputs, HyperlaneMessageOutputs};
+use ev_zkevm_types::programs::hyperlane::types::{
+    HyperlaneBranchProof, HyperlaneBranchProofInputs, HyperlaneMessageInputs, HyperlaneMessageOutputs,
+};
 use ev_zkevm_types::{events::Dispatch, programs::hyperlane::types::HYPERLANE_MERKLE_TREE_KEYS};
 use reqwest::Url;
 use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};

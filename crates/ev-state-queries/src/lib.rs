@@ -1,6 +1,6 @@
 pub mod hyperlane;
 
-use alloy_primitives::{FixedBytes, hex::FromHex};
+use alloy_primitives::FixedBytes;
 use alloy_provider::{Provider, fillers::FillProvider};
 use anyhow::{Context, Result};
 use async_trait::async_trait;

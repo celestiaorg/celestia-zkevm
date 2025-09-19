@@ -14,7 +14,7 @@ celestia-types = { workspace = true }
 ed25519-dalek = { workspace = true }
 ev-types = { workspace = true, default-features = false }
 ev-zkevm-types = { workspace = true }
-hex = "0.4.3"
+hex = { workspace = true }
 nmt-rs = "*"
 prost = { workspace = true }
 reth-primitives = { workspace = true }

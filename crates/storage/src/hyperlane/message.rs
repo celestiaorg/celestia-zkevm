@@ -2,7 +2,6 @@
 /// It is used to store and retrieve Hyperlane messages.
 /// The messages are stored in a column family called "messages".
 use anyhow::{Context, Result};
-use dotenvy::dotenv;
 use ev_zkevm_types::StoredHyperlaneMessage;
 use rocksdb::{ColumnFamilyDescriptor, DB, IteratorMode, Options};
 use std::env;
@@ -22,7 +21,7 @@ pub struct HyperlaneMessageStore {
 
 impl HyperlaneMessageStore {
     pub fn from_path_relative(crate_depth: usize, index_mode: IndexMode) -> Result<Self> {
-        dotenv().ok();
+        dotenvy::dotenv().ok();
         let mut workspace_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
         for _ in 0..crate_depth {
             workspace_path = workspace_path.parent().unwrap().to_path_buf();

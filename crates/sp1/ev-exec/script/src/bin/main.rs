@@ -82,7 +82,7 @@ pub struct ProofInputMetrics {
 
 fn main() -> Result<(), Box<dyn Error>> {
     sp1_sdk::utils::setup_logger();
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     let args = Args::parse();
 

@@ -2896,12 +2896,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dotenv"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
-
-[[package]]
 name = "dotenvy"
 version = "0.15.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3162,7 +3156,7 @@ dependencies = [
  "celestia-rpc",
  "celestia-types",
  "clap",
- "dotenv",
+ "dotenvy",
  "ev-types",
  "ev-zkevm-types",
  "eyre",
@@ -3201,12 +3195,14 @@ dependencies = [
 name = "ev-hyperlane-script"
 version = "0.1.0"
 dependencies = [
+ "alloy",
+ "alloy-eips",
  "alloy-primitives",
  "alloy-provider",
  "anyhow",
  "bincode",
  "clap",
- "dotenv",
+ "dotenvy",
  "ev-zkevm-types",
  "sp1-build",
  "sp1-sdk",
@@ -3290,7 +3286,7 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "clap",
- "dotenv",
+ "dotenvy",
  "ev-zkevm-types",
  "hashbrown 0.14.5",
  "hex",
