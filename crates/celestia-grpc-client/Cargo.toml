@@ -1,0 +1,58 @@
+[package]
+name = "celestia-grpc-client"
+version = "0.1.0"
+edition = "2021"
+description = "gRPC client for submitting proofs to Celestia consensus network"
+
+[dependencies]
+# Lumina gRPC library for Celestia interaction
+celestia-grpc = { git = "https://github.com/eigerco/lumina", branch = "main" }
+
+# Core dependencies
+anyhow = {workspace = true}
+async-trait = "0.1"
+bytes = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = "1.0"
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+# Crypto dependencies
+k256 = "0.13"
+ed25519-dalek = { workspace = true }
+
+# Celestia dependencies - use same version as lumina-grpc to avoid conflicts
+celestia-types = { git = "https://github.com/eigerco/lumina", branch = "main" }
+tendermint = { workspace = true }
+
+# Optional cosmrs for transaction building
+cosmrs = { version = "0.21", optional = true, features = ["grpc", "cosmwasm"] }
+
+# gRPC and protobuf dependencies
+tonic = "0.13"
+prost = { workspace = true }
+
+# CLI dependencies
+clap = { version = "4", features = ["derive"] }
+hex = { workspace = true }
+tracing-subscriber = "0.3"
+
+# For placeholder hash generation
+md5 = "0.7"
+
+[features]
+default = ["cosmrs-support"]
+cosmrs-support = ["cosmrs"]
+
+[dev-dependencies]
+tempfile = "3.8"
+tokio-test = "0.4"
+
+[build-dependencies]
+tonic-build = "0.13"
+prost-build = "0.13"
+
+[[bin]]
+name = "proof_submitter"
+path = "src/bin/proof_submitter.rs"

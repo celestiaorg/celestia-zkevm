@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package celestia.zkism.v1;
+
+// Msg defines the zkISM Tx service.
+service Msg {
+  // UpdateZKExecutionISM updates the state root and height for a ZK execution ISM.
+  rpc UpdateZKExecutionISM(MsgUpdateZKExecutionISM) returns (MsgUpdateZKExecutionISMResponse);
+
+  // SubmitMessages submits messages with state membership proof verification.
+  rpc SubmitMessages(MsgSubmitMessages) returns (MsgSubmitMessagesResponse);
+}
+
+// MsgUpdateZKExecutionISM is a message to update the ZK execution ISM state.
+message MsgUpdateZKExecutionISM {
+  // ISM identifier
+  string id = 1;
+  // Block height for the state transition
+  uint64 height = 2;
+  // ZK proof bytes
+  bytes proof = 3;
+  // Public values/inputs for proof verification
+  bytes public_values = 4;
+}
+
+// MsgUpdateZKExecutionISMResponse is the response for UpdateZKExecutionISM.
+message MsgUpdateZKExecutionISMResponse {
+  // Updated state root
+  string state_root = 1;
+  // Block height
+  uint64 height = 2;
+}
+
+// MsgSubmitMessages is a message to submit messages with state membership proof.
+message MsgSubmitMessages {
+  // ISM identifier
+  string id = 1;
+  // Block height for the state membership proof
+  uint64 height = 2;
+  // ZK proof bytes for state membership
+  bytes proof = 3;
+  // Public values/inputs for proof verification
+  bytes public_values = 4;
+}
+
+// MsgSubmitMessagesResponse is the response for SubmitMessages.
+message MsgSubmitMessagesResponse {
+  // Empty response
+}

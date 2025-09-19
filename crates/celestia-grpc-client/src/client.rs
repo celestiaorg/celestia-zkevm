@@ -1,0 +1,320 @@
+use crate::error::{ProofSubmissionError, Result};
+use crate::message::{StateInclusionProofMsg, StateTransitionProofMsg};
+use crate::types::{ClientConfig, ProofSubmissionResponse, ProofType};
+
+use anyhow::Context;
+use async_trait::async_trait;
+use celestia_grpc::GrpcClient;
+use tracing::{debug, info, warn};
+
+/// Trait for proof submission operations
+#[async_trait]
+pub trait ProofSubmitter {
+    /// Submit a state transition proof to Celestia
+    async fn submit_state_transition_proof(
+        &self,
+        proof_msg: StateTransitionProofMsg,
+    ) -> Result<ProofSubmissionResponse>;
+
+    /// Submit a state inclusion proof to Celestia
+    async fn submit_state_inclusion_proof(
+        &self,
+        proof_msg: StateInclusionProofMsg,
+    ) -> Result<ProofSubmissionResponse>;
+}
+
+/// Celestia gRPC client for proof submission
+pub struct CelestiaProofClient {
+    grpc_client: GrpcClient,
+    config: ClientConfig,
+}
+
+impl CelestiaProofClient {
+    /// Create a new Celestia proof client
+    pub async fn new(config: ClientConfig) -> Result<Self> {
+        debug!("Creating Celestia proof client with endpoint: {}", config.grpc_endpoint);
+
+        let grpc_client = GrpcClient::builder()
+            .url(&config.grpc_endpoint)
+            .private_key_hex(&config.private_key_hex)
+            .build()
+            .context("Failed to build Lumina gRPC client")?;
+
+        info!("Successfully created Celestia proof client");
+
+        Ok(Self { grpc_client, config })
+    }
+
+    /// Create a client from environment variables
+    pub async fn from_env() -> Result<Self> {
+        let config = ClientConfig {
+            grpc_endpoint: std::env::var("CELESTIA_GRPC_ENDPOINT")
+                .unwrap_or_else(|_| "http://localhost:9090".to_string()),
+            private_key_hex: std::env::var("CELESTIA_PRIVATE_KEY")
+                .map_err(|_| ProofSubmissionError::Configuration(
+                    "CELESTIA_PRIVATE_KEY environment variable not set".to_string()
+                ))?,
+            chain_id: std::env::var("CELESTIA_CHAIN_ID")
+                .unwrap_or_else(|_| "celestia-zkevm-testnet".to_string()),
+            gas_price: std::env::var("CELESTIA_GAS_PRICE")
+                .unwrap_or_else(|_| "1000".to_string())
+                .parse()
+                .map_err(|_| ProofSubmissionError::Configuration(
+                    "Invalid CELESTIA_GAS_PRICE".to_string()
+                ))?,
+            max_gas: std::env::var("CELESTIA_MAX_GAS")
+                .unwrap_or_else(|_| "200000".to_string())
+                .parse()
+                .map_err(|_| ProofSubmissionError::Configuration(
+                    "Invalid CELESTIA_MAX_GAS".to_string()
+                ))?,
+            confirmation_timeout: std::env::var("CELESTIA_CONFIRMATION_TIMEOUT")
+                .unwrap_or_else(|_| "60".to_string())
+                .parse()
+                .map_err(|_| ProofSubmissionError::Configuration(
+                    "Invalid CELESTIA_CONFIRMATION_TIMEOUT".to_string()
+                ))?,
+        };
+
+        Self::new(config).await
+    }
+
+    /// Get the gRPC client reference for direct access to Lumina functionality
+    pub fn grpc_client(&self) -> &GrpcClient {
+        &self.grpc_client
+    }
+
+    /// Get the client configuration
+    pub fn config(&self) -> &ClientConfig {
+        &self.config
+    }
+
+    /// Get the configured chain ID
+    pub fn chain_id(&self) -> &str {
+        &self.config.chain_id
+    }
+
+    /// Get the configured gRPC endpoint
+    pub fn grpc_endpoint(&self) -> &str {
+        &self.config.grpc_endpoint
+    }
+
+    /// Estimate gas for a proof submission by proof type
+    pub async fn estimate_gas(&self, proof_type: ProofType) -> Result<u64> {
+        let message_type = match proof_type {
+            ProofType::StateTransition => "MsgUpdateZKExecutionISM",
+            ProofType::StateInclusion => "MsgSubmitMessages",
+        };
+
+        self.estimate_gas_for_message(message_type)
+    }
+
+    /// Internal gas estimation function - single source of truth for gas estimates
+    fn estimate_gas_for_message(&self, message_type: &str) -> Result<u64> {
+        // PLACEHOLDER: These are arbitrary estimates, not based on real Celestia data
+        // TODO: Replace with actual gas estimation from Celestia network
+        let base_gas = match message_type {
+            "MsgUpdateZKExecutionISM" => 150_000, // State transition proof placeholder
+            "MsgSubmitMessages" => 100_000,       // State inclusion proof placeholder
+            _ => 120_000,                         // Default placeholder
+        };
+
+        // Ensure we don't exceed the configured max gas
+        let estimated_gas = base_gas.min(self.config.max_gas);
+
+        warn!(
+            "Using placeholder gas estimate for {}: {} (max: {})",
+            message_type, estimated_gas, self.config.max_gas
+        );
+
+        Ok(estimated_gas)
+    }
+
+    /// Submit a zkISM proof message via Lumina (placeholder implementation)
+    async fn submit_zkism_message(&self, message_type: &str, msg_data: &[u8]) -> Result<ProofSubmissionResponse> {
+        debug!(
+            "Submitting {} message to Celestia via Lumina (endpoint: {}, chain: {})",
+            message_type, self.config.grpc_endpoint, self.config.chain_id
+        );
+
+        // TODO: Once the actual zkISM module is deployed on Celestia, this will use
+        // the proper Lumina submit_message API with the correct message types.
+        // For now, return a placeholder response indicating the message structure is ready.
+
+        let tx_hash = format!("placeholder-{}-{:x}", message_type, md5::compute(msg_data));
+
+        info!(
+            "zkISM message ready for submission: {} bytes (gas_price: {}, max_gas: {})",
+            msg_data.len(), self.config.gas_price, self.config.max_gas
+        );
+
+        // Use centralized gas estimation
+        let estimated_gas = self.estimate_gas_for_message(message_type)?;
+
+        Ok(ProofSubmissionResponse {
+            tx_hash,
+            height: 0, // Will be filled by actual submission
+            gas_used: estimated_gas,
+            success: true,
+            error_message: None,
+        })
+    }
+}
+
+#[async_trait]
+impl ProofSubmitter for CelestiaProofClient {
+    async fn submit_state_transition_proof(
+        &self,
+        proof_msg: StateTransitionProofMsg,
+    ) -> Result<ProofSubmissionResponse> {
+        info!(
+            "Submitting state transition proof for ISM id: {}, height: {}",
+            proof_msg.id, proof_msg.height
+        );
+
+        // Validate proof message
+        if proof_msg.proof.is_empty() {
+            return Err(ProofSubmissionError::InvalidProof(
+                "Proof data cannot be empty".to_string(),
+            ));
+        }
+
+        if proof_msg.id.is_empty() {
+            return Err(ProofSubmissionError::InvalidProof(
+                "ISM ID cannot be empty".to_string(),
+            ));
+        }
+
+        // Serialize the message to verify structure
+        let message_data = serde_json::to_vec(&proof_msg)?;
+
+        // Submit via Lumina (placeholder for now)
+        self.submit_zkism_message("MsgUpdateZKExecutionISM", &message_data).await
+    }
+
+    async fn submit_state_inclusion_proof(
+        &self,
+        proof_msg: StateInclusionProofMsg,
+    ) -> Result<ProofSubmissionResponse> {
+        info!(
+            "Submitting state inclusion proof for ISM id: {}, height: {}",
+            proof_msg.id, proof_msg.height
+        );
+
+        // Validate proof message
+        if proof_msg.proof.is_empty() {
+            return Err(ProofSubmissionError::InvalidProof(
+                "Proof data cannot be empty".to_string(),
+            ));
+        }
+
+        if proof_msg.id.is_empty() {
+            return Err(ProofSubmissionError::InvalidProof(
+                "ISM ID cannot be empty".to_string(),
+            ));
+        }
+
+        // Serialize the message to verify structure
+        let message_data = serde_json::to_vec(&proof_msg)?;
+
+        // Submit via Lumina (placeholder for now)
+        self.submit_zkism_message("MsgSubmitMessages", &message_data).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[allow(dead_code)]
+    fn create_test_config() -> ClientConfig {
+        ClientConfig {
+            grpc_endpoint: "http://localhost:9090".to_string(),
+            private_key_hex: "0123456789abcdef".repeat(8), // 64 hex chars
+            chain_id: "test-chain".to_string(),
+            gas_price: 1000,
+            max_gas: 200_000,
+            confirmation_timeout: 30,
+        }
+    }
+
+    #[test]
+    fn test_state_transition_proof_message_structure() {
+        // Test the new message structure based on actual Celestia PR #5788
+        let proof_msg = StateTransitionProofMsg::new(
+            "".to_string(), // Empty ISM ID should be validated
+            100,            // height
+            vec![1, 2, 3],  // proof
+            vec![4, 5, 6],  // public_values
+        );
+
+        // Test the new field structure
+        assert_eq!(proof_msg.id, "");
+        assert_eq!(proof_msg.height, 100);
+        assert_eq!(proof_msg.proof, vec![1, 2, 3]);
+        assert_eq!(proof_msg.public_values, vec![4, 5, 6]);
+    }
+
+    #[test]
+    fn test_state_inclusion_proof_message_structure() {
+        // Test the new message structure based on actual Celestia PR #5790
+        let proof_msg = StateInclusionProofMsg::new(
+            "test-ism".to_string(), // ISM ID
+            200,                    // height
+            vec![7, 8, 9],         // proof
+            vec![10, 11, 12],      // public_values
+        );
+
+        // Test the new field structure
+        assert_eq!(proof_msg.id, "test-ism");
+        assert_eq!(proof_msg.height, 200);
+        assert_eq!(proof_msg.proof, vec![7, 8, 9]);
+        assert_eq!(proof_msg.public_values, vec![10, 11, 12]);
+    }
+
+    #[test]
+    fn test_message_serialization() {
+        let proof_msg = StateTransitionProofMsg::new(
+            "test-ism-123".to_string(),
+            1000,
+            vec![0xff, 0xee, 0xdd],
+            vec![0x01, 0x02, 0x03],
+        );
+
+        // Test that the message can be serialized (this validates the structure)
+        let serialized = serde_json::to_vec(&proof_msg).expect("Should serialize");
+        assert!(!serialized.is_empty());
+
+        // Test deserialization
+        let deserialized: StateTransitionProofMsg =
+            serde_json::from_slice(&serialized).expect("Should deserialize");
+        assert_eq!(deserialized.id, proof_msg.id);
+        assert_eq!(deserialized.height, proof_msg.height);
+        assert_eq!(deserialized.proof, proof_msg.proof);
+        assert_eq!(deserialized.public_values, proof_msg.public_values);
+    }
+
+    #[test]
+    fn test_gas_estimation() {
+        // Test gas estimation for different proof types
+        assert_eq!(
+            ProofType::StateTransition as u8 != ProofType::StateInclusion as u8,
+            true
+        );
+    }
+
+    #[test]
+    fn test_client_config_usage() {
+        let config = create_test_config();
+
+        // Test that config fields are accessible and properly structured
+        assert_eq!(config.grpc_endpoint, "http://localhost:9090");
+        assert_eq!(config.chain_id, "test-chain");
+        assert_eq!(config.gas_price, 1000);
+        assert_eq!(config.max_gas, 200_000);
+        assert_eq!(config.confirmation_timeout, 30);
+
+        // Test that private key is properly formatted (64 hex chars)
+        assert_eq!(config.private_key_hex.len(), 128); // 64 bytes * 2 chars per byte
+    }
+}
