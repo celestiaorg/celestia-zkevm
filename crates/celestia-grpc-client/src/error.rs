@@ -24,6 +24,9 @@ pub enum ProofSubmissionError {
     #[error("Insufficient gas or fees")]
     InsufficientGas,
 
+    #[error("Proof submission failed: {0}")]
+    SubmissionFailed(String),
+
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
 

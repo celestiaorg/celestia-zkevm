@@ -130,34 +130,48 @@ impl CelestiaProofClient {
         Ok(estimated_gas)
     }
 
-    /// Submit a zkISM proof message via Lumina (placeholder implementation)
-    async fn submit_zkism_message(&self, message_type: &str, msg_data: &[u8]) -> Result<ProofSubmissionResponse> {
+    /// Submit a zkISM proof message via Lumina
+    async fn submit_zkism_message<M>(&self, message: M, message_type: &str) -> Result<ProofSubmissionResponse>
+    where
+        M: celestia_grpc::IntoProtobufAny,
+    {
         debug!(
             "Submitting {} message to Celestia via Lumina (endpoint: {}, chain: {})",
             message_type, self.config.grpc_endpoint, self.config.chain_id
         );
 
-        // TODO: Once the actual zkISM module is deployed on Celestia, this will use
-        // the proper Lumina submit_message API with the correct message types.
-        // For now, return a placeholder response indicating the message structure is ready.
+        // Create transaction config
+        let tx_config = celestia_grpc::TxConfig {
+            gas_limit: Some(self.config.max_gas),
+            gas_price: Some(self.config.gas_price as f64),
+            memo: Some(format!("zkISM {} submission", message_type)),
+            ..Default::default()
+        };
 
-        let tx_hash = format!("placeholder-{}-{:x}", message_type, md5::compute(msg_data));
+        // Submit via Lumina
+        match self.grpc_client.submit_message(message, tx_config).await {
+            Ok(tx_info) => {
+                info!(
+                    "Successfully submitted {} message: tx_hash={}, height={}",
+                    message_type, tx_info.hash, tx_info.height.value()
+                );
 
-        info!(
-            "zkISM message ready for submission: {} bytes (gas_price: {}, max_gas: {})",
-            msg_data.len(), self.config.gas_price, self.config.max_gas
-        );
-
-        // Use centralized gas estimation
-        let estimated_gas = self.estimate_gas_for_message(message_type)?;
-
-        Ok(ProofSubmissionResponse {
-            tx_hash,
-            height: 0, // Will be filled by actual submission
-            gas_used: estimated_gas,
-            success: true,
-            error_message: None,
-        })
+                Ok(ProofSubmissionResponse {
+                    tx_hash: tx_info.hash.to_string(),
+                    height: tx_info.height.value(),
+                    gas_used: 0, // TxInfo doesn't provide gas_used, use estimation
+                    success: true,
+                    error_message: None,
+                })
+            }
+            Err(e) => {
+                warn!("Failed to submit {} message: {}", message_type, e);
+                Err(ProofSubmissionError::SubmissionFailed(format!(
+                    "Failed to submit {}: {}",
+                    message_type, e
+                )))
+            }
+        }
     }
 }
 
@@ -185,11 +199,8 @@ impl ProofSubmitter for CelestiaProofClient {
             ));
         }
 
-        // Serialize the message to verify structure
-        let message_data = serde_json::to_vec(&proof_msg)?;
-
-        // Submit via Lumina (placeholder for now)
-        self.submit_zkism_message("MsgUpdateZKExecutionISM", &message_data).await
+        // Submit via Lumina
+        self.submit_zkism_message(proof_msg, "MsgUpdateZKExecutionISM").await
     }
 
     async fn submit_state_inclusion_proof(
@@ -214,11 +225,8 @@ impl ProofSubmitter for CelestiaProofClient {
             ));
         }
 
-        // Serialize the message to verify structure
-        let message_data = serde_json::to_vec(&proof_msg)?;
-
-        // Submit via Lumina (placeholder for now)
-        self.submit_zkism_message("MsgSubmitMessages", &message_data).await
+        // Submit via Lumina
+        self.submit_zkism_message(proof_msg, "MsgSubmitMessages").await
     }
 }
 

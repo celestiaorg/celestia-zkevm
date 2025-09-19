@@ -25,6 +25,7 @@ ed25519-dalek = { workspace = true }
 # Celestia dependencies - use same version as lumina-grpc to avoid conflicts
 celestia-types = { git = "https://github.com/eigerco/lumina", branch = "main" }
 tendermint = { workspace = true }
+tendermint-proto = { workspace = true }
 
 # Optional cosmrs for transaction building
 cosmrs = { version = "0.21", optional = true, features = ["grpc", "cosmwasm"] }
@@ -32,6 +33,7 @@ cosmrs = { version = "0.21", optional = true, features = ["grpc", "cosmwasm"] }
 # gRPC and protobuf dependencies
 tonic = "0.13"
 prost = { workspace = true }
+prost-types = "0.13"
 
 # CLI dependencies
 clap = { version = "4", features = ["derive"] }

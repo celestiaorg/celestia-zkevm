@@ -1,44 +1,55 @@
 use serde::{Deserialize, Serialize};
+use prost::Name;
 
 /// Message for updating ZK Execution ISM (corresponds to MsgUpdateZKExecutionISM)
 /// From celestia-app PR #5788: proto/celestia/zkism/v1/tx.proto
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, prost::Message)]
 pub struct MsgUpdateZkExecutionIsm {
     /// ISM identifier
+    #[prost(string, tag = "1")]
     pub id: String,
     /// Block height for the state transition
+    #[prost(uint64, tag = "2")]
     pub height: u64,
     /// ZK proof bytes
+    #[prost(bytes = "vec", tag = "3")]
     pub proof: Vec<u8>,
     /// Public values/inputs for proof verification
+    #[prost(bytes = "vec", tag = "4")]
     pub public_values: Vec<u8>,
 }
 
 /// Response for MsgUpdateZKExecutionISM
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, prost::Message)]
 pub struct MsgUpdateZkExecutionIsmResponse {
     /// Updated state root
+    #[prost(string, tag = "1")]
     pub state_root: String,
     /// Block height
+    #[prost(uint64, tag = "2")]
     pub height: u64,
 }
 
 /// Message for submitting messages with state membership proof (corresponds to MsgSubmitMessages)
 /// From celestia-app PR #5790: proto/celestia/zkism/v1/tx.proto
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, prost::Message)]
 pub struct MsgSubmitMessages {
     /// ISM identifier
+    #[prost(string, tag = "1")]
     pub id: String,
     /// Block height for the state membership proof
+    #[prost(uint64, tag = "2")]
     pub height: u64,
     /// ZK proof bytes for state membership
+    #[prost(bytes = "vec", tag = "3")]
     pub proof: Vec<u8>,
     /// Public values/inputs for proof verification
+    #[prost(bytes = "vec", tag = "4")]
     pub public_values: Vec<u8>,
 }
 
 /// Response for MsgSubmitMessages
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, prost::Message)]
 pub struct MsgSubmitMessagesResponse {
     // Empty response according to the protobuf definition
 }
@@ -79,5 +90,15 @@ impl MsgSubmitMessages {
             public_values,
         }
     }
+}
+
+impl Name for MsgUpdateZkExecutionIsm {
+    const NAME: &'static str = "MsgUpdateZkExecutionIsm";
+    const PACKAGE: &'static str = "celestia.zkism.v1";
+}
+
+impl Name for MsgSubmitMessages {
+    const NAME: &'static str = "MsgSubmitMessages";
+    const PACKAGE: &'static str = "celestia.zkism.v1";
 }
 
