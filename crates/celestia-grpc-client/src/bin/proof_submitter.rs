@@ -1,9 +1,7 @@
 #!/usr/bin/env cargo
 
 use anyhow::Result;
-use celestia_grpc_client::{
-    CelestiaProofClient, ProofSubmitter, StateInclusionProofMsg, StateTransitionProofMsg,
-};
+use celestia_grpc_client::{CelestiaProofClient, ProofSubmitter, StateInclusionProofMsg, StateTransitionProofMsg};
 use clap::{Parser, Subcommand};
 use tracing::{info, Level};
 use tracing_subscriber;
@@ -54,9 +52,7 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     let cli = Cli::parse();
 
@@ -75,12 +71,7 @@ async fn main() -> Result<()> {
             let proof = read_hex_file(proof_file)?;
             let public_values = read_hex_file(public_values_file)?;
 
-            let proof_msg = StateTransitionProofMsg::new(
-                id.clone(),
-                *height,
-                proof,
-                public_values,
-            );
+            let proof_msg = StateTransitionProofMsg::new(id.clone(), *height, proof, public_values);
 
             let response = client.submit_state_transition_proof(proof_msg).await?;
             println!("State transition proof submitted successfully!");
@@ -99,12 +90,7 @@ async fn main() -> Result<()> {
             let proof = read_hex_file(proof_file)?;
             let public_values = read_hex_file(public_values_file)?;
 
-            let proof_msg = StateInclusionProofMsg::new(
-                id.clone(),
-                *height,
-                proof,
-                public_values,
-            );
+            let proof_msg = StateInclusionProofMsg::new(id.clone(), *height, proof, public_values);
 
             let response = client.submit_state_inclusion_proof(proof_msg).await?;
             println!("State inclusion proof submitted successfully!");
@@ -129,4 +115,3 @@ fn read_hex_file(file_path: &str) -> Result<Vec<u8>> {
     let bytes = hex::decode(hex_content)?;
     Ok(bytes)
 }
-

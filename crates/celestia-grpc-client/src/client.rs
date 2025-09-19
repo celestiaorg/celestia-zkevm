@@ -17,10 +17,7 @@ pub trait ProofSubmitter {
     ) -> Result<ProofSubmissionResponse>;
 
     /// Submit a state inclusion proof to Celestia
-    async fn submit_state_inclusion_proof(
-        &self,
-        proof_msg: StateInclusionProofMsg,
-    ) -> Result<ProofSubmissionResponse>;
+    async fn submit_state_inclusion_proof(&self, proof_msg: StateInclusionProofMsg) -> Result<ProofSubmissionResponse>;
 }
 
 /// Celestia gRPC client for proof submission
@@ -50,30 +47,24 @@ impl CelestiaProofClient {
         let config = ClientConfig {
             grpc_endpoint: std::env::var("CELESTIA_GRPC_ENDPOINT")
                 .unwrap_or_else(|_| "http://localhost:9090".to_string()),
-            private_key_hex: std::env::var("CELESTIA_PRIVATE_KEY")
-                .map_err(|_| ProofSubmissionError::Configuration(
-                    "CELESTIA_PRIVATE_KEY environment variable not set".to_string()
-                ))?,
-            chain_id: std::env::var("CELESTIA_CHAIN_ID")
-                .unwrap_or_else(|_| "celestia-zkevm-testnet".to_string()),
+            private_key_hex: std::env::var("CELESTIA_PRIVATE_KEY").map_err(|_| {
+                ProofSubmissionError::Configuration("CELESTIA_PRIVATE_KEY environment variable not set".to_string())
+            })?,
+            chain_id: std::env::var("CELESTIA_CHAIN_ID").unwrap_or_else(|_| "celestia-zkevm-testnet".to_string()),
             gas_price: std::env::var("CELESTIA_GAS_PRICE")
                 .unwrap_or_else(|_| "1000".to_string())
                 .parse()
-                .map_err(|_| ProofSubmissionError::Configuration(
-                    "Invalid CELESTIA_GAS_PRICE".to_string()
-                ))?,
+                .map_err(|_| ProofSubmissionError::Configuration("Invalid CELESTIA_GAS_PRICE".to_string()))?,
             max_gas: std::env::var("CELESTIA_MAX_GAS")
                 .unwrap_or_else(|_| "200000".to_string())
                 .parse()
-                .map_err(|_| ProofSubmissionError::Configuration(
-                    "Invalid CELESTIA_MAX_GAS".to_string()
-                ))?,
+                .map_err(|_| ProofSubmissionError::Configuration("Invalid CELESTIA_MAX_GAS".to_string()))?,
             confirmation_timeout: std::env::var("CELESTIA_CONFIRMATION_TIMEOUT")
                 .unwrap_or_else(|_| "60".to_string())
                 .parse()
-                .map_err(|_| ProofSubmissionError::Configuration(
-                    "Invalid CELESTIA_CONFIRMATION_TIMEOUT".to_string()
-                ))?,
+                .map_err(|_| {
+                    ProofSubmissionError::Configuration("Invalid CELESTIA_CONFIRMATION_TIMEOUT".to_string())
+                })?,
         };
 
         Self::new(config).await
@@ -153,7 +144,9 @@ impl CelestiaProofClient {
             Ok(tx_info) => {
                 info!(
                     "Successfully submitted {} message: tx_hash={}, height={}",
-                    message_type, tx_info.hash, tx_info.height.value()
+                    message_type,
+                    tx_info.hash,
+                    tx_info.height.value()
                 );
 
                 Ok(ProofSubmissionResponse {
@@ -194,19 +187,14 @@ impl ProofSubmitter for CelestiaProofClient {
         }
 
         if proof_msg.id.is_empty() {
-            return Err(ProofSubmissionError::InvalidProof(
-                "ISM ID cannot be empty".to_string(),
-            ));
+            return Err(ProofSubmissionError::InvalidProof("ISM ID cannot be empty".to_string()));
         }
 
         // Submit via Lumina
         self.submit_zkism_message(proof_msg, "MsgUpdateZKExecutionISM").await
     }
 
-    async fn submit_state_inclusion_proof(
-        &self,
-        proof_msg: StateInclusionProofMsg,
-    ) -> Result<ProofSubmissionResponse> {
+    async fn submit_state_inclusion_proof(&self, proof_msg: StateInclusionProofMsg) -> Result<ProofSubmissionResponse> {
         info!(
             "Submitting state inclusion proof for ISM id: {}, height: {}",
             proof_msg.id, proof_msg.height
@@ -220,9 +208,7 @@ impl ProofSubmitter for CelestiaProofClient {
         }
 
         if proof_msg.id.is_empty() {
-            return Err(ProofSubmissionError::InvalidProof(
-                "ISM ID cannot be empty".to_string(),
-            ));
+            return Err(ProofSubmissionError::InvalidProof("ISM ID cannot be empty".to_string()));
         }
 
         // Submit via Lumina
@@ -269,8 +255,8 @@ mod tests {
         let proof_msg = StateInclusionProofMsg::new(
             "test-ism".to_string(), // ISM ID
             200,                    // height
-            vec![7, 8, 9],         // proof
-            vec![10, 11, 12],      // public_values
+            vec![7, 8, 9],          // proof
+            vec![10, 11, 12],       // public_values
         );
 
         // Test the new field structure
@@ -294,8 +280,7 @@ mod tests {
         assert!(!serialized.is_empty());
 
         // Test deserialization
-        let deserialized: StateTransitionProofMsg =
-            serde_json::from_slice(&serialized).expect("Should deserialize");
+        let deserialized: StateTransitionProofMsg = serde_json::from_slice(&serialized).expect("Should deserialize");
         assert_eq!(deserialized.id, proof_msg.id);
         assert_eq!(deserialized.height, proof_msg.height);
         assert_eq!(deserialized.proof, proof_msg.proof);

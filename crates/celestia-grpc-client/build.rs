@@ -9,10 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build_server(false) // We only need client-side code
         .build_client(true)
         .out_dir(&out_dir)
-        .compile_protos(
-            &["proto/celestia/zkism/v1/tx.proto"],
-            &["proto"],
-        )?;
+        .compile_protos(&["proto/celestia/zkism/v1/tx.proto"], &["proto"])?;
 
     // Tell Cargo to recompile if proto files change
     println!("cargo:rerun-if-changed=proto/");

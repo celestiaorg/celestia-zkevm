@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use prost::Name;
+use serde::{Deserialize, Serialize};
 
 /// Message for updating ZK Execution ISM (corresponds to MsgUpdateZKExecutionISM)
 /// From celestia-app PR #5788: proto/celestia/zkism/v1/tx.proto
@@ -60,12 +60,7 @@ pub type StateInclusionProofMsg = MsgSubmitMessages;
 
 impl MsgUpdateZkExecutionIsm {
     /// Create a new ZK execution ISM update message
-    pub fn new(
-        id: String,
-        height: u64,
-        proof: Vec<u8>,
-        public_values: Vec<u8>,
-    ) -> Self {
+    pub fn new(id: String, height: u64, proof: Vec<u8>, public_values: Vec<u8>) -> Self {
         Self {
             id,
             height,
@@ -77,12 +72,7 @@ impl MsgUpdateZkExecutionIsm {
 
 impl MsgSubmitMessages {
     /// Create a new message submission with state membership proof
-    pub fn new(
-        id: String,
-        height: u64,
-        proof: Vec<u8>,
-        public_values: Vec<u8>,
-    ) -> Self {
+    pub fn new(id: String, height: u64, proof: Vec<u8>, public_values: Vec<u8>) -> Self {
         Self {
             id,
             height,
@@ -101,4 +91,3 @@ impl Name for MsgSubmitMessages {
     const NAME: &'static str = "MsgSubmitMessages";
     const PACKAGE: &'static str = "celestia.zkism.v1";
 }
-

@@ -13,7 +13,7 @@ pub mod types;
 pub use client::{CelestiaProofClient, ProofSubmitter};
 pub use error::{ProofSubmissionError, Result};
 pub use message::{
-    MsgSubmitMessages, MsgSubmitMessagesResponse, MsgUpdateZkExecutionIsm,
-    MsgUpdateZkExecutionIsmResponse, StateInclusionProofMsg, StateTransitionProofMsg,
+    MsgSubmitMessages, MsgSubmitMessagesResponse, MsgUpdateZkExecutionIsm, MsgUpdateZkExecutionIsmResponse,
+    StateInclusionProofMsg, StateTransitionProofMsg,
 };
 pub use types::{ProofSubmissionResponse, ProofType};
