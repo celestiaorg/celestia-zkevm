@@ -264,14 +264,7 @@ impl HyperlaneMessageProver {
             "[INFO] Proving messages with ids: {:?}",
             messages.iter().map(|m| m.message.id()).collect::<Vec<String>>()
         );
-        let proof = self.prove(input).await.expect("Failed to prove");
-        let outputs_deserialized = bincode::deserialize::<HyperlaneMessageOutputs>(&proof.0.public_values.as_slice())
-            .expect("Failed to deserialize outputs");
-        println!("[INFO] Proof outputs: {outputs_deserialized:?}");
-        let raw_proof = proof.0.bytes();
-        println!("[INFO] Proof bytes: {raw_proof:?}");
-        let (_, vk) = self.prover.setup(EV_HYPERLANE_ELF);
-        let _ = self.prover.verify(&proof.0, &vk).expect("Failed to verify proof");
+        let _proof = self.prove(input).await.expect("Failed to prove");
         println!("[Success] Proof was generated successfully!");
 
         // insert messages into snapshot to get new snapshot for next proof
