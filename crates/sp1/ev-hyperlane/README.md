@@ -42,7 +42,7 @@ The `script` crate contains three binaries and depends on the `testdata` directo
 1. Run the `vkey` binary to output the verifier key for the `ev-hyperlane` program.
 
     ```shell
-    cargo run -p ev-exec-script --bin vkey-ev-hyperlane --release
+    cargo run -p ev-hyperlane-script --bin vkey-ev-hyperlane --release
     ```
 
 2. The `ev-hyperlane` binary can be run in both `--execute` and `--prove` mode. Execution mode will run the program without generating a proof.
@@ -52,7 +52,7 @@ The binary accepts a number of flags, `contract` the contract Address of the Mer
 Running the program in proving mode requires the `SP1_PROVER` and optionally the `NETWORK_PRIVATE_KEY` env variables to be set.
 See `.env.example` at the root of the repository.
 
-Run the `ev-exec` binary in execution mode.
+Run the `ev-hyperlane` binary in execution mode.
 
 ```shell
 RUST_LOG=info cargo run -p ev-hyperlane-script --release -- --execute --contract 0xFCb1d485ef46344029D9E8A7925925e146B3430E --start-idx 0 --end-idx 23 --target-height 268 --rpc-url http://127.0.0.1:8545
