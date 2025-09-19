@@ -12,9 +12,9 @@ use evm_state_types::{
     hyperlane::decode_hyperlane_message,
 };
 use std::{env, str::FromStr, sync::Arc};
-use storage::hyperlane_messages::storage::HyperlaneMessageStore;
+use storage::hyperlane::message::HyperlaneMessageStore;
 
-pub type DefaultProvider = FillProvider<
+type DefaultProvider = FillProvider<
     alloy_provider::fillers::JoinFill<
         alloy_provider::Identity,
         alloy_provider::fillers::JoinFill<
@@ -63,13 +63,8 @@ impl HyperlaneIndexer {
         Ok(Self::new(socket, contract_address, filter))
     }
 
-    pub async fn index(
-        &self,
-        message_store: Arc<HyperlaneMessageStore>,
-        filter: Filter,
-        provider: Arc<DefaultProvider>,
-    ) -> Result<()> {
-        let logs = provider.get_logs(&filter).await?;
+    pub async fn index(&self, message_store: Arc<HyperlaneMessageStore>, provider: Arc<DefaultProvider>) -> Result<()> {
+        let logs = provider.get_logs(&self.filter).await?;
         for log in logs {
             match Dispatch::decode_log_data(log.data()) {
                 Ok(event) => {
@@ -78,25 +73,6 @@ impl HyperlaneIndexer {
                     let next_index = current_index;
                     let hyperlane_message =
                         decode_hyperlane_message(&dispatch_event.message).expect("Failed to decode Hyperlane message");
-
-                    // It is up to the user to set the starting block of the first hyperlane message,
-                    // if the user fails to do so, the indexer will still assume that the first message in that block
-                    // is the first message that ever occurred.
-                    if current_index > 1 {
-                        let previous_hyperlane_message = message_store.get_message(current_index - 1).unwrap();
-                        if hyperlane_message.nonce != previous_hyperlane_message.message.nonce + 1
-                            && hyperlane_message.nonce != 0
-                        {
-                            // Only the next message can be successfully indexed, if there is a mismatch,
-                            // make sure to use the correct block range starting from the last indexed block + 1
-                            eprintln!(
-                                "Nonce mismatch: {} != {}, try a different block range.",
-                                hyperlane_message.nonce,
-                                previous_hyperlane_message.message.nonce + 1
-                            );
-                            continue;
-                        }
-                    }
                     let stored_message = StoredHyperlaneMessage::new(hyperlane_message, log.block_number);
                     message_store.insert_message(next_index, stored_message).unwrap();
                     println!("Inserted Hyperlane Message at index: {next_index}");
@@ -115,7 +91,11 @@ impl Default for HyperlaneIndexer {
     fn default() -> Self {
         let socket = WsConnect::new("ws://127.0.0.1:8546");
         let contract_address = Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap();
-        let filter = Filter::new().address(contract_address).event(&Dispatch::id());
+        let filter = Filter::new()
+            .address(contract_address)
+            .event(&Dispatch::id())
+            .from_block(0)
+            .to_block(10000);
         Self {
             socket,
             contract_address,

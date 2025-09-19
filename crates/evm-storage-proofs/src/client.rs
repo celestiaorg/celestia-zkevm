@@ -2,7 +2,7 @@ use alloy::{providers::Provider, rpc::types::EIP1186AccountProofResponse};
 use alloy_primitives::{Address, FixedBytes, hex::FromHex};
 use anyhow::{Context, Result};
 
-pub type DefaultProvider = alloy::providers::fillers::FillProvider<
+type DefaultProvider = alloy::providers::fillers::FillProvider<
     alloy::providers::fillers::JoinFill<
         alloy::providers::Identity,
         alloy::providers::fillers::JoinFill<

@@ -9,7 +9,7 @@ use tonic_reflection::server::Builder as ReflectionBuilder;
 
 use crate::config::config::Config;
 use crate::proto::celestia::prover::v1::prover_server::ProverServer;
-use crate::prover::block::{AppContext, BlockExecProver};
+use crate::prover::programs::block::{AppContext, BlockExecProver};
 use crate::prover::service::ProverService;
 
 pub async fn create_grpc_server(config: Config) -> Result<()> {
@@ -35,6 +35,11 @@ pub async fn create_grpc_server(config: Config) -> Result<()> {
             }
         }
     });
+
+    // Todo: Integrate message prover and supply trusted_root, trusted_height from block prover
+    // First generate the block proof, then generate the message proof inside a joined service.
+    // We have a service implementation for each prover that can run in isolation, but for our ZK ISM
+    // we will want to send both proofs together in a single request.
 
     let prover_serivce = ProverService::new(config)?;
 

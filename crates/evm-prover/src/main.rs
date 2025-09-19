@@ -1,15 +1,8 @@
 use clap::Parser;
-
-mod commands;
-mod config;
-mod grpc;
-mod proto;
-mod prover;
-mod storage;
-#[cfg(test)]
-mod tests_storage;
-
-use commands::cli::{Cli, Commands};
+use evm_prover::commands::{
+    self,
+    cli::{Cli, Commands},
+};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
