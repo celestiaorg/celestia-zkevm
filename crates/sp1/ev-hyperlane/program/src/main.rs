@@ -19,7 +19,7 @@
 
 #![no_main]
 use alloy_primitives::hex;
-use ev_hyperlane_types::{HyperlaneMessageInputs, HyperlaneMessageOutputs};
+use ev_zkevm_types::programs::hyperlane::types::{HyperlaneMessageInputs, HyperlaneMessageOutputs};
 sp1_zkvm::entrypoint!(main);
 
 pub fn main() {

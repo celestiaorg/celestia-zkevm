@@ -19,8 +19,7 @@ anyhow = { workspace = true }
 bincode = { workspace = true }
 clap = { version = "4.0", features = ["cargo", "derive", "env"] }
 dotenv = "0.15.0"
-ev-hyperlane-types = { workspace = true }
-ev-storage-proofs = { workspace = true, features = ["alloy"] }
+ev-zkevm-types = { workspace = true }
 sp1-sdk = { workspace = true }
 storage = { workspace = true }
 tokio = { version = "1.45.0", features = [

@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod events;
 pub mod hyperlane;
+pub mod programs;
 use hyperlane::HyperlaneMessage;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

@@ -4,7 +4,7 @@
 
 use anyhow::{Context, Result};
 use dotenvy::dotenv;
-use ev_hyperlane_types::tree::{MerkleTree, ZERO_BYTES};
+use ev_zkevm_types::programs::hyperlane::tree::{MerkleTree, ZERO_BYTES};
 use rocksdb::{ColumnFamilyDescriptor, DB, IteratorMode, Options};
 use std::env;
 use std::path::PathBuf;

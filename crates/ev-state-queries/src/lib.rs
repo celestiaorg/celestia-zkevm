@@ -2,9 +2,8 @@ pub mod hyperlane;
 
 use alloy_primitives::{FixedBytes, hex::FromHex};
 use alloy_provider::{Provider, fillers::FillProvider};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use async_trait::async_trait;
-use ev_storage_proofs::client::EvmClient;
 
 pub type DefaultProvider = FillProvider<
     alloy_provider::fillers::JoinFill<
@@ -31,18 +30,22 @@ pub trait StateQueryProvider: Send + Sync {
 
 pub struct MockStateQueryProvider {
     provider: DefaultProvider,
-    client: EvmClient,
 }
 impl MockStateQueryProvider {
-    pub fn new(provider: DefaultProvider, client: EvmClient) -> Self {
-        Self { provider, client }
+    pub fn new(provider: DefaultProvider) -> Self {
+        Self { provider }
     }
 }
 
 #[async_trait]
 impl StateQueryProvider for MockStateQueryProvider {
     async fn get_state_root(&self, height: u64) -> Result<FixedBytes<32>> {
-        Ok(FixedBytes::from_hex(&self.client.get_state_root(height).await?).expect("Failed to get state root"))
+        let block = self
+            .provider
+            .get_block(height.into())
+            .await?
+            .context("Failed to get block")?;
+        Ok(block.header.state_root)
     }
     async fn get_height(&self) -> u64 {
         self.provider.get_block_number().await.expect("Failed to get height")

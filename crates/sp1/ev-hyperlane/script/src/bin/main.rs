@@ -14,10 +14,9 @@ use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
 use anyhow::Result;
 use clap::{command, Parser};
-use ev_hyperlane_types::{tree::MerkleTree, HyperlaneMessageInputs, HyperlaneMessageOutputs};
-use ev_storage_proofs::{
-    client::EvmClient,
-    types::{HyperlaneBranchProof, HyperlaneBranchProofInputs, HYPERLANE_MERKLE_TREE_KEYS},
+use ev_zkevm_types::programs::hyperlane::{
+    tree::MerkleTree,
+    types::{HyperlaneMessageInputs, HyperlaneMessageOutputs},
 };
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 use std::{env, str::FromStr, time::Instant};

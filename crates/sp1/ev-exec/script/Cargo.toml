@@ -28,8 +28,8 @@ celestia-rpc = { workspace = true }
 celestia-types = { workspace = true }
 clap = { version = "4.0", features = ["cargo", "derive", "env"] }
 dotenv = "0.15.0"
-ev-exec-types = { path = "../../ev-exec-types" }
 ev-types = { workspace = true, features = ["grpc"] }
+ev-zkevm-types = { workspace = true }
 eyre = "0.6.12"
 hashbrown = "0.14.5"
 hex = { workspace = true }

@@ -139,7 +139,7 @@ mod tests {
     use alloy_primitives::Keccak256;
     use anyhow::Result;
 
-    use crate::tree::{MerkleTree, ZERO_HASHES};
+    use crate::programs::hyperlane::tree::{MerkleTree, ZERO_HASHES};
     #[test]
     fn test_insert() {
         let mut tree = MerkleTree::default();
