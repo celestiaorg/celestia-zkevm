@@ -174,7 +174,7 @@ impl HyperlaneMessageProver {
 
             let new_root = alloy::hex::encode(block.header.state_root);
 
-            if new_root != new_root {
+            if new_root != hex::encode(state_root) {
                 panic!(
                     "The state root has changed at depth HEAD-{DISTANCE_TO_HEAD}, this should not happen! Expected: {state_root}, Got: {new_root}",
                 );
