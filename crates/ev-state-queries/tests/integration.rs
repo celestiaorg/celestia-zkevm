@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use alloy_provider::ProviderBuilder;
 use ev_state_queries::hyperlane::indexer::HyperlaneIndexer;
-use storage::hyperlane::message::{HyperlaneMessageStore};
 use storage::APP_HOME;
+use storage::hyperlane::message::HyperlaneMessageStore;
 
 /* Context
     We want to generate proofs for events that occurred between one finalized block and another (latest)

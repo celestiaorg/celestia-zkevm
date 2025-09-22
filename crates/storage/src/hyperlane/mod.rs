@@ -3,7 +3,10 @@ pub mod snapshot;
 
 #[cfg(test)]
 mod tests {
-    use crate::{hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore}, APP_HOME};
+    use crate::{
+        APP_HOME,
+        hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore},
+    };
     use ev_zkevm_types::{
         StoredHyperlaneMessage, hyperlane::decode_hyperlane_message, programs::hyperlane::tree::MerkleTree,
     };

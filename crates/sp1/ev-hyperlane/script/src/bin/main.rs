@@ -23,7 +23,7 @@ use ev_zkevm_types::programs::hyperlane::{
 };
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 use std::{env, str::FromStr, time::Instant};
-use storage::{APP_HOME,hyperlane::message::HyperlaneMessageStore};
+use storage::{hyperlane::message::HyperlaneMessageStore, APP_HOME};
 use url::Url;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
