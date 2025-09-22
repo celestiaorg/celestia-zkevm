@@ -1,6 +1,9 @@
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use ev_zkevm_types::programs::block::{BlockExecOutput, BlockRangeExecOutput};
+use ev_zkevm_types::programs::{
+    block::{BlockExecOutput, BlockRangeExecOutput},
+    hyperlane::types::HyperlaneMessageOutputs,
+};
 use rocksdb::{ColumnFamily, ColumnFamilyDescriptor, DB, Options};
 use serde::{Deserialize, Serialize};
 use sp1_sdk::SP1ProofWithPublicValues;
@@ -35,6 +38,13 @@ pub struct StoredBlockProof {
 pub struct StoredRangeProof {
     pub start_height: u64,
     pub end_height: u64,
+    pub proof_data: Vec<u8>,
+    pub public_values: Vec<u8>,
+    pub created_at: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredMembershipProof {
     pub proof_data: Vec<u8>,
     pub public_values: Vec<u8>,
     pub created_at: u64,
@@ -76,6 +86,20 @@ pub trait ProofStorage: Send + Sync {
     ) -> Result<Vec<StoredBlockProof>, ProofStorageError>;
 
     #[allow(dead_code)]
+    async fn store_membership_proof(
+        &self,
+        height: u64,
+        proof: &SP1ProofWithPublicValues,
+        output: &HyperlaneMessageOutputs,
+    ) -> Result<(), ProofStorageError>;
+
+    #[allow(dead_code)]
+    async fn get_membership_proof(&self, height: u64) -> Result<StoredMembershipProof, ProofStorageError>;
+
+    #[allow(dead_code)]
+    async fn get_latest_membership_proof(&self) -> Result<Option<StoredMembershipProof>, ProofStorageError>;
+
+    #[allow(dead_code)]
     async fn get_latest_block_proof(&self) -> Result<Option<StoredBlockProof>, ProofStorageError>;
 }
 
@@ -85,6 +109,7 @@ pub struct RocksDbProofStorage {
 
 const CF_BLOCK_PROOFS: &str = "block_proofs";
 const CF_RANGE_PROOFS: &str = "range_proofs";
+const CF_MEMBERSHIP_PROOFS: &str = "membership_proofs";
 const CF_METADATA: &str = "metadata";
 
 impl RocksDbProofStorage {
@@ -96,6 +121,7 @@ impl RocksDbProofStorage {
         let cfs = vec![
             ColumnFamilyDescriptor::new(CF_BLOCK_PROOFS, Options::default()),
             ColumnFamilyDescriptor::new(CF_RANGE_PROOFS, Options::default()),
+            ColumnFamilyDescriptor::new(CF_MEMBERSHIP_PROOFS, Options::default()),
             ColumnFamilyDescriptor::new(CF_METADATA, Options::default()),
         ];
 
@@ -183,6 +209,30 @@ impl ProofStorage for RocksDbProofStorage {
         Ok(())
     }
 
+    async fn store_membership_proof(
+        &self,
+        height: u64,
+        proof: &SP1ProofWithPublicValues,
+        _output: &HyperlaneMessageOutputs,
+    ) -> Result<(), ProofStorageError> {
+        let cf = self.get_cf(CF_MEMBERSHIP_PROOFS)?;
+
+        let stored_proof = StoredMembershipProof {
+            proof_data: bincode::serialize(&proof.proof)?,
+            public_values: proof.public_values.to_vec(),
+            created_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        };
+
+        let key = self.height_key(height);
+        let value = self.serialize(&stored_proof)?;
+
+        self.db.put_cf(cf, key, value)?;
+        Ok(())
+    }
+
     async fn get_block_proof(&self, celestia_height: u64) -> Result<StoredBlockProof, ProofStorageError> {
         let cf = self.get_cf(CF_BLOCK_PROOFS)?;
         let key = self.height_key(celestia_height);
@@ -259,6 +309,26 @@ impl ProofStorage for RocksDbProofStorage {
             return Ok(Some(proof));
         }
 
+        Ok(None)
+    }
+
+    async fn get_membership_proof(&self, height: u64) -> Result<StoredMembershipProof, ProofStorageError> {
+        let cf = self.get_cf(CF_MEMBERSHIP_PROOFS)?;
+        let key = self.height_key(height);
+
+        match self.db.get_cf(cf, key)? {
+            Some(data) => Ok(self.deserialize(&data)?),
+            None => Err(ProofStorageError::ProofNotFound(height)),
+        }
+    }
+
+    async fn get_latest_membership_proof(&self) -> Result<Option<StoredMembershipProof>, ProofStorageError> {
+        let cf = self.get_cf(CF_MEMBERSHIP_PROOFS)?;
+        let mut iter = self.db.iterator_cf(cf, rocksdb::IteratorMode::End);
+        if let Some(Ok((_, value))) = iter.next() {
+            let proof: StoredMembershipProof = self.deserialize(&value)?;
+            return Ok(Some(proof));
+        }
         Ok(None)
     }
 }

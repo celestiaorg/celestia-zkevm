@@ -9,7 +9,6 @@ alloy-genesis = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 alloy-rpc-types = { workspace = true }
-dotenvy = { workspace = true }
 anyhow = "1.0"
 async-trait = "0.1.88"
 bincode = { workspace = true }
@@ -18,6 +17,7 @@ celestia-rpc = { workspace = true }
 celestia-types = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 dirs = "5"
+dotenvy = { workspace = true }
 ev-state-queries = { workspace = true }
 ev-types = { workspace = true, features = ["grpc"] }
 ev-zkevm-types = { workspace = true }

@@ -10,6 +10,7 @@ use ev_state_queries::{DefaultProvider, MockStateQueryProvider};
 use reqwest::Url;
 use storage::{
     hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore},
+    proofs::RocksDbProofStorage,
     APP_HOME,
 };
 
@@ -26,8 +27,15 @@ async fn test_run_message_prover() {
         .join(APP_HOME)
         .join("data")
         .join("messages.db");
+    let proof_storage_path = dirs::home_dir()
+        .expect("cannot find home directory")
+        .join(APP_HOME)
+        .join("data")
+        .join("proofs.db");
     let hyperlane_message_store = Arc::new(HyperlaneMessageStore::new(message_storage_path).unwrap());
     let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
+    let proof_store = Arc::new(RocksDbProofStorage::new(proof_storage_path).unwrap());
+
     hyperlane_message_store.prune_all().unwrap();
     hyperlane_snapshot_store.prune_all().unwrap();
 
@@ -46,6 +54,7 @@ async fn test_run_message_prover() {
         app,
         hyperlane_message_store,
         hyperlane_snapshot_store,
+        proof_store,
         Arc::new(MockStateQueryProvider::new(evm_provider)),
     )
     .unwrap();
