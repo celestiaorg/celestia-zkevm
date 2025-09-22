@@ -3311,6 +3311,7 @@ dependencies = [
  "alloy-sol-types",
  "anyhow",
  "async-trait",
+ "dirs",
  "dotenvy",
  "ev-zkevm-types",
  "serde_json",

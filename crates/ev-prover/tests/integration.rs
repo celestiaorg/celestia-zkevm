@@ -8,7 +8,7 @@ use alloy_provider::ProviderBuilder;
 use ev_prover::prover::programs::message::{AppContext, HyperlaneMessageProver, MerkleTreeState};
 use ev_state_queries::{DefaultProvider, MockStateQueryProvider};
 use reqwest::Url;
-use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore, APP_HOME};
+use storage::{APP_HOME,hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore}};
 
 #[tokio::test]
 async fn test_run_message_prover() {

@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::result::Result::{Err, Ok};
 use std::sync::Arc;
-use storage::hyperlane::APP_HOME;
+use storage::APP_HOME;
 
 use alloy_genesis::Genesis as AlloyGenesis;
 use alloy_primitives::FixedBytes;

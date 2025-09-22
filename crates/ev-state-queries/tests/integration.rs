@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use alloy_provider::ProviderBuilder;
 use ev_state_queries::hyperlane::indexer::HyperlaneIndexer;
-use storage::hyperlane::message::{HyperlaneMessageStore, IndexMode};
+use storage::hyperlane::message::{HyperlaneMessageStore};
+use storage::APP_HOME;
 
 /* Context
     We want to generate proofs for events that occurred between one finalized block and another (latest)
@@ -18,8 +19,13 @@ use storage::hyperlane::message::{HyperlaneMessageStore, IndexMode};
 */
 #[tokio::test]
 async fn test_run_indexer() {
+    let message_storage_path = dirs::home_dir()
+        .expect("cannot find home directory")
+        .join(APP_HOME)
+        .join("data")
+        .join("messages.db");
     let indexer = HyperlaneIndexer::default();
-    let message_store = Arc::new(HyperlaneMessageStore::from_path_relative(2, IndexMode::Message).unwrap());
+    let message_store = Arc::new(HyperlaneMessageStore::new(message_storage_path).unwrap());
     message_store.prune_all().unwrap();
     let provider = Arc::new(ProviderBuilder::new().connect_ws(indexer.socket.clone()).await.unwrap());
     indexer.index(message_store, provider).await.unwrap();

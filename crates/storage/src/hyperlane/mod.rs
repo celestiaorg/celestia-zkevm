@@ -1,11 +1,9 @@
 pub mod message;
 pub mod snapshot;
 
-pub const APP_HOME: &str = ".ev-prover";
-
 #[cfg(test)]
 mod tests {
-    use crate::hyperlane::{APP_HOME, message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
+    use crate::{hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore}, APP_HOME};
     use ev_zkevm_types::{
         StoredHyperlaneMessage, hyperlane::decode_hyperlane_message, programs::hyperlane::tree::MerkleTree,
     };

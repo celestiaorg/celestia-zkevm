@@ -1,7 +1,7 @@
 use std::fs;
 
 use anyhow::{bail, Result};
-use storage::hyperlane::APP_HOME;
+use storage::APP_HOME;
 
 use crate::commands::cli::VERSION;
 use crate::config::config::{Config, CONFIG_DIR, CONFIG_FILE, DEFAULT_GENESIS_JSON, GENESIS_FILE};
