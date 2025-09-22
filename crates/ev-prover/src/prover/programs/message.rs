@@ -8,17 +8,15 @@ use std::{
     time::Duration,
 };
 
-use alloy_primitives::{Address, FixedBytes};
-use alloy_provider::{ProviderBuilder, WsConnect};
+use alloy_primitives::{hex::FromHex, Address, FixedBytes};
+use alloy_provider::{Provider, ProviderBuilder, WsConnect};
 use alloy_rpc_types::{EIP1186AccountProofResponse, Filter};
-use anyhow::Result;
-use ev_hyperlane_types::{HyperlaneMessageInputs, HyperlaneMessageOutputs};
+use anyhow::{Context, Result};
 use ev_state_queries::{hyperlane::indexer::HyperlaneIndexer, DefaultProvider, StateQueryProvider};
-use ev_state_types::events::Dispatch;
-use ev_storage_proofs::{
-    client::EvmClient,
-    types::{HyperlaneBranchProof, HyperlaneBranchProofInputs, HYPERLANE_MERKLE_TREE_KEYS},
+use ev_zkevm_types::programs::hyperlane::types::{
+    HyperlaneBranchProof, HyperlaneBranchProofInputs, HyperlaneMessageInputs, HyperlaneMessageOutputs,
 };
+use ev_zkevm_types::{events::Dispatch, programs::hyperlane::types::HYPERLANE_MERKLE_TREE_KEYS};
 use reqwest::Url;
 use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
@@ -128,7 +126,6 @@ impl HyperlaneMessageProver {
     pub async fn run(self: Arc<Self>) -> Result<()> {
         let evm_provider: DefaultProvider =
             ProviderBuilder::new().connect_http(Url::from_str(&self.app.evm_rpc).unwrap());
-        let evm_client = EvmClient::new(evm_provider.clone());
         let socket = WsConnect::new(&self.app.evm_ws);
         let contract_address = self.app.mailbox_address;
         let filter = Filter::new().address(contract_address).event(&Dispatch::id());
@@ -143,10 +140,16 @@ impl HyperlaneMessageProver {
                 .await
                 .expect("Failed to get state root");
 
-            let proof = evm_client
-                .get_proof(&HYPERLANE_MERKLE_TREE_KEYS, self.app.merkle_tree_address, Some(height))
-                .await
-                .expect("Failed to get merkle proof");
+            let proof = evm_provider
+                .get_proof(
+                    self.app.merkle_tree_address,
+                    HYPERLANE_MERKLE_TREE_KEYS
+                        .iter()
+                        .map(|k| FixedBytes::from_hex(k).unwrap())
+                        .collect(),
+                )
+                .block_id(height.into())
+                .await?;
 
             println!(
                 "[INFO] state_root: {state_root}, height: {height}, trusted height: {}",
@@ -164,7 +167,13 @@ impl HyperlaneMessageProver {
             }
 
             // Check if the root has changed for our height, if so panic
-            let new_root = evm_client.get_state_root(height).await.unwrap();
+            let block = evm_provider
+                .get_block(height.into())
+                .await?
+                .context("Failed to get block")?;
+
+            let new_root = alloy::hex::encode(block.header.state_root);
+
             if new_root != hex::encode(state_root) {
                 panic!(
                     "The state root has changed at depth HEAD-{DISTANCE_TO_HEAD}, this should not happen! Expected: {state_root}, Got: {new_root}",

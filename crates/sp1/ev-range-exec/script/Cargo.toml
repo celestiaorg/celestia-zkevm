@@ -20,8 +20,8 @@ path = "src/bin/vkey.rs"
 
 bincode = { workspace = true }
 clap = { version = "4.0", features = ["derive", "env"] }
-dotenv = "0.15.0"
-ev-exec-types = { path = "../../ev-exec-types" }
+dotenvy = { workspace = true }
+ev-zkevm-types = { workspace = true }
 hashbrown = "0.14.5"
 hex = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

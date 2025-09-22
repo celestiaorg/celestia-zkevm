@@ -12,9 +12,9 @@ bincode = { workspace = true }
 bytes = { workspace = true }
 celestia-types = { workspace = true }
 ed25519-dalek = { workspace = true }
-ev-exec-types = { path = "../../ev-exec-types" }
 ev-types = { workspace = true, default-features = false }
-hex = "0.4.3"
+ev-zkevm-types = { workspace = true }
+hex = { workspace = true }
 nmt-rs = "*"
 prost = "=0.12.6"
 reth-primitives = { workspace = true }

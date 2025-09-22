@@ -1,14 +1,29 @@
+use ev_zkevm_types::hyperlane::HyperlaneMessage;
+use serde::{Deserialize, Serialize};
+
 pub mod message;
 pub mod snapshot;
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct StoredHyperlaneMessage {
+    pub block_number: Option<u64>,
+    pub message: HyperlaneMessage,
+}
+
+impl StoredHyperlaneMessage {
+    pub fn new(message: HyperlaneMessage, block_number: Option<u64>) -> Self {
+        Self { block_number, message }
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use crate::hyperlane::{
+        StoredHyperlaneMessage,
         message::{HyperlaneMessageStore, IndexMode},
         snapshot::HyperlaneSnapshotStore,
     };
-    use ev_hyperlane_types::tree::MerkleTree;
-    use ev_state_types::{StoredHyperlaneMessage, hyperlane::decode_hyperlane_message};
+    use ev_zkevm_types::{hyperlane::decode_hyperlane_message, programs::hyperlane::tree::MerkleTree};
 
     #[test]
     fn test_insert_message() {

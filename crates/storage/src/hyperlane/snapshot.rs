@@ -3,8 +3,7 @@
 // The snapshots are stored in a column family called "snapshots".
 
 use anyhow::{Context, Result};
-use dotenvy::dotenv;
-use ev_hyperlane_types::tree::{MerkleTree, ZERO_BYTES};
+use ev_zkevm_types::programs::hyperlane::tree::{MerkleTree, ZERO_BYTES};
 use rocksdb::{ColumnFamilyDescriptor, DB, IteratorMode, Options};
 use std::env;
 use std::path::PathBuf;
@@ -18,7 +17,7 @@ pub struct HyperlaneSnapshotStore {
 
 impl HyperlaneSnapshotStore {
     pub fn from_path_relative(crate_depth: usize) -> Result<Self> {
-        dotenv().ok();
+        dotenvy::dotenv().ok();
         let mut workspace_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
         for _ in 0..crate_depth {
             workspace_path = workspace_path.parent().unwrap().to_path_buf();
