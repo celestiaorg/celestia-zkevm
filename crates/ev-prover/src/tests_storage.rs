@@ -8,7 +8,7 @@ mod tests {
         },
     };
     use celestia_types::nmt::Namespace;
-    use ev_exec_types::{BlockExecOutput, BlockRangeExecOutput};
+    use ev_zkevm_types::programs::block::{BlockExecOutput, BlockRangeExecOutput};
     use sp1_sdk::{ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1PublicValues, SP1_CIRCUIT_VERSION};
     use tempfile::TempDir;
 

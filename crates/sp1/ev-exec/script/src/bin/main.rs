@@ -27,7 +27,7 @@ use anyhow::Result;
 use celestia_types::nmt::{Namespace, NamespaceProof};
 use celestia_types::{Blob, DataAvailabilityHeader};
 use clap::Parser;
-use ev_exec_types::{BlockExecInput, BlockExecOutput};
+use ev_zkevm_types::programs::block::{BlockExecInput, BlockExecOutput};
 use hashbrown::HashMap;
 use rsp_client_executor::io::{EthClientExecutorInput, WitnessInput};
 use serde::{Deserialize, Serialize};
@@ -82,7 +82,7 @@ pub struct ProofInputMetrics {
 
 fn main() -> Result<(), Box<dyn Error>> {
     sp1_sdk::utils::setup_logger();
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     let args = Args::parse();
 

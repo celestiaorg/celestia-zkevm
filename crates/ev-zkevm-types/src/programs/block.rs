@@ -2,12 +2,12 @@ use std::fmt::{Display, Formatter, Result as FmtResult};
 
 use alloy_primitives::FixedBytes;
 use celestia_types::{
-    nmt::{Namespace, NamespaceProof},
     DataAvailabilityHeader,
+    nmt::{Namespace, NamespaceProof},
 };
 use hex::encode;
 use rsp_client_executor::io::EthClientExecutorInput;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 /// BlockExecInput is the input for the BlockExec circuit.
 #[derive(Serialize, Deserialize, Debug)]

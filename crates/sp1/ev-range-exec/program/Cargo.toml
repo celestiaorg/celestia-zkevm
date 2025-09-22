@@ -7,7 +7,7 @@ edition = "2021"
 bincode = { workspace = true }
 
 celestia-types = { workspace = true }
-ev-exec-types = { path = "../../ev-exec-types" }
+ev-zkevm-types = { workspace = true }
 hex = { workspace = true }
 nmt-rs = "*"
 rsp-client-executor = { workspace = true }
