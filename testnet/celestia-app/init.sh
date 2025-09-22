@@ -15,6 +15,10 @@ if [ ! -f "$GENESIS_FILE" ]; then
     # Enable app grpc and expose to network
     celestia-appd config set app grpc.enable true
     celestia-appd config set app grpc.address 0.0.0.0:9090
+
+    # Enable app api and expose to network
+    celestia-appd config set app api.enable true
+    celestia-appd config set app api.address tcp://0.0.0.0:1317
     
     # Expose core rpc to network
     sed -i 's#laddr = "tcp://127.0.0.1:26657"#laddr = "tcp://0.0.0.0:26657"#' config/config.toml
