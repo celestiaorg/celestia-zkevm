@@ -1,6 +1,5 @@
 pub mod tree;
 pub mod types;
-
 use sha3::{Digest, Keccak256};
 
 pub fn digest_keccak(bytes: &[u8]) -> [u8; 32] {
