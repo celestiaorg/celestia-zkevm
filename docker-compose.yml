@@ -34,7 +34,7 @@ services:
       - celestia-zkevm-net
 
   celestia-bridge:
-    image: ghcr.io/celestiaorg/celestia-node:v0.23.0-rc0
+    image: ghcr.io/celestiaorg/celestia-node:v0.27.0-arabica
     container_name: celestia-bridge
     volumes:
       - ./testnet/celestia-node/init.sh:/scripts/init.sh:ro
@@ -159,21 +159,21 @@ services:
     networks:
       - celestia-zkevm-net
 
-  evm-prover:
+  ev-prover:
     build:
       context: .
-      dockerfile: crates/evm-prover/Dockerfile
+      dockerfile: crates/ev-prover/Dockerfile
     platform: linux/amd64
-    container_name: evm-prover
+    container_name: ev-prover
     ports:
       - "50051:50051"
     environment:
       - SP1_PROVER=mock
     volumes:
-      - ./testnet/evm-prover/docker-entrypoint.sh:/app/docker-entrypoint.sh:ro
-      - ./testnet/evm-prover/config.yaml:/home/evm-prover/.evm-prover/config/config.yaml:ro
-      - ./testnet/eth-genesis.json:/home/evm-prover/.evm-prover/config/eth-genesis.json:ro
-      - evm-prover-data:/home/evm-prover
+      - ./testnet/ev-prover/docker-entrypoint.sh:/app/docker-entrypoint.sh:ro
+      - ./testnet/ev-prover/config.yaml:/home/ev-prover/.ev-prover/config/config.yaml:ro
+      - ./testnet/eth-genesis.json:/home/ev-prover/.ev-prover/config/eth-genesis.json:ro
+      - ev-prover-data:/home/ev-prover
     entrypoint: /app/docker-entrypoint.sh
     healthcheck:
       test: >
@@ -196,7 +196,7 @@ volumes:
   hyperlane:
   reth:
   evm-single-data:
-  evm-prover-data:
+  ev-prover-data:
 
 networks:
   celestia-zkevm-net:

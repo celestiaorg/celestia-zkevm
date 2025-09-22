@@ -1,0 +1,33 @@
+[package]
+version = "0.1.0"
+name = "ev-range-exec-script"
+edition = "2021"
+default-run = "ev-range-exec"
+
+[[bin]]
+name = "ev-range-exec"
+path = "src/bin/main.rs"
+
+[[bin]]
+name = "parser"
+path = "src/bin/parser.rs"
+
+[[bin]]
+name = "vkey-ev-range-exec"
+path = "src/bin/vkey.rs"
+
+[dependencies]
+
+bincode = { workspace = true }
+clap = { version = "4.0", features = ["derive", "env"] }
+dotenv = "0.15.0"
+ev-exec-types = { path = "../../ev-exec-types" }
+hashbrown = "0.14.5"
+hex = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["alloc"] }
+sp1-sdk = { workspace = true }
+tracing = "0.1.40"
+
+[build-dependencies]
+sp1-build = { workspace = true }

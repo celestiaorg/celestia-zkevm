@@ -1,0 +1,9 @@
+[package]
+version = "0.1.0"
+name = "ev-hyperlane-program"
+edition = "2021"
+
+[dependencies]
+alloy-primitives = { workspace = true }
+ev-hyperlane-types = { workspace = true }
+sp1-zkvm = { workspace = true }

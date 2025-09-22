@@ -1,8 +1,0 @@
-[package]
-version = "0.1.0"
-name = "evm-hyperlane-program"
-edition = "2021"
-
-[dependencies]
-evm-hyperlane-types-sp1 = { workspace = true }
-sp1-zkvm = { workspace = true }

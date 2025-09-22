@@ -1,6 +1,0 @@
-# Default configuration for evm-prover in Docker environment
-grpc_address: "0.0.0.0:50051"
-celestia_rpc: "http://celestia-bridge:26658"
-evm_rpc: "http://reth:8545"
-namespace_hex: "a8045f161bf468bf4d44"
-pub_key: "3964a68700cf76e215626e076e76d23bd1f4c3b31184b5822fd7b4df15d5ce9a"
