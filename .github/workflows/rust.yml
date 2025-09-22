@@ -11,7 +11,7 @@ on:
 jobs:
   ci:
     name: Rust CI Workflow
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
