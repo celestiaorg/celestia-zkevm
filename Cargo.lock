@@ -3523,7 +3523,7 @@ dependencies = [
  "ev-types",
  "hex",
  "nmt-rs",
- "prost 0.13.5",
+ "prost 0.12.6",
  "reth-primitives",
  "rsp-client-executor",
  "serde_cbor",
