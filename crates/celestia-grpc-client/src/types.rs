@@ -1,14 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-/// Type of proof being submitted
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ProofType {
-    /// State transition proof for ZK execution ISM
-    StateTransition,
-    /// State inclusion proof for message submission
-    StateInclusion,
-}
-
 /// Response from proof submission
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofSubmissionResponse {

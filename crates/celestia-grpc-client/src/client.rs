@@ -1,6 +1,6 @@
 use crate::error::{ProofSubmissionError, Result};
 use crate::message::{StateInclusionProofMsg, StateTransitionProofMsg};
-use crate::types::{ClientConfig, ProofSubmissionResponse, ProofType};
+use crate::types::{ClientConfig, ProofSubmissionResponse};
 
 use anyhow::Context;
 use async_trait::async_trait;
@@ -88,37 +88,6 @@ impl CelestiaProofClient {
     /// Get the configured gRPC endpoint
     pub fn grpc_endpoint(&self) -> &str {
         &self.config.grpc_endpoint
-    }
-
-    /// Estimate gas for a proof submission by proof type
-    pub async fn estimate_gas(&self, proof_type: ProofType) -> Result<u64> {
-        let message_type = match proof_type {
-            ProofType::StateTransition => "MsgUpdateZKExecutionISM",
-            ProofType::StateInclusion => "MsgSubmitMessages",
-        };
-
-        self.estimate_gas_for_message(message_type)
-    }
-
-    /// Internal gas estimation function - single source of truth for gas estimates
-    fn estimate_gas_for_message(&self, message_type: &str) -> Result<u64> {
-        // PLACEHOLDER: These are arbitrary estimates, not based on real Celestia data
-        // TODO: Replace with actual gas estimation from Celestia network
-        let base_gas = match message_type {
-            "MsgUpdateZKExecutionISM" => 150_000, // State transition proof placeholder
-            "MsgSubmitMessages" => 100_000,       // State inclusion proof placeholder
-            _ => 120_000,                         // Default placeholder
-        };
-
-        // Ensure we don't exceed the configured max gas
-        let estimated_gas = base_gas.min(self.config.max_gas);
-
-        warn!(
-            "Using placeholder gas estimate for {}: {} (max: {})",
-            message_type, estimated_gas, self.config.max_gas
-        );
-
-        Ok(estimated_gas)
     }
 
     /// Submit a zkISM proof message via Lumina
@@ -285,15 +254,6 @@ mod tests {
         assert_eq!(deserialized.height, proof_msg.height);
         assert_eq!(deserialized.proof, proof_msg.proof);
         assert_eq!(deserialized.public_values, proof_msg.public_values);
-    }
-
-    #[test]
-    fn test_gas_estimation() {
-        // Test gas estimation for different proof types
-        assert_eq!(
-            ProofType::StateTransition as u8 != ProofType::StateInclusion as u8,
-            true
-        );
     }
 
     #[test]

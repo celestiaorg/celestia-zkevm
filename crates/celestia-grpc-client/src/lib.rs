@@ -16,4 +16,4 @@ pub use message::{
     MsgSubmitMessages, MsgSubmitMessagesResponse, MsgUpdateZkExecutionIsm, MsgUpdateZkExecutionIsmResponse,
     StateInclusionProofMsg, StateTransitionProofMsg,
 };
-pub use types::{ProofSubmissionResponse, ProofType};
+pub use types::ProofSubmissionResponse;
