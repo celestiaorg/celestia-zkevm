@@ -174,7 +174,8 @@ pub fn main() {
         }
 
         let mut data_bytes = Vec::new();
-        prost::Message::encode(sd.data.as_ref().expect("SignedData must contain data"), &mut data_bytes).expect("Failed to encode data");
+        prost::Message::encode(sd.data.as_ref().expect("SignedData must contain data"), &mut data_bytes)
+            .expect("Failed to encode data");
 
         verify_signature(&inputs.pub_key, &data_bytes, &sd.signature).expect("Sequencer signature verification failed");
 
