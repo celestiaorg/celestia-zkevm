@@ -18,3 +18,4 @@ serde = { workspace = true }
 sp1-sdk = { workspace = true }
 thiserror = "1.0"
 tokio = { workspace = true }
+dirs = "5.0.1"

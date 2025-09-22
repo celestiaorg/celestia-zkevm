@@ -1,9 +1,10 @@
 use std::fs;
 
 use anyhow::{bail, Result};
+use storage::hyperlane::APP_HOME;
 
 use crate::commands::cli::VERSION;
-use crate::config::config::{Config, APP_HOME, CONFIG_DIR, CONFIG_FILE, DEFAULT_GENESIS_JSON, GENESIS_FILE};
+use crate::config::config::{Config, CONFIG_DIR, CONFIG_FILE, DEFAULT_GENESIS_JSON, GENESIS_FILE};
 use crate::grpc::server::create_grpc_server;
 
 pub fn init() -> Result<()> {

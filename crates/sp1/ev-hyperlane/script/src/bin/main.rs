@@ -23,7 +23,7 @@ use ev_zkevm_types::programs::hyperlane::{
 };
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 use std::{env, str::FromStr, time::Instant};
-use storage::hyperlane::message::{HyperlaneMessageStore, IndexMode};
+use storage::hyperlane::{message::HyperlaneMessageStore, APP_HOME};
 use url::Url;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
@@ -43,10 +43,7 @@ struct Args {
     contract: String,
 
     #[arg(long)]
-    start_idx: u32,
-
-    #[arg(long)]
-    end_idx: u32,
+    start_height: u32,
 
     #[arg(long)]
     target_height: u32,
@@ -100,12 +97,16 @@ async fn main() {
 }
 
 async fn write_proof_inputs(stdin: &mut SP1Stdin, args: &Args) -> Result<()> {
-    let message_db = HyperlaneMessageStore::from_path_relative(4, IndexMode::Message).unwrap();
+    let message_storage_path = dirs::home_dir()
+        .expect("cannot find home directory")
+        .join(APP_HOME)
+        .join("data")
+        .join("messages.db");
+    let message_db = HyperlaneMessageStore::new(message_storage_path).unwrap();
     let mut messages = Vec::new();
     // insert messages into local database
-    for height in args.start_idx..=args.end_idx {
-        let message = message_db.get_message(height as u64).unwrap();
-        messages.push(message);
+    for height in args.start_height..=args.target_height {
+        messages = message_db.get_by_block(height as u64).unwrap();
     }
 
     // get the merkle proofs from the EVM execution client

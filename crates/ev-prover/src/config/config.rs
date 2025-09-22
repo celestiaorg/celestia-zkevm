@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-pub const APP_HOME: &str = ".ev-prover";
 pub const CONFIG_DIR: &str = "config";
 
 pub const CONFIG_FILE: &str = "config.yaml";

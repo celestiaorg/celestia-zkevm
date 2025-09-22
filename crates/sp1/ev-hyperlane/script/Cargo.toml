@@ -26,6 +26,7 @@ sp1-sdk = { workspace = true }
 storage = { workspace = true }
 tokio = { workspace = true }
 url = { version = "2.5", default-features = false }
+dirs = "5.0.1"
 
 [build-dependencies]
 sp1-build = "5.0.8"
