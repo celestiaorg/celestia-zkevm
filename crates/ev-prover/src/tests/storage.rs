@@ -1,15 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use crate::{
-        prover::programs::block::EV_EXEC_ELF,
-        storage::{
-            proof_storage::{ProofStorageError, RocksDbProofStorage},
-            ProofStorage,
-        },
-    };
+    use crate::prover::programs::block::EV_EXEC_ELF;
     use celestia_types::nmt::Namespace;
     use ev_zkevm_types::programs::block::{BlockExecOutput, BlockRangeExecOutput};
     use sp1_sdk::{ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1PublicValues, SP1_CIRCUIT_VERSION};
+    use storage::proofs::{ProofStorage, ProofStorageError, RocksDbProofStorage};
     use tempfile::TempDir;
 
     fn create_test_storage() -> (RocksDbProofStorage, TempDir) {

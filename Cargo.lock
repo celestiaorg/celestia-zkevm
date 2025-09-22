@@ -8733,12 +8733,15 @@ name = "storage"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "bincode",
  "dotenvy",
  "ev-zkevm-types",
  "hex",
  "rocksdb",
  "serde",
+ "sp1-sdk",
+ "thiserror 1.0.69",
  "tokio",
 ]
 

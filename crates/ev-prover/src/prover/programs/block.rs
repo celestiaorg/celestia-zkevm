@@ -32,7 +32,7 @@ use tokio::{
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
 use crate::prover::{ProgramProver, ProverConfig};
-use crate::storage::{ProofStorage, RocksDbProofStorage};
+use storage::proofs::{ProofStorage, RocksDbProofStorage};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_EXEC_ELF: &[u8] = include_elf!("ev-exec-program");
