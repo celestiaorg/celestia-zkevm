@@ -13,24 +13,18 @@ name = "vkey-ev-hyperlane"
 path = "src/bin/vkey.rs"
 
 [dependencies]
+alloy = { workspace = true }
+alloy-eips = { version = "1.0.32" }
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 anyhow = { workspace = true }
 bincode = { workspace = true }
 clap = { version = "4.0", features = ["cargo", "derive", "env"] }
-dotenv = "0.15.0"
-ev-hyperlane-types = { workspace = true }
-ev-storage-proofs = { workspace = true, features = ["alloy"] }
+dotenvy = { workspace = true }
+ev-zkevm-types = { workspace = true }
 sp1-sdk = { workspace = true }
 storage = { workspace = true }
-tokio = { version = "1.45.0", features = [
-    "sync",
-    "macros",
-    "io-util",
-    "rt",
-    "time",
-    "rt-multi-thread",
-], default-features = false }
+tokio = { workspace = true }
 url = { version = "2.5", default-features = false }
 
 [build-dependencies]

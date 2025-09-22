@@ -1,35 +1,18 @@
+use crate::DefaultProvider;
 /// This service listens for Dispatch events emitted from the Mailbox contract
 /// using the reth websocket.
 /// Events are then processed and inserted into the storage (rocksDB)
 use alloy_primitives::Address;
-use alloy_provider::{Provider, WsConnect, fillers::FillProvider};
+use alloy_provider::{Provider, WsConnect};
 use alloy_rpc_types::Filter;
 use alloy_sol_types::SolEvent;
 use anyhow::Result;
-use ev_state_types::{
-    StoredHyperlaneMessage,
+use ev_zkevm_types::{
     events::{Dispatch, DispatchEvent},
     hyperlane::decode_hyperlane_message,
 };
 use std::{env, str::FromStr, sync::Arc};
-use storage::hyperlane::message::HyperlaneMessageStore;
-
-type DefaultProvider = FillProvider<
-    alloy_provider::fillers::JoinFill<
-        alloy_provider::Identity,
-        alloy_provider::fillers::JoinFill<
-            alloy_provider::fillers::GasFiller,
-            alloy_provider::fillers::JoinFill<
-                alloy_provider::fillers::BlobGasFiller,
-                alloy_provider::fillers::JoinFill<
-                    alloy_provider::fillers::NonceFiller,
-                    alloy_provider::fillers::ChainIdFiller,
-                >,
-            >,
-        >,
-    >,
-    alloy_provider::RootProvider,
->;
+use storage::hyperlane::{StoredHyperlaneMessage, message::HyperlaneMessageStore};
 
 /// HyperlaneIndexer is a service that indexes Hyperlane messages from the Dispatch event emitted from the Mailbox contract.
 pub struct HyperlaneIndexer {

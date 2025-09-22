@@ -14,7 +14,7 @@ use std::fs;
 use std::path::Path;
 
 use clap::Parser;
-use ev_exec_types::{BlockRangeExecInput, BlockRangeExecOutput};
+use ev_zkevm_types::programs::block::{BlockRangeExecInput, BlockRangeExecOutput};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use sp1_sdk::{include_elf, HashableKey, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
@@ -50,7 +50,7 @@ pub struct BenchmarkReport {
 
 fn main() -> Result<(), Box<dyn Error>> {
     sp1_sdk::utils::setup_logger();
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     let args = Args::parse();
 
