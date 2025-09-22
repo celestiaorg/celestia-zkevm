@@ -3229,6 +3229,7 @@ dependencies = [
  "celestia-types",
  "clap",
  "dirs",
+ "dotenvy",
  "ev-state-queries",
  "ev-types",
  "ev-zkevm-types",

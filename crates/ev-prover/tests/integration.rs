@@ -15,7 +15,7 @@ use storage::{
 
 #[tokio::test]
 async fn test_run_message_prover() {
-    #[allow(unused_imports)]
+    dotenvy::dotenv().ok();
     let snapshot_storage_path = dirs::home_dir()
         .expect("cannot find home directory")
         .join(APP_HOME)
