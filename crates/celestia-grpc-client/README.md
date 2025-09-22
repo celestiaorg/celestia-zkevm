@@ -39,12 +39,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Submit state transition proof
     let state_transition_proof = StateTransitionProofMsg::new(
-        "client_id".to_string(),
+        "ism_id_123".to_string(),
+        1000, // height
         proof_bytes,
         public_values,
-        target_height,
-        prev_state_root,
-        new_state_root,
     );
 
     let response = client.submit_state_transition_proof(state_transition_proof).await?;
@@ -52,12 +50,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Submit state inclusion proof
     let state_inclusion_proof = StateInclusionProofMsg::new(
-        "client_id".to_string(),
-        key_paths,
+        "ism_id_123".to_string(),
+        1000, // height
         proof_bytes,
-        height,
-        state_root,
-        values,
+        public_values,
     );
 
     let response = client.submit_state_inclusion_proof(state_inclusion_proof).await?;
@@ -79,24 +75,17 @@ export CELESTIA_CHAIN_ID="celestia-zkevm-testnet"
 
 # Submit state transition proof
 cargo run --bin proof_submitter -- state-transition \
-    --client-id "0x123..." \
+    --id "ism_id_123" \
     --proof-file "./proof.hex" \
     --public-values-file "./public_values.hex" \
-    --target-height 1000 \
-    --prev-state-root "0xabc..." \
-    --new-state-root "0xdef..."
+    --height 1000
 
 # Submit state inclusion proof
 cargo run --bin proof_submitter -- state-inclusion \
-    --client-id "0x123..." \
-    --key-paths "key1,key2,key3" \
+    --id "ism_id_123" \
     --proof-file "./proof.hex" \
-    --height 1000 \
-    --state-root "0xabc..." \
-    --values-file "./values.hex"
-
-# Check account balance
-cargo run --bin proof_submitter -- balance
+    --public-values-file "./public_values.hex" \
+    --height 1000
 ```
 
 ## Environment Variables

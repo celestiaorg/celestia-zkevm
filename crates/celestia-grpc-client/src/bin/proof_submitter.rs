@@ -45,8 +45,6 @@ enum Commands {
         #[arg(long)]
         height: u64,
     },
-    /// Check account balance
-    Balance,
 }
 
 #[tokio::main]
@@ -97,12 +95,6 @@ async fn main() -> Result<()> {
             println!("Transaction hash: {}", response.tx_hash);
             println!("Block height: {}", response.height);
             println!("Gas used: {}", response.gas_used);
-        }
-        Commands::Balance => {
-            // TODO: Get the actual address from the client's keypair
-            // For now, we'll show an error message explaining this limitation
-            println!("Balance check requires an address parameter.");
-            println!("This will be implemented once we can extract the address from the client's keypair.");
         }
     }
 

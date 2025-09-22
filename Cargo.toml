@@ -49,7 +49,7 @@ ev-types = { version = "0.0.1", default-features = false }
 hex = "0.4.3"
 jsonrpsee-core = "0.25.1"
 nmt-rs = "*"
-prost = "0.12"
+prost = "0.13"
 reqwest = "0.12.20"
 reth-chainspec = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.0", default-features = false }
 reth-primitives = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.0", default-features = false }
