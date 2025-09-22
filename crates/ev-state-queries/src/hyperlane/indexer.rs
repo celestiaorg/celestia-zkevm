@@ -8,12 +8,11 @@ use alloy_rpc_types::Filter;
 use alloy_sol_types::SolEvent;
 use anyhow::Result;
 use ev_zkevm_types::{
-    StoredHyperlaneMessage,
     events::{Dispatch, DispatchEvent},
     hyperlane::decode_hyperlane_message,
 };
 use std::{env, str::FromStr, sync::Arc};
-use storage::hyperlane::message::HyperlaneMessageStore;
+use storage::hyperlane::{StoredHyperlaneMessage, message::HyperlaneMessageStore};
 
 /// HyperlaneIndexer is a service that indexes Hyperlane messages from the Dispatch event emitted from the Mailbox contract.
 pub struct HyperlaneIndexer {

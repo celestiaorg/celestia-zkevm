@@ -2,11 +2,12 @@
 /// It is used to store and retrieve Hyperlane messages.
 /// The messages are stored in a column family called "messages".
 use anyhow::{Context, Result};
-use ev_zkevm_types::StoredHyperlaneMessage;
 use rocksdb::{ColumnFamilyDescriptor, DB, IteratorMode, Options};
 use std::env;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
+
+use crate::hyperlane::StoredHyperlaneMessage;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IndexMode {
