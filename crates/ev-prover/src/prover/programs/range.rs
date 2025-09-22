@@ -3,7 +3,7 @@ use std::result::Result::{Err, Ok};
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ev_exec_types::{BlockRangeExecInput, BlockRangeExecOutput};
+use ev_zkevm_types::programs::block::{BlockRangeExecInput, BlockRangeExecOutput};
 use sp1_sdk::{
     include_elf, EnvProver, ProverClient, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
 };

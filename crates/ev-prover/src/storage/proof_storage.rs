@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ev_exec_types::{BlockExecOutput, BlockRangeExecOutput};
+use ev_zkevm_types::programs::block::{BlockExecOutput, BlockRangeExecOutput};
 use rocksdb::{ColumnFamily, ColumnFamilyDescriptor, Options, DB};
 use serde::{Deserialize, Serialize};
 use sp1_sdk::SP1ProofWithPublicValues;

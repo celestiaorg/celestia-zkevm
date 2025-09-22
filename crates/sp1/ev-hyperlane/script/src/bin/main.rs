@@ -10,14 +10,16 @@
 //! RUST_LOG=info cargo run -p ev-hyperlane-script --release -- --prove --contract 0xFCb1d485ef46344029D9E8A7925925e146B3430E --start-idx 0 --end-idx 23 --target-height 268 --rpc-url http://127.0.0.1:8545
 //! ```
 
-use alloy_primitives::Address;
-use alloy_provider::ProviderBuilder;
-use anyhow::Result;
+use alloy_primitives::{hex::FromHex, Address, FixedBytes};
+use alloy_provider::{Provider, ProviderBuilder};
+use anyhow::{Context, Result};
 use clap::{command, Parser};
-use ev_hyperlane_types::{tree::MerkleTree, HyperlaneMessageInputs, HyperlaneMessageOutputs};
-use ev_storage_proofs::{
-    client::EvmClient,
-    types::{HyperlaneBranchProof, HyperlaneBranchProofInputs, HYPERLANE_MERKLE_TREE_KEYS},
+use ev_zkevm_types::programs::hyperlane::{
+    tree::MerkleTree,
+    types::{
+        HyperlaneBranchProof, HyperlaneBranchProofInputs, HyperlaneMessageInputs, HyperlaneMessageOutputs,
+        HYPERLANE_MERKLE_TREE_KEYS,
+    },
 };
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 use std::{env, str::FromStr, time::Instant};
@@ -57,7 +59,7 @@ struct Args {
 async fn main() {
     // Setup the logger.
     sp1_sdk::utils::setup_logger();
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     // Parse the command line arguments.
     let args = Args::parse();
@@ -108,17 +110,28 @@ async fn write_proof_inputs(stdin: &mut SP1Stdin, args: &Args) -> Result<()> {
 
     // get the merkle proofs from the EVM execution client
     let provider = ProviderBuilder::new().connect_http(Url::from_str(&args.rpc_url).unwrap());
-    let evm_client = EvmClient::new(provider);
-    let proof = evm_client
+    let proof = provider
         .get_proof(
-            &HYPERLANE_MERKLE_TREE_KEYS,
             Address::from_str(&args.contract).unwrap(),
-            Some(args.target_height.into()),
+            HYPERLANE_MERKLE_TREE_KEYS
+                .iter()
+                .map(|k| FixedBytes::from_hex(k).unwrap())
+                .collect(),
         )
+        .block_id(alloy_eips::BlockId::Number(alloy_eips::BlockNumberOrTag::Number(
+            args.target_height.into(),
+        )))
         .await
         .unwrap();
 
-    let execution_state_root = evm_client.get_state_root(args.target_height.into()).await.unwrap();
+    let block = provider
+        .get_block(alloy_eips::BlockId::Number(alloy_eips::BlockNumberOrTag::Number(
+            args.target_height.into(),
+        )))
+        .await?
+        .context("Failed to get block")?;
+    let execution_state_root = alloy::hex::encode(block.header.state_root.0);
+
     let branch_proof = HyperlaneBranchProof::new(proof);
 
     // write the inputs to the stdin

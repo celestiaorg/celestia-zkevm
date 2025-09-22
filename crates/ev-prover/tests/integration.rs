@@ -7,7 +7,6 @@ use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
 use ev_prover::prover::programs::message::{AppContext, HyperlaneMessageProver, MerkleTreeState};
 use ev_state_queries::{DefaultProvider, MockStateQueryProvider};
-use ev_storage_proofs::client::EvmClient;
 use reqwest::Url;
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 
@@ -30,13 +29,12 @@ async fn test_run_message_prover() {
 
     let evm_provider: DefaultProvider =
         ProviderBuilder::new().connect_http(Url::from_str("http://127.0.0.1:8545").unwrap());
-    let evm_client = EvmClient::new(evm_provider.clone());
 
     let prover = HyperlaneMessageProver::new(
         app,
         hyperlane_message_store,
         hyperlane_snapshot_store,
-        Arc::new(MockStateQueryProvider::new(evm_provider, evm_client)),
+        Arc::new(MockStateQueryProvider::new(evm_provider)),
     )
     .unwrap();
     prover.run().await.unwrap();

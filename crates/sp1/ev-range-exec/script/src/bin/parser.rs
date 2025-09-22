@@ -23,7 +23,7 @@ pub const EV_RANGE_EXEC_ELF: &[u8] = include_elf!("ev-range-exec-program");
 
 fn main() -> Result<(), Box<dyn Error>> {
     sp1_sdk::utils::setup_logger();
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     let client = ProverClient::from_env();
 
