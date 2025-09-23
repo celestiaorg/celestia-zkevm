@@ -235,6 +235,7 @@ impl HyperlaneMessageProver {
                     .snapshot_index,
             )
             .expect("Failed to get snapshot");
+
         let messages = self
             .message_store
             .get_by_block(

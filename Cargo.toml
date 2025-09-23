@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/e2e",
     "crates/ev-prover",
     "crates/ev-state-queries",
     "crates/ev-zkevm-types",

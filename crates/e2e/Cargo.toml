@@ -1,0 +1,16 @@
+[package]
+name = "e2e"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dirs = "5.0.1"
+anyhow = { workspace = true }
+alloy-provider = { workspace = true }
+ev-state-queries = { workspace = true }
+alloy-primitives = { workspace = true }
+ev-zkevm-types = { workspace = true }
+alloy-rpc-types = { workspace = true }
+storage = { workspace = true }
+sp1-sdk = { workspace = true }
+alloy-sol-types = { workspace = true }
