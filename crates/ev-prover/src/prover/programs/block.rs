@@ -4,7 +4,6 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::result::Result::{Err, Ok};
 use std::sync::Arc;
-use storage::APP_HOME;
 
 use alloy_genesis::Genesis as AlloyGenesis;
 use alloy_primitives::FixedBytes;
@@ -31,7 +30,7 @@ use tokio::{
     task::JoinSet,
 };
 
-use crate::config::config::{Config, CONFIG_DIR, GENESIS_FILE};
+use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
 use crate::prover::{ProgramProver, ProverConfig};
 use storage::proofs::{ProofStorage, RocksDbProofStorage};
 

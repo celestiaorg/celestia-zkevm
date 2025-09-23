@@ -2948,6 +2948,7 @@ dependencies = [
  "ev-zkevm-types",
  "sp1-sdk",
  "storage",
+ "tempfile",
  "tokio",
  "url",
 ]

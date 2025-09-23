@@ -17,10 +17,8 @@ use ev_zkevm_types::{
     },
 };
 use sp1_sdk::{ProverClient, SP1ProofWithPublicValues, SP1Stdin};
-use storage::{
-    APP_HOME,
-    hyperlane::{StoredHyperlaneMessage, message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore},
-};
+use storage::hyperlane::{StoredHyperlaneMessage, message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
+use tempfile::TempDir;
 
 use crate::config::{MAILBOX_ADDRESS, MERKLE_TREE_ADDRESS};
 
@@ -29,6 +27,7 @@ pub async fn prove_messages(
     evm_provider: &DefaultProvider,
     state_query_provider: &dyn StateQueryProvider,
 ) -> Result<SP1ProofWithPublicValues> {
+    let tmp = TempDir::new().expect("cannot create temp directory");
     let state_root = state_query_provider
         .get_state_root(target_height)
         .await
@@ -49,7 +48,7 @@ pub async fn prove_messages(
     // we need the message store for the indexer
     let message_storage_path = dirs::home_dir()
         .expect("cannot find home directory")
-        .join(APP_HOME)
+        .join(&tmp)
         .join("data")
         .join("messages.db");
     let hyperlane_message_store = Arc::new(HyperlaneMessageStore::new(message_storage_path).unwrap());
@@ -93,7 +92,7 @@ pub async fn prove_messages(
     // initialize and prune the snapshot store that will return the empty tree
     let snapshot_storage_path = dirs::home_dir()
         .expect("cannot find home directory")
-        .join(APP_HOME)
+        .join(&tmp)
         .join("data")
         .join("snapshots.db");
     let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
