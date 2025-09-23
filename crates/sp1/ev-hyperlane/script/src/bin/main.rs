@@ -23,11 +23,12 @@ use ev_zkevm_types::programs::hyperlane::{
 };
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 use std::{env, str::FromStr, time::Instant};
-use storage::{hyperlane::message::HyperlaneMessageStore, APP_HOME};
+use storage::hyperlane::message::HyperlaneMessageStore;
 use url::Url;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
+const APP_HOME: &str = ".ev-prover";
 
 /// The arguments for the command.
 #[derive(Parser, Debug)]

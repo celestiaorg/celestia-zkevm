@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use alloy_provider::ProviderBuilder;
 use ev_state_queries::hyperlane::indexer::HyperlaneIndexer;
-use storage::APP_HOME;
 use storage::hyperlane::message::HyperlaneMessageStore;
+use tempfile::TempDir;
 
 /* Context
     We want to generate proofs for events that occurred between one finalized block and another (latest)
@@ -19,9 +19,10 @@ use storage::hyperlane::message::HyperlaneMessageStore;
 */
 #[tokio::test]
 async fn test_run_indexer() {
+    let tmp = TempDir::new().expect("cannot create temp directory");
     let message_storage_path = dirs::home_dir()
         .expect("cannot find home directory")
-        .join(APP_HOME)
+        .join(&tmp)
         .join("data")
         .join("messages.db");
     let indexer = HyperlaneIndexer::default();
