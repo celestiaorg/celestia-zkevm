@@ -8,13 +8,13 @@ name = "message-prover"
 path = "src/bin/message.rs"
 
 [dependencies]
-dotenvy = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 alloy-rpc-types = { workspace = true }
 alloy-sol-types = { workspace = true }
 anyhow = { workspace = true }
 dirs = "5.0.1"
+dotenvy = { workspace = true }
 ev-state-queries = { workspace = true }
 ev-zkevm-types = { workspace = true }
 sp1-sdk = { workspace = true }
