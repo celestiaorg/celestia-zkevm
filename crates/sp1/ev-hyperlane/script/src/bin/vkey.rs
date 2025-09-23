@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(path, encoded)?;
     println!("successfully wrote vkey to: {path}");
 
-    let path = "elfs/ev-hyperlane-elf.bin";
+    let path = "elfs/ev-hyperlane-elf";
     fs::write(path, EV_HYPERLANE_ELF)?;
     println!("successfully wrote elf to: {path}");
 
