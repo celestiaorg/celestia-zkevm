@@ -14,3 +14,5 @@ alloy-rpc-types = { workspace = true }
 storage = { workspace = true }
 sp1-sdk = { workspace = true }
 alloy-sol-types = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }

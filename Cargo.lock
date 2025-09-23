@@ -2947,6 +2947,8 @@ dependencies = [
  "ev-zkevm-types",
  "sp1-sdk",
  "storage",
+ "tokio",
+ "url",
 ]
 
 [[package]]

@@ -1,14 +1,14 @@
 // This endpoint generates a message proof for a new height,
 // always starting with the original, empty Hyperlane Merkle Tree.
 
-use std::{str::FromStr, sync::Arc};
+use std::{fs, str::FromStr, sync::Arc};
 
 use alloy_primitives::{Address, FixedBytes, hex::FromHex};
 use alloy_provider::Provider;
 use alloy_rpc_types::Filter;
 use alloy_sol_types::SolEvent;
 use anyhow::Result;
-use ev_state_queries::{DefaultProvider, StateQueryProvider, hyperlane::indexer::HyperlaneIndexer};
+use ev_state_queries::{DefaultProvider, StateQueryProvider};
 use ev_zkevm_types::{
     events::{Dispatch, DispatchEvent},
     hyperlane::decode_hyperlane_message,
@@ -28,10 +28,9 @@ pub async fn prove_messages(
     target_height: u64,
     evm_provider: &DefaultProvider,
     state_query_provider: &dyn StateQueryProvider,
-    height: u64,
 ) -> Result<SP1ProofWithPublicValues> {
     let state_root = state_query_provider
-        .get_state_root(height)
+        .get_state_root(target_height)
         .await
         .expect("Failed to get state root");
 
@@ -43,7 +42,7 @@ pub async fn prove_messages(
                 .map(|k| FixedBytes::from_hex(k).unwrap())
                 .collect(),
         )
-        .block_id(height.into())
+        .block_id(target_height.into())
         .await?;
     let branch_proof = HyperlaneBranchProof::new(merkle_proof);
 
@@ -61,7 +60,7 @@ pub async fn prove_messages(
         .address(Address::from_str(MAILBOX_ADDRESS).unwrap())
         .event(&Dispatch::id())
         .from_block(0)
-        .to_block(height);
+        .to_block(target_height);
 
     // run the indexer to get all messages that occurred since the last trusted height and insert them as if they all occurred at target_height
     let logs = evm_provider.get_logs(&filter).await?;
@@ -114,15 +113,31 @@ pub async fn prove_messages(
     let mut stdin = SP1Stdin::new();
     stdin.write(&input);
     let client = ProverClient::from_env();
-    todo!("Must import ELF from ELFs directory");
-    let EV_HYPERLANE_ELF = [0u8; 32];
-    let (pk, vk) = client.setup(&EV_HYPERLANE_ELF);
+    let ev_hyperlane_elf = fs::read("elfs/ev-hyperlane-elf").expect("Failed to read ELF");
+    let (pk, vk) = client.setup(&ev_hyperlane_elf);
     let proof = client
         .prove(&pk, &stdin)
         .groth16()
         .run()
         .expect("failed to generate proof");
-    // just for extra sanity
+    // could be removed but this is just a test so doesn't really matter
+    // might actually be better to keep this in for sanity
     client.verify(&proof, &vk).expect("failed to verify proof");
     Ok(proof)
+}
+
+#[tokio::test]
+async fn test_prove_messages() {
+    use crate::config::{EV_RPC, TARGET_HEIGHT};
+    use alloy_provider::ProviderBuilder;
+    use ev_state_queries::MockStateQueryProvider;
+    use url::Url;
+    let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
+    let _proof = prove_messages(
+        TARGET_HEIGHT,
+        &evm_provider.clone(),
+        &MockStateQueryProvider::new(evm_provider),
+    )
+    .await
+    .unwrap();
 }
