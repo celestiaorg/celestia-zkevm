@@ -18,33 +18,41 @@ impl StoredHyperlaneMessage {
 
 #[cfg(test)]
 mod tests {
-    use crate::hyperlane::{
-        StoredHyperlaneMessage,
-        message::{HyperlaneMessageStore, IndexMode},
-        snapshot::HyperlaneSnapshotStore,
-    };
+    use crate::hyperlane::{StoredHyperlaneMessage, message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
     use ev_zkevm_types::{hyperlane::decode_hyperlane_message, programs::hyperlane::tree::MerkleTree};
+    use tempfile::TempDir;
+
+    const DEFAULT_MESSAGE: &str = "0300000009000004d2000000000000000000000000a7578551bae89a96c3365b93493ad2d4ebcbae9700010f2c726f757465725f617070000000000000000000000000000100000000000000000000000000000000000000006a809b36caf0d46a935ee76835065ec5a8b3cea700000000000000000000000000000000000000000000000000000000000003e8";
 
     #[test]
     fn test_insert_message() {
-        dotenvy::dotenv().ok();
-
-        let store = HyperlaneMessageStore::from_path_relative(2, IndexMode::Message).unwrap();
-        let message = hex::decode("0300000009000004d2000000000000000000000000a7578551bae89a96c3365b93493ad2d4ebcbae9700010f2c726f757465725f617070000000000000000000000000000100000000000000000000000000000000000000006a809b36caf0d46a935ee76835065ec5a8b3cea700000000000000000000000000000000000000000000000000000000000003e8").unwrap();
+        let tmp = TempDir::new().expect("cannot create temp directory");
+        let message_storage_path = dirs::home_dir()
+            .expect("cannot find home directory")
+            .join(&tmp)
+            .join("data")
+            .join("messages.db");
+        let store = HyperlaneMessageStore::new(message_storage_path).unwrap();
+        let message = hex::decode(DEFAULT_MESSAGE).unwrap();
         let current_index = store.current_index().unwrap();
         let message = decode_hyperlane_message(&message).unwrap();
         let message = StoredHyperlaneMessage::new(message, None);
         store.insert_message(current_index, message.clone()).unwrap();
-        let retrieved_message = store.get_message(current_index).unwrap();
-        assert_eq!(retrieved_message.message, message.message);
+        let retrieved_message = store.get_by_block(current_index).unwrap();
+        assert_eq!(retrieved_message.first().unwrap().message, message.message);
         store.prune_all().unwrap();
     }
 
     #[test]
     fn test_insert_message_by_block() {
-        dotenvy::dotenv().ok();
-        let message = hex::decode("0300000009000004d2000000000000000000000000a7578551bae89a96c3365b93493ad2d4ebcbae9700010f2c726f757465725f617070000000000000000000000000000100000000000000000000000000000000000000006a809b36caf0d46a935ee76835065ec5a8b3cea700000000000000000000000000000000000000000000000000000000000003e8").unwrap();
-        let store = HyperlaneMessageStore::from_path_relative(2, IndexMode::Block).unwrap();
+        let tmp = TempDir::new().expect("cannot create temp directory");
+        let message = hex::decode(DEFAULT_MESSAGE).unwrap();
+        let message_storage_path = dirs::home_dir()
+            .expect("cannot find home directory")
+            .join(&tmp)
+            .join("data")
+            .join("messages.db");
+        let store = HyperlaneMessageStore::new(message_storage_path).unwrap();
         let message = decode_hyperlane_message(&message).unwrap();
         let message = StoredHyperlaneMessage::new(message, Some(100));
         let current_index = store.current_index().unwrap();
@@ -57,9 +65,13 @@ mod tests {
 
     #[test]
     fn test_insert_snapshot() {
-        dotenvy::dotenv().ok();
-
-        let store = HyperlaneSnapshotStore::from_path_relative(2).unwrap();
+        let tmp = TempDir::new().expect("cannot create temp directory");
+        let snapshot_storage_path = dirs::home_dir()
+            .expect("cannot find home directory")
+            .join(&tmp)
+            .join("data")
+            .join("snapshots.db");
+        let store = HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap();
         let snapshot = MerkleTree::default();
         let current_index = store.current_index().unwrap();
         store.insert_snapshot(current_index, snapshot.clone()).unwrap();

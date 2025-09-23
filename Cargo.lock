@@ -3202,6 +3202,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "clap",
+ "dirs",
  "dotenvy",
  "ev-zkevm-types",
  "sp1-build",
@@ -3228,6 +3229,7 @@ dependencies = [
  "celestia-types",
  "clap",
  "dirs",
+ "dotenvy",
  "ev-state-queries",
  "ev-types",
  "ev-zkevm-types",
@@ -3310,10 +3312,12 @@ dependencies = [
  "alloy-sol-types",
  "anyhow",
  "async-trait",
+ "dirs",
  "dotenvy",
  "ev-zkevm-types",
  "serde_json",
  "storage",
+ "tempfile",
  "tokio",
  "tokio-stream",
  "url",
@@ -8733,12 +8737,17 @@ name = "storage"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "bincode",
+ "dirs",
  "dotenvy",
  "ev-zkevm-types",
  "hex",
  "rocksdb",
  "serde",
+ "sp1-sdk",
+ "tempfile",
+ "thiserror 1.0.69",
  "tokio",
 ]
 
@@ -8944,9 +8953,9 @@ checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "tempfile"
-version = "3.21.0"
+version = "3.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15b61f8f20e3a6f7e0649d825294eaf317edce30f82cf6026e7e4cb9222a7d1e"
+checksum = "2d31c77bdf42a745371d260a26ca7163f1e0924b64afa0b688e61b5a9fa02f16"
 dependencies = [
  "fastrand",
  "getrandom 0.3.3",

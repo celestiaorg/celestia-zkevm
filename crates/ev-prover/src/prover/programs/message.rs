@@ -2,12 +2,7 @@
 //! two given heights against a given EVM block height.
 
 #![allow(dead_code)]
-use std::{
-    str::FromStr,
-    sync::{Arc, RwLock},
-    time::Duration,
-};
-
+use crate::prover::{ProgramProver, ProverConfig};
 use alloy_primitives::{hex::FromHex, Address, FixedBytes};
 use alloy_provider::{Provider, ProviderBuilder, WsConnect};
 use alloy_rpc_types::{EIP1186AccountProofResponse, Filter};
@@ -19,14 +14,17 @@ use ev_zkevm_types::programs::hyperlane::types::{
 use ev_zkevm_types::{events::Dispatch, programs::hyperlane::types::HYPERLANE_MERKLE_TREE_KEYS};
 use reqwest::Url;
 use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
+use std::{
+    str::FromStr,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
+use storage::proofs::ProofStorage;
 use tokio::time::sleep;
-
-use crate::prover::{ProgramProver, ProverConfig};
 
 const TIMEOUT: u64 = 6; // in seconds
 const DISTANCE_TO_HEAD: u64 = 32; // in blocks
-
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
 
@@ -66,6 +64,7 @@ pub struct HyperlaneMessageProver {
     pub prover: EnvProver,
     pub message_store: Arc<HyperlaneMessageStore>,
     pub snapshot_store: Arc<HyperlaneSnapshotStore>,
+    pub proof_store: Arc<dyn ProofStorage>,
     pub state_query_provider: Arc<dyn StateQueryProvider>,
 }
 
@@ -99,6 +98,7 @@ impl HyperlaneMessageProver {
         app: AppContext,
         message_store: Arc<HyperlaneMessageStore>,
         snapshot_store: Arc<HyperlaneSnapshotStore>,
+        proof_store: Arc<dyn ProofStorage>,
         state_query_provider: Arc<dyn StateQueryProvider>,
     ) -> Result<Arc<Self>> {
         let config = HyperlaneMessageProver::default_config();
@@ -110,6 +110,7 @@ impl HyperlaneMessageProver {
             prover,
             message_store,
             snapshot_store,
+            proof_store,
             state_query_provider,
         }))
     }
@@ -140,7 +141,7 @@ impl HyperlaneMessageProver {
                 .await
                 .expect("Failed to get state root");
 
-            let proof = evm_provider
+            let merkle_proof = evm_provider
                 .get_proof(
                     self.app.merkle_tree_address,
                     HYPERLANE_MERKLE_TREE_KEYS
@@ -150,7 +151,6 @@ impl HyperlaneMessageProver {
                 )
                 .block_id(height.into())
                 .await?;
-
             println!(
                 "[INFO] state_root: {state_root}, height: {height}, trusted height: {}",
                 self.app.merkle_tree_state.read().unwrap().height + 1
@@ -171,9 +171,8 @@ impl HyperlaneMessageProver {
                 .get_block(height.into())
                 .await?
                 .context("Failed to get block")?;
-
+            // This is an optional check to ensure the state root is always finalized
             let new_root = alloy::hex::encode(block.header.state_root);
-
             if new_root != hex::encode(state_root) {
                 panic!(
                     "The state root has changed at depth HEAD-{DISTANCE_TO_HEAD}, this should not happen! Expected: {state_root}, Got: {new_root}",
@@ -181,12 +180,12 @@ impl HyperlaneMessageProver {
             }
 
             if let Err(e) = self
-                .run_inner(&evm_provider, &mut indexer, height, proof.clone(), state_root)
+                .run_inner(&evm_provider, &mut indexer, height, merkle_proof.clone(), state_root)
                 .await
             {
                 println!(
                     "Failed to generate proof, Stored Value: {}",
-                    hex::encode(proof.storage_proof.last().unwrap().value.to_be_bytes::<32>())
+                    hex::encode(merkle_proof.storage_proof.last().unwrap().value.to_be_bytes::<32>())
                 );
                 panic!("[ERROR] Failed to generate proof: {e:?}");
             }
@@ -219,7 +218,6 @@ impl HyperlaneMessageProver {
             .index(self.message_store.clone(), Arc::new(evm_provider.clone()))
             .await
             .expect("Failed to index messages");
-
         println!(
             "[INFO] Indexed messages, new height {}",
             self.message_store.current_index().expect("Failed to get current index")
@@ -237,7 +235,6 @@ impl HyperlaneMessageProver {
                     .snapshot_index,
             )
             .expect("Failed to get snapshot");
-
         let messages = self
             .message_store
             .get_by_block(
@@ -249,9 +246,9 @@ impl HyperlaneMessageProver {
                     + 1,
             )
             .expect("Failed to get messages");
-
         let branch_proof = HyperlaneBranchProof::new(proof);
 
+        // Construct program inputs from values
         let input = HyperlaneMessageInputs::new(
             state_root.to_string(),
             self.app.merkle_tree_address.to_string(),
@@ -259,13 +256,17 @@ impl HyperlaneMessageProver {
             HyperlaneBranchProofInputs::from(branch_proof),
             snapshot.clone(),
         );
-
         println!(
             "[INFO] Proving messages with ids: {:?}",
             messages.iter().map(|m| m.message.id()).collect::<Vec<String>>()
         );
-        let _proof = self.prove(input).await.expect("Failed to prove");
-        println!("[Success] Proof was generated successfully!");
+
+        // Generate a proof
+        let proof = self.prove(input).await.expect("Failed to prove");
+        self.proof_store
+            .store_membership_proof(height, &proof.0, &proof.1)
+            .await
+            .expect("Failed to store proof");
 
         // insert messages into snapshot to get new snapshot for next proof
         for message in messages {
