@@ -18,4 +18,5 @@ async fn main() {
     )
     .await
     .unwrap();
+    println!("Proof generated successfully!");
 }
