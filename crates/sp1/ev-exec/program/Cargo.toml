@@ -16,7 +16,7 @@ ev-types = { workspace = true, default-features = false }
 ev-zkevm-types = { workspace = true }
 hex = { workspace = true }
 nmt-rs = "*"
-prost = "=0.12.6"
+prost = { workspace = true }
 reth-primitives = { workspace = true }
 rsp-client-executor = { workspace = true }
 serde_cbor = { workspace = true }

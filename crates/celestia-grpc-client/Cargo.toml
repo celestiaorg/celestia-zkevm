@@ -32,7 +32,7 @@ cosmrs = { version = "0.21", optional = true, features = ["grpc", "cosmwasm"] }
 
 # gRPC and protobuf dependencies
 tonic = "0.13"
-prost = { workspace = true }
+prost = "0.13"
 prost-types = "0.13"
 
 # CLI dependencies
