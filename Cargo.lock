@@ -2943,6 +2943,7 @@ dependencies = [
  "alloy-sol-types",
  "anyhow",
  "dirs",
+ "dotenvy",
  "ev-state-queries",
  "ev-zkevm-types",
  "sp1-sdk",

@@ -3,7 +3,12 @@ name = "e2e"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "message-prover"
+path = "src/bin/message.rs"
+
 [dependencies]
+dotenvy = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 alloy-rpc-types = { workspace = true }

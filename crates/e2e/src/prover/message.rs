@@ -125,19 +125,3 @@ pub async fn prove_messages(
     client.verify(&proof, &vk).expect("failed to verify proof");
     Ok(proof)
 }
-
-#[tokio::test]
-async fn test_prove_messages() {
-    use crate::config::{EV_RPC, TARGET_HEIGHT};
-    use alloy_provider::ProviderBuilder;
-    use ev_state_queries::MockStateQueryProvider;
-    use url::Url;
-    let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
-    let _proof = prove_messages(
-        TARGET_HEIGHT,
-        &evm_provider.clone(),
-        &MockStateQueryProvider::new(evm_provider),
-    )
-    .await
-    .unwrap();
-}
