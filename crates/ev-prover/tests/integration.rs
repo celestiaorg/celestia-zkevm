@@ -11,25 +11,26 @@ use reqwest::Url;
 use storage::{
     hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore},
     proofs::RocksDbProofStorage,
-    APP_HOME,
 };
+use tempfile::TempDir;
 
 #[tokio::test]
 async fn test_run_message_prover() {
     dotenvy::dotenv().ok();
+    let tmp = TempDir::new().expect("cannot create temp directory");
     let snapshot_storage_path = dirs::home_dir()
         .expect("cannot find home directory")
-        .join(APP_HOME)
+        .join(&tmp)
         .join("data")
         .join("snapshots.db");
     let message_storage_path = dirs::home_dir()
         .expect("cannot find home directory")
-        .join(APP_HOME)
+        .join(&tmp)
         .join("data")
         .join("messages.db");
     let proof_storage_path = dirs::home_dir()
         .expect("cannot find home directory")
-        .join(APP_HOME)
+        .join(&tmp)
         .join("data")
         .join("proofs.db");
     let hyperlane_message_store = Arc::new(HyperlaneMessageStore::new(message_storage_path).unwrap());
