@@ -17,8 +17,8 @@ alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 alloy-rpc-types = { workspace = true }
 alloy-sol-types = { workspace = true }
-bincode = { workspace = true }
 anyhow = { workspace = true }
+bincode = { workspace = true }
 celestia-rpc = { workspace = true }
 celestia-types = { workspace = true }
 dirs = { workspace = true }

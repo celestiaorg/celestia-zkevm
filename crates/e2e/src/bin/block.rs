@@ -7,12 +7,12 @@ use e2e::{
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
-    let _proof = prove_blocks(
+    prove_blocks(
         START_HEIGHT,
         TRUSTED_HEIGHT,
         NUM_BLOCKS,
         &mut FixedBytes::from_hex(TRUSTED_ROOT).unwrap(),
     )
     .await
-    .unwrap();
+    .expect("Failed to prove blocks");
 }

@@ -173,8 +173,8 @@ pub async fn synchroneous_prover(
             namespace,
             proofs,
             executor_inputs: executor_inputs.clone(),
-            trusted_height: trusted_height.clone(),
-            trusted_root: trusted_root.clone(),
+            trusted_height: *trusted_height,
+            trusted_root: *trusted_root,
         };
 
         stdin.write(&input);
@@ -187,7 +187,7 @@ pub async fn synchroneous_prover(
         block_proofs.push(proof.clone());
         println!("Proof generated successfully!");
 
-        let public_values: BlockExecOutput = bincode::deserialize(&proof.public_values.as_slice())?;
+        let public_values: BlockExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
         // update trusted root and height
         *trusted_root = public_values.new_state_root.into();
         *trusted_height = public_values.new_height;
@@ -195,7 +195,7 @@ pub async fn synchroneous_prover(
     }
 
     let last_proof = block_proofs.last().unwrap();
-    let public_values: BlockExecOutput = bincode::deserialize(&last_proof.public_values.as_slice())?;
+    let public_values: BlockExecOutput = bincode::deserialize(last_proof.public_values.as_slice())?;
     println!("Target state root: {:?}", public_values.new_state_root);
     Ok(block_proofs)
 }
