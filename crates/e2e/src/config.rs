@@ -13,15 +13,3 @@ pub const TARGET_HEIGHT: u64 = 10;
 pub const TRUSTED_ROOT: &str = "0x2892acb3938e55f74887eb9624668f2c5f0d97fae9151d83dea3b70d5ea850b5";
 pub const EV_RPC: &str = "http://127.0.0.1:8545";
 pub const EV_WS: &str = "ws://127.0.0.1:8546";
-
-/*
-curl -s -X POST http://127.0.0.1:8545 \
-  -H "Content-Type: application/json" \
-  --data "{
-    \"jsonrpc\":\"2.0\",
-    \"method\":\"eth_getBlockByNumber\",
-    \"params\":[\"$(printf '0x%x' 1234)\", false],
-    \"id\":1
-  }" | jq -r '.result.stateRoot'
-
-*/
