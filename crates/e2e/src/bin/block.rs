@@ -1,6 +1,6 @@
 use alloy_primitives::{FixedBytes, hex::FromHex};
 use e2e::{
-    config::{NUM_BLOCKS, TRUSTED_HEIGHT, TRUSTED_ROOT},
+    config::{NUM_BLOCKS, START_HEIGHT, TRUSTED_HEIGHT, TRUSTED_ROOT},
     prover::block::prove_blocks,
 };
 
@@ -8,6 +8,7 @@ use e2e::{
 async fn main() {
     dotenvy::dotenv().ok();
     let _proof = prove_blocks(
+        START_HEIGHT,
         TRUSTED_HEIGHT,
         NUM_BLOCKS,
         &mut FixedBytes::from_hex(TRUSTED_ROOT).unwrap(),

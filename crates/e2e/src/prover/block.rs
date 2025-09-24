@@ -20,7 +20,7 @@ use ev_zkevm_types::programs::block::{BlockExecInput, BlockExecOutput};
 use eyre::Context;
 use prost::Message;
 use reth_chainspec::ChainSpec;
-use rsp_client_executor::io::{EthClientExecutorInput, WitnessInput};
+use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
@@ -77,6 +77,7 @@ async fn get_sequencer_pubkey() -> Result<Vec<u8>, Box<dyn Error>> {
 }
 
 pub async fn prove_blocks(
+    start_height: u64,
     trusted_height: u64,
     num_blocks: u64,
     trusted_root: &mut FixedBytes<32>,
@@ -90,7 +91,7 @@ pub async fn prove_blocks(
     }
     // synchroneous mode (cuda, cpu, mock)
     else {
-        synchroneous_prover(&mut trusted_height, num_blocks, trusted_root).await?;
+        synchroneous_prover(start_height, &mut trusted_height, num_blocks, trusted_root).await?;
     }
     Ok(())
 }
@@ -100,6 +101,7 @@ pub async fn parallel_prover() -> Result<(), Box<dyn Error>> {
 }
 
 pub async fn synchroneous_prover(
+    start_height: u64,
     trusted_height: &mut u64,
     num_blocks: u64,
     trusted_root: &mut FixedBytes<32>,
@@ -124,7 +126,7 @@ pub async fn synchroneous_prover(
     // loop and adjust inputs for each iteration,
     // collect all proofs into a vec and return
     // later wrap them in g16
-    for block_number in *trusted_height..(*trusted_height + num_blocks) {
+    for block_number in start_height..(start_height + num_blocks) {
         println!("\nProcessing block: {block_number}");
         let blobs: Vec<Blob> = celestia_client
             .blob_get_all(block_number, &[namespace])
@@ -152,6 +154,7 @@ pub async fn synchroneous_prover(
             };
             let height = data.metadata.unwrap().height;
             println!("Got SignedData for EVM block {height}");
+
             let client_executor_input =
                 generate_client_executor_input(config::EVM_RPC_URL, height, chain_spec.clone(), genesis.clone())
                     .await?;
@@ -181,12 +184,11 @@ pub async fn synchroneous_prover(
         block_proofs.push(proof.clone());
         println!("Proof generated successfully!");
 
-        // update trusted root and height
         let public_values: BlockExecOutput = bincode::deserialize(&proof.public_values.as_slice())?;
+        // update trusted root and height
         *trusted_root = public_values.new_state_root.into();
         *trusted_height = public_values.new_height;
-
-        println!("Got EthClientExecutorInputs, total: {}", executor_inputs.len());
+        println!("New state root: {:?}", *trusted_root);
     }
 
     let last_proof = block_proofs.last().unwrap();
