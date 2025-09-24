@@ -110,6 +110,7 @@ pub fn main() {
         // this should be okay since they don't progress the state
         // but we should be very careful about this before prod
         if proof.is_of_absence() {
+            //todo: verify the absence proof?
             continue;
         }
         let share_count = (proof.end_idx() - proof.start_idx()) as usize;
