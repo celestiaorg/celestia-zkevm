@@ -12,32 +12,33 @@ name = "block-prover"
 path = "src/bin/message.rs"
 
 [dependencies]
-anyhow = { workspace = true }
 alloy-genesis = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 alloy-rpc-types = { workspace = true }
 alloy-sol-types = { workspace = true }
+anyhow = { workspace = true }
+celestia-rpc = { workspace = true }
+celestia-types = { workspace = true }
 dirs = { workspace = true }
 dotenvy = { workspace = true }
+ev-prover = { workspace = true }
 ev-state-queries = { workspace = true }
+ev-types = { workspace = true, features = ["grpc"] }
 ev-zkevm-types = { workspace = true }
+eyre = "0.6.12"
+prost = { workspace = true }
+reth-chainspec = { workspace = true }
+rsp-client-executor = { workspace = true }
+rsp-host-executor = { workspace = true }
+rsp-primitives = { workspace = true }
+rsp-rpc-db = { workspace = true }
+serde_cbor = { workspace = true }
+serde_json = { workspace = true, default-features = false, features = [
+    "alloc",
+] }
 sp1-sdk = { workspace = true }
 storage = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
-ev-prover = { workspace = true }
-celestia-rpc = { workspace = true }
-celestia-types = { workspace = true }
-ev-types = { workspace = true, features = ["grpc"] }
-reth-chainspec = { workspace = true }
-rsp-client-executor = { workspace = true }
-rsp-host-executor = { workspace = true }
-prost = { workspace = true }
-eyre = "0.6.12"
-rsp-primitives = { workspace = true }
-rsp-rpc-db = { workspace = true }
-serde_json = { workspace = true, default-features = false, features = [
-    "alloc",
-] }

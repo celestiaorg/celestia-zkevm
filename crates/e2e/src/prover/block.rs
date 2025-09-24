@@ -6,10 +6,8 @@ use std::error::Error;
 use std::fs;
 use std::sync::Arc;
 
-use alloy_primitives::FixedBytes;
-use ev_prover::config::config::Config;
-
 use alloy_genesis::Genesis as AlloyGenesis;
+use alloy_primitives::{FixedBytes, hex};
 use alloy_provider::ProviderBuilder;
 use anyhow::Result;
 use celestia_rpc::{BlobClient, Client, HeaderClient, ShareClient};
@@ -18,13 +16,22 @@ use celestia_types::nmt::{Namespace, NamespaceProof};
 use ev_types::v1::get_block_request::Identifier;
 use ev_types::v1::store_service_client::StoreServiceClient;
 use ev_types::v1::{GetBlockRequest, SignedData};
+use ev_zkevm_types::programs::block::BlockExecInput;
 use eyre::Context;
 use prost::Message;
 use reth_chainspec::ChainSpec;
-use rsp_client_executor::io::EthClientExecutorInput;
+use rsp_client_executor::io::{EthClientExecutorInput, WitnessInput};
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
+use sp1_sdk::SP1Stdin;
+use sp1_sdk::{ProverClient, SP1ProofWithPublicValues};
+
+mod config {
+    pub const CELESTIA_RPC_URL: &str = "http://localhost:26658";
+    pub const EVM_RPC_URL: &str = "http://localhost:8545";
+    pub const SEQUENCER_URL: &str = "http://localhost:7331";
+}
 
 /// Loads the genesis file from disk and converts it into a ChainSpec
 fn load_chain_spec_from_genesis(path: &str) -> Result<(Genesis, Arc<ChainSpec>), Box<dyn Error>> {
@@ -70,12 +77,12 @@ async fn get_sequencer_pubkey() -> Result<Vec<u8>, Box<dyn Error>> {
 }
 
 pub async fn prove_blocks(
-    start_height: u64,
+    trusted_height: u64,
     num_blocks: u64,
-    trusted_root: FixedBytes<32>,
-    target_height: u64,
-) -> Result<()> {
+    trusted_root: &mut FixedBytes<32>,
+) -> Result<(), Box<dyn Error>> {
     dotenvy::dotenv().ok();
+    let mut trusted_height = trusted_height;
     let prover_mode = env::var("SP1_PROVER").unwrap_or("mock".to_string());
     // parallel mode (network)
     if prover_mode == "network" {
@@ -83,17 +90,20 @@ pub async fn prove_blocks(
     }
     // synchroneous mode (cuda, cpu, mock)
     else {
-        synchronous_prover(start_height, num_blocks).await?;
+        synchroneous_prover(&mut trusted_height, num_blocks, trusted_root).await?;
     }
     Ok(())
 }
 
 pub async fn parallel_prover() -> Result<(), Box<dyn Error>> {
     todo!("Implement parallel prover");
-    Ok(())
 }
 
-pub async fn synchronous_prover(start_height: u64, num_blocks: u64) -> Result<()> {
+pub async fn synchroneous_prover(
+    trusted_height: &mut u64,
+    num_blocks: u64,
+    trusted_root: &mut FixedBytes<32>,
+) -> Result<Vec<SP1ProofWithPublicValues>, Box<dyn Error>> {
     let genesis_path = env::var("GENESIS_PATH").expect("GENESIS_PATH must be set");
     let (genesis, chain_spec) = load_chain_spec_from_genesis(&genesis_path)?;
     let namespace_hex = env::var("CELESTIA_NAMESPACE").expect("CELESTIA_NAMESPACE must be set");
@@ -102,32 +112,32 @@ pub async fn synchronous_prover(start_height: u64, num_blocks: u64) -> Result<()
         .await
         .context("Failed creating Celestia RPC client")?;
     let pub_key = get_sequencer_pubkey().await?;
+    let client = ProverClient::from_env();
+    let block_prover_elf = fs::read("elfs/ev-exec-elf").expect("Failed to read ELF");
+    let (pk, _) = client.setup(&block_prover_elf);
 
-    // loop and adjsut inputs for each iteration,
+    let mut block_proofs: Vec<SP1ProofWithPublicValues> = Vec::new();
+    // loop and adjust inputs for each iteration,
     // collect all proofs into a vec and return
     // later wrap them in g16
-    for block_number in start_height..(start_height + num_blocks) {
+    for block_number in *trusted_height..(*trusted_height + num_blocks) {
         println!("\nProcessing block: {block_number}");
-
         let blobs: Vec<Blob> = celestia_client
             .blob_get_all(block_number, &[namespace])
             .await?
             .unwrap_or_default();
-
         println!("Got {} blobs for block: {}", blobs.len(), block_number);
 
         let extended_header = celestia_client.header_get_by_height(block_number).await?;
         let namespace_data = celestia_client
             .share_get_namespace_data(&extended_header, namespace)
             .await?;
-
         let mut proofs: Vec<NamespaceProof> = Vec::new();
         for row in namespace_data.rows {
             if row.proof.is_of_presence() {
                 proofs.push(row.proof);
             }
         }
-
         println!("Got NamespaceProofs, total: {}", proofs.len());
 
         let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
@@ -136,19 +146,40 @@ pub async fn synchronous_prover(start_height: u64, num_blocks: u64) -> Result<()
                 Ok(data) => data.data.unwrap(),
                 Err(_) => continue,
             };
-
             let height = data.metadata.unwrap().height;
             println!("Got SignedData for EVM block {height}");
-
             let client_executor_input =
                 generate_client_executor_input(config::EVM_RPC_URL, height, chain_spec.clone(), genesis.clone())
                     .await?;
-
             executor_inputs.push(client_executor_input);
         }
 
+        let mut stdin = SP1Stdin::new();
+        let input = BlockExecInput {
+            header_raw: serde_cbor::to_vec(&extended_header.header)?,
+            dah: extended_header.dah,
+            blobs_raw: serde_cbor::to_vec(&blobs)?,
+            pub_key: pub_key.clone(),
+            namespace,
+            proofs,
+            executor_inputs: executor_inputs.clone(),
+            trusted_height: trusted_height.clone(),
+            trusted_root: trusted_root.clone(),
+        };
+
+        stdin.write(&input);
+        let proof = client
+            .prove(&pk, &stdin)
+            .groth16()
+            .run()
+            .expect("failed to generate proof");
+        block_proofs.push(proof);
+
+        // update trusted root and height
+        *trusted_root = executor_inputs.first().unwrap().state_anchor();
+        *trusted_height = executor_inputs.first().unwrap().parent_header().number;
         println!("Got EthClientExecutorInputs, total: {}", executor_inputs.len());
     }
 
-    Ok(())
+    Ok(block_proofs)
 }

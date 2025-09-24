@@ -18,7 +18,7 @@ impl StoredHyperlaneMessage {
 
 #[cfg(test)]
 mod tests {
-    use crate::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore, StoredHyperlaneMessage};
+    use crate::hyperlane::{StoredHyperlaneMessage, message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
     use ev_zkevm_types::{hyperlane::decode_hyperlane_message, programs::hyperlane::tree::MerkleTree};
     use tempfile::TempDir;
 
