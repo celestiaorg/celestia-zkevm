@@ -42,7 +42,7 @@ use alloy_consensus::{proofs, BlockHeader};
 use alloy_primitives::B256;
 use alloy_rlp::Decodable;
 use bytes::Bytes;
-use celestia_types::nmt::NamespacedHash;
+use celestia_types::nmt::{NamespacedHash, EMPTY_LEAVES};
 use celestia_types::Blob;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use ev_types::v1::{Data, SignedData};
@@ -106,11 +106,11 @@ pub fn main() {
 
     let mut cursor = 0;
     for (proof, root) in inputs.proofs.iter().zip(roots) {
-        // skip absence proofs
-        // this should be okay since they don't progress the state
-        // but we should be very careful about this before prod
+        // we also need to verify absence proofs because we get a root for them
         if proof.is_of_absence() {
-            //todo: verify the absence proof?
+            proof
+                .verify_complete_namespace(root, EMPTY_LEAVES, inputs.namespace.into())
+                .expect("Failed to verify proof");
             continue;
         }
         let share_count = (proof.end_idx() - proof.start_idx()) as usize;
