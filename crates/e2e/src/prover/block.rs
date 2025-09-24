@@ -65,12 +65,15 @@ async fn generate_client_executor_input(
 }
 
 async fn get_sequencer_pubkey() -> Result<Vec<u8>, Box<dyn Error>> {
+    println!("Connecting to sequencer url: {}", config::SEQUENCER_URL);
     let mut sequencer_client = StoreServiceClient::connect(config::SEQUENCER_URL).await?;
+    println!("Connected to sequencer url: {}", config::SEQUENCER_URL);
     let block_req = GetBlockRequest {
         identifier: Some(Identifier::Height(1)),
     };
-
+    println!("Getting block from sequencer url: {}", config::SEQUENCER_URL);
     let resp = sequencer_client.get_block(block_req).await?;
+    println!("Got block from sequencer url: {}", config::SEQUENCER_URL);
     let pub_key = resp.into_inner().block.unwrap().header.unwrap().signer.unwrap().pub_key;
 
     Ok(pub_key[4..].to_vec())
