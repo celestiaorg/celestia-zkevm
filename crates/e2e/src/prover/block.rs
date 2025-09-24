@@ -143,9 +143,7 @@ pub async fn synchroneous_prover(
             .await?;
         let mut proofs: Vec<NamespaceProof> = Vec::new();
         for row in namespace_data.rows {
-            if row.proof.is_of_presence() || row.proof.is_of_absence() {
-                proofs.push(row.proof);
-            }
+            proofs.push(row.proof);
         }
         println!("Got NamespaceProofs, total: {}", proofs.len());
 

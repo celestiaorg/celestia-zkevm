@@ -131,9 +131,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         let mut proofs: Vec<NamespaceProof> = Vec::new();
         for row in namespace_data.rows {
-            if row.proof.is_of_presence() {
-                proofs.push(row.proof);
-            }
+            proofs.push(row.proof);
         }
 
         println!("Got NamespaceProofs, total: {}", proofs.len());
