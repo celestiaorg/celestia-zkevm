@@ -9,7 +9,7 @@ path = "src/bin/message.rs"
 
 [[bin]]
 name = "block-prover"
-path = "src/bin/message.rs"
+path = "src/bin/block.rs"
 
 [dependencies]
 alloy-genesis = { workspace = true }
@@ -17,6 +17,7 @@ alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 alloy-rpc-types = { workspace = true }
 alloy-sol-types = { workspace = true }
+bincode = { workspace = true }
 anyhow = { workspace = true }
 celestia-rpc = { workspace = true }
 celestia-types = { workspace = true }

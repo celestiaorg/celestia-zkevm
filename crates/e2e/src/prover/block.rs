@@ -16,7 +16,7 @@ use celestia_types::nmt::{Namespace, NamespaceProof};
 use ev_types::v1::get_block_request::Identifier;
 use ev_types::v1::store_service_client::StoreServiceClient;
 use ev_types::v1::{GetBlockRequest, SignedData};
-use ev_zkevm_types::programs::block::BlockExecInput;
+use ev_zkevm_types::programs::block::{BlockExecInput, BlockExecOutput};
 use eyre::Context;
 use prost::Message;
 use reth_chainspec::ChainSpec;
@@ -104,8 +104,12 @@ pub async fn synchroneous_prover(
     num_blocks: u64,
     trusted_root: &mut FixedBytes<32>,
 ) -> Result<Vec<SP1ProofWithPublicValues>, Box<dyn Error>> {
-    let genesis_path = env::var("GENESIS_PATH").expect("GENESIS_PATH must be set");
-    let (genesis, chain_spec) = load_chain_spec_from_genesis(&genesis_path)?;
+    let genesis_path = dirs::home_dir()
+        .expect("cannot find home directory")
+        .join(".ev-prover")
+        .join("config")
+        .join("genesis.json");
+    let (genesis, chain_spec) = load_chain_spec_from_genesis(genesis_path.to_str().unwrap())?;
     let namespace_hex = env::var("CELESTIA_NAMESPACE").expect("CELESTIA_NAMESPACE must be set");
     let namespace = Namespace::new_v0(&hex::decode(namespace_hex)?)?;
     let celestia_client = Client::new(config::CELESTIA_RPC_URL, None)
@@ -168,18 +172,25 @@ pub async fn synchroneous_prover(
         };
 
         stdin.write(&input);
+        println!("Generating proof for block: {block_number}, trusted height: {trusted_height}");
         let proof = client
             .prove(&pk, &stdin)
             .groth16()
             .run()
             .expect("failed to generate proof");
-        block_proofs.push(proof);
+        block_proofs.push(proof.clone());
+        println!("Proof generated successfully!");
 
         // update trusted root and height
-        *trusted_root = executor_inputs.first().unwrap().state_anchor();
-        *trusted_height = executor_inputs.first().unwrap().parent_header().number;
+        let public_values: BlockExecOutput = bincode::deserialize(&proof.public_values.as_slice())?;
+        *trusted_root = public_values.new_state_root.into();
+        *trusted_height = public_values.new_height;
+
         println!("Got EthClientExecutorInputs, total: {}", executor_inputs.len());
     }
 
+    let last_proof = block_proofs.last().unwrap();
+    let public_values: BlockExecOutput = bincode::deserialize(&last_proof.public_values.as_slice())?;
+    println!("Target state root: {:?}", public_values.new_state_root);
     Ok(block_proofs)
 }
