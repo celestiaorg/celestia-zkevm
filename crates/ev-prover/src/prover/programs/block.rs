@@ -56,8 +56,8 @@ pub struct AppContext {
 /// This type is wrapped in a RwLock by the AppContext such that it can be updated safely across concurrent tasks.
 /// Updates are made optimisticly using the EthClientExecutorInputs queried from the configured EVM full node.
 pub struct TrustedState {
-    height: u64,
-    root: FixedBytes<32>,
+    pub height: u64,
+    pub root: FixedBytes<32>,
 }
 
 impl TrustedState {
@@ -268,7 +268,7 @@ impl BlockExecProver {
     /// height. Events are fed into the pipeline via the WebSocket subscription, and
     /// proofs are generated concurrently while ensuring the trusted state is updated
     /// monotonically in block-height order.
-    pub async fn run(self: Arc<Self>) -> Result<()> {
+    pub async fn run(self: Arc<Self>, target_height: Option<u64>) -> Result<()> {
         let (client, mut subscription) = self.connect_and_subscribe().await?;
 
         // Queues for the 3-stage pipeline

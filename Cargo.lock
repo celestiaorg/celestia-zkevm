@@ -2944,6 +2944,7 @@ dependencies = [
  "anyhow",
  "dirs",
  "dotenvy",
+ "ev-prover",
  "ev-state-queries",
  "ev-zkevm-types",
  "sp1-sdk",

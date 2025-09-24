@@ -7,6 +7,10 @@ edition = "2024"
 name = "message-prover"
 path = "src/bin/message.rs"
 
+[[bin]]
+name = "block-prover"
+path = "src/bin/block.rs"
+
 [dependencies]
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
@@ -22,3 +26,4 @@ storage = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+ev-prover = { workspace = true }
