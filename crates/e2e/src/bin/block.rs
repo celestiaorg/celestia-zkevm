@@ -7,7 +7,7 @@ use e2e::{
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
-    let _proof = prove_blocks(0, FixedBytes::from_hex(TRUSTED_ROOT).unwrap(), TARGET_HEIGHT)
+    let _proof = prove_blocks(0, 1, FixedBytes::from_hex(TRUSTED_ROOT).unwrap(), TARGET_HEIGHT)
         .await
         .unwrap();
     println!("Proof generated successfully!");
