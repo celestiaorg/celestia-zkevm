@@ -8,12 +8,31 @@ import (
 	hooktypes "github.com/bcp-innovations/hyperlane-cosmos/x/core/02_post_dispatch/types"
 	coretypes "github.com/bcp-innovations/hyperlane-cosmos/x/core/types"
 	warptypes "github.com/bcp-innovations/hyperlane-cosmos/x/warp/types"
+	zkismtypes "github.com/celestiaorg/celestia-app/v6/x/zkism/types"
 	abci "github.com/cometbft/cometbft/abci/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/gogoproto/proto"
 )
 
-func parseISMFromEvents(events []abci.Event) util.HexAddress {
+func parseIsmIDFromZkISMEvents(events []abci.Event) util.HexAddress {
+	var ismID util.HexAddress
+	for _, evt := range events {
+		if evt.GetType() == proto.MessageName(&zkismtypes.EventCreateZKExecutionISM{}) {
+			event, err := sdk.ParseTypedEvent(evt)
+			if err != nil {
+				log.Fatalf("failed to parse typed event: %v", err)
+			}
+
+			if ismEvent, ok := event.(*zkismtypes.EventCreateZKExecutionISM); ok {
+				ismID = ismEvent.Id
+			}
+		}
+	}
+
+	return ismID
+}
+
+func parseIsmIDFromNoopISMEvents(events []abci.Event) util.HexAddress {
 	var ismID util.HexAddress
 	for _, evt := range events {
 		if evt.GetType() == proto.MessageName(&ismtypes.EventCreateNoopIsm{}) {

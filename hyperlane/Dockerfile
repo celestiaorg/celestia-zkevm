@@ -30,5 +30,6 @@ WORKDIR /home/hyperlane
 COPY hyperlane/configs /home/hyperlane/configs
 COPY hyperlane/registry /home/hyperlane/registry
 COPY hyperlane/scripts /home/hyperlane/scripts
+COPY testdata/vkeys /home/hyperlane/testdata/vkeys
 
 ENTRYPOINT [ "scripts/docker-entrypoint.sh" ]
