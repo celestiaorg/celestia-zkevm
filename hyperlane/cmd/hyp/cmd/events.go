@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/bcp-innovations/hyperlane-cosmos/util"
@@ -24,6 +25,7 @@ func parseIsmIDFromZkISMEvents(events []abci.Event) util.HexAddress {
 			}
 
 			if ismEvent, ok := event.(*zkismtypes.EventCreateZKExecutionISM); ok {
+				fmt.Printf("successfully created zk execution ISM: %s\n", ismEvent)
 				ismID = ismEvent.Id
 			}
 		}

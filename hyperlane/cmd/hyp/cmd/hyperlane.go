@@ -16,17 +16,18 @@ import (
 	warptypes "github.com/bcp-innovations/hyperlane-cosmos/x/warp/types"
 	zkismtypes "github.com/celestiaorg/celestia-app/v6/x/zkism/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	evclient "github.com/evstack/ev-node/pkg/rpc/client"
 )
 
-var (
-	// TODO: Configure these values either by arguments or environment for convenience
+const (
+	// Currently we hardcode this value here as this is the canonical namespace used by the
+	// infrastructure in this repo.
 	namespaceHex = "00000000000000000000000000000000000000a8045f161bf468bf4d44"
-	publicKeyHex = "c87f6c4cdd4c8ac26cb6a06909e5e252b73043fdf85232c18ae92b9922b65507"
 )
 
 // SetupZkIsm deploys a new zk ism using the provided evm client to fetch the latest block
 // for the initial trusted height and trusted root.
-func SetupZKIsm(ctx context.Context, broadcaster *Broadcaster, ethClient *ethclient.Client) util.HexAddress {
+func SetupZKIsm(ctx context.Context, broadcaster *Broadcaster, ethClient *ethclient.Client, evnodeClient *evclient.Client) util.HexAddress {
 	block, err := ethClient.BlockByNumber(ctx, nil) // nil == latest
 	if err != nil {
 		log.Fatal(err)
@@ -39,10 +40,12 @@ func SetupZKIsm(ctx context.Context, broadcaster *Broadcaster, ethClient *ethcli
 		log.Fatal(err)
 	}
 
-	pubKey, err := hex.DecodeString(publicKeyHex)
+	pubKey, err := getSequencerPubKey(ctx, evnodeClient)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	fmt.Printf("successfully got pubkey from ev-node %x\n", pubKey)
 
 	groth16Vkey := readGroth16Vkey()
 	stateTransitionVkey := readStateTransitionVkey()
@@ -62,7 +65,6 @@ func SetupZKIsm(ctx context.Context, broadcaster *Broadcaster, ethClient *ethcli
 	res := broadcaster.BroadcastTx(ctx, &msgCreateZkExecutionISM)
 	ismID := parseIsmIDFromZkISMEvents(res.Events)
 
-	fmt.Printf("successfully created zk execution ism: %s\n", ismID)
 	return ismID
 }
 
@@ -133,6 +135,15 @@ func SetupRemoteRouter(ctx context.Context, broadcaster *Broadcaster, tokenID ut
 	recvContract := parseReceiverContractFromEvents(res.Events)
 
 	fmt.Printf("successfully registered remote router on Hyperlane cosmosnative: \n%s", recvContract)
+}
+
+func getSequencerPubKey(ctx context.Context, client *evclient.Client) ([]byte, error) {
+	resp, err := client.GetBlockByHeight(ctx, 1)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Block.Header.Signer.PubKey[4:], nil
 }
 
 func readGroth16Vkey() []byte {

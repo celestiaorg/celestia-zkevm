@@ -17,7 +17,7 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
   hyperlane warp deploy --config ./configs/warp-config.yaml --registry ./registry --yes
 
   echo "Deploying Hyperlane on cosmosnative..."
-  hyp deploy-zkism celestia-validator:9090 reth:8545
+  hyp deploy-zkism celestia-validator:9090 reth:8545 ev-node-evm-single:7331
 
   echo "Configuring remote router for warp route on EVM..."
   cast send 0x345a583028762De4d733852c9D4f419077093A48 \

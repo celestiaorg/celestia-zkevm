@@ -10,6 +10,7 @@ import (
 	"github.com/celestiaorg/celestia-app/v6/app"
 	"github.com/celestiaorg/celestia-app/v6/app/encoding"
 	"github.com/ethereum/go-ethereum/ethclient"
+	evclient "github.com/evstack/ev-node/pkg/rpc/client"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -41,9 +42,9 @@ func NewRootCmd() *cobra.Command {
 
 func getDeployZKIsmStackCmd() *cobra.Command {
 	deployCmd := &cobra.Command{
-		Use:   "deploy-zkism [celestia-grpc] [evm-rpc]",
+		Use:   "deploy-zkism [celestia-grpc] [evm-rpc] [ev-node-rpc]",
 		Short: "Deploy cosmosnative hyperlane components using a ZKExecutionIsm to a remote service via gRPC",
-		Args:  cobra.ExactArgs(2),
+		Args:  cobra.ExactArgs(3),
 		Run: func(cmd *cobra.Command, args []string) {
 			ctx := cmd.Context()
 			enc := encoding.MakeConfig(app.ModuleEncodingRegisters...)
@@ -57,13 +58,16 @@ func getDeployZKIsmStackCmd() *cobra.Command {
 
 			broadcaster := NewBroadcaster(enc, grpcConn)
 
-			rpcAddr := args[1]
-			client, err := ethclient.Dial(fmt.Sprintf("http://%s", rpcAddr))
+			evmRpcAddr := args[1]
+			client, err := ethclient.Dial(fmt.Sprintf("http://%s", evmRpcAddr))
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			ismID := SetupZKIsm(ctx, broadcaster, client)
+			evnodeRpcAddr := args[2]
+			evnode := evclient.NewClient(fmt.Sprintf("http://%s", evnodeRpcAddr))
+
+			ismID := SetupZKIsm(ctx, broadcaster, client, evnode)
 			SetupWithIsm(ctx, broadcaster, ismID)
 		},
 	}
