@@ -106,12 +106,11 @@ pub fn main() {
 
     let mut cursor = 0;
     for (proof, root) in inputs.proofs.iter().zip(roots) {
-        // we also need to verify absence proofs because we get a root for them
         if proof.is_of_absence() {
             proof
                 .verify_complete_namespace(root, EMPTY_LEAVES, inputs.namespace.into())
                 .expect("Failed to verify proof");
-            continue;
+            break;
         }
         let share_count = (proof.end_idx() - proof.start_idx()) as usize;
         let end = cursor + share_count;

@@ -129,11 +129,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .share_get_namespace_data(&extended_header, namespace)
             .await?;
 
-        let mut proofs: Vec<NamespaceProof> = Vec::new();
-        for row in namespace_data.rows {
-            proofs.push(row.proof);
-        }
-
+        let proofs: Vec<NamespaceProof> = namespace_data.rows.into_iter().map(|row| row.proof).collect();
         println!("Got NamespaceProofs, total: {}", proofs.len());
 
         let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
