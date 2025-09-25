@@ -41,7 +41,8 @@ use std::sync::Arc;
 use alloy_consensus::{proofs, BlockHeader};
 use alloy_primitives::B256;
 use alloy_rlp::Decodable;
-use celestia_types::nmt::NamespacedHash;
+use bytes::Bytes;
+use celestia_types::nmt::{NamespacedHash, EMPTY_LEAVES};
 use celestia_types::Blob;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use ev_types::v1::{Data, SignedData};
@@ -105,8 +106,12 @@ pub fn main() {
 
     let mut cursor = 0;
     for (proof, root) in inputs.proofs.iter().zip(roots) {
-        assert!(proof.is_of_presence(), "NamespaceProof must be of presence");
-
+        if proof.is_of_absence() {
+            proof
+                .verify_complete_namespace(root, EMPTY_LEAVES, inputs.namespace.into())
+                .expect("Failed to verify proof");
+            break;
+        }
         let share_count = (proof.end_idx() - proof.start_idx()) as usize;
         let end = cursor + share_count;
 
