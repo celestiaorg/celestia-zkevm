@@ -20,10 +20,8 @@ import (
 
 var (
 	// TODO: Configure these values either by arguments or environment for convenience
-	stateVkeyHash   = "0x00acd6f9c9d0074611353a1e0c94751d3c49beef64ebc3ee82f0ddeadaf242ef"
-	messageVkeyHash = "0x00c88cdad907c05533b8755953d58af6a3b753a4e05acc6617d41ca206c25d2a"
-	namespaceHex    = "00000000000000000000000000000000000000a8045f161bf468bf4d44"
-	publicKeyHex    = "c87f6c4cdd4c8ac26cb6a06909e5e252b73043fdf85232c18ae92b9922b65507"
+	namespaceHex = "00000000000000000000000000000000000000a8045f161bf468bf4d44"
+	publicKeyHex = "c87f6c4cdd4c8ac26cb6a06909e5e252b73043fdf85232c18ae92b9922b65507"
 )
 
 // SetupZkIsm deploys a new zk ism using the provided evm client to fetch the latest block
@@ -36,18 +34,6 @@ func SetupZKIsm(ctx context.Context, broadcaster *Broadcaster, ethClient *ethcli
 
 	fmt.Printf("successfully got block %d from ev-reth\n", block.NumberU64())
 
-	stateVkeyHex := strings.TrimPrefix(stateVkeyHash, "0x")
-	stateVkey, err := hex.DecodeString(stateVkeyHex)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	messageVkeyHex := strings.TrimPrefix(messageVkeyHash, "0x")
-	messageVkey, err := hex.DecodeString(messageVkeyHex)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	namespace, err := hex.DecodeString(namespaceHex)
 	if err != nil {
 		log.Fatal(err)
@@ -59,6 +45,8 @@ func SetupZKIsm(ctx context.Context, broadcaster *Broadcaster, ethClient *ethcli
 	}
 
 	groth16Vkey := readGroth16Vkey()
+	stateTransitionVkey := readStateTransitionVkey()
+	stateMembershipVkey := readStateMembershipVkey()
 
 	msgCreateZkExecutionISM := zkismtypes.MsgCreateZKExecutionISM{
 		Creator:             broadcaster.address.String(),
@@ -67,8 +55,8 @@ func SetupZKIsm(ctx context.Context, broadcaster *Broadcaster, ethClient *ethcli
 		Namespace:           namespace,
 		SequencerPublicKey:  pubKey,
 		Groth16Vkey:         groth16Vkey,
-		StateTransitionVkey: stateVkey,
-		StateMembershipVkey: messageVkey,
+		StateTransitionVkey: stateTransitionVkey,
+		StateMembershipVkey: stateMembershipVkey,
 	}
 
 	res := broadcaster.BroadcastTx(ctx, &msgCreateZkExecutionISM)
@@ -154,6 +142,36 @@ func readGroth16Vkey() []byte {
 	}
 
 	return groth16Vkey
+}
+
+func readStateTransitionVkey() []byte {
+	data, err := os.ReadFile("testdata/vkeys/ev-range-exec-vkey-hash")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	hashStr := strings.TrimSpace(string(data))
+	hashBz, err := hex.DecodeString(strings.TrimPrefix(hashStr, "0x"))
+	if err != nil {
+		log.Fatalf("failed to decode hex: %v", err)
+	}
+
+	return hashBz
+}
+
+func readStateMembershipVkey() []byte {
+	data, err := os.ReadFile("testdata/vkeys/ev-hyperlane-vkey-hash")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	hashStr := strings.TrimSpace(string(data))
+	hashBz, err := hex.DecodeString(strings.TrimPrefix(hashStr, "0x"))
+	if err != nil {
+		log.Fatalf("failed to decode hex: %v", err)
+	}
+
+	return hashBz
 }
 
 func writeConfig(cfg *HyperlaneConfig) {
