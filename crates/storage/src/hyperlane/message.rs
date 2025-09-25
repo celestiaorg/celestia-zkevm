@@ -55,7 +55,7 @@ impl HyperlaneMessageStore {
     /// Insert a serialized hyperlane message into the database
     pub fn insert_message(&self, index: u64, message: StoredHyperlaneMessage) -> Result<()> {
         let serialized = bincode::serialize(&message)?;
-        let write_lock = self.db.write().map_err(|e| anyhow::anyhow!("lock error: {}", e))?;
+        let write_lock = self.db.write().map_err(|e| anyhow::anyhow!("lock error: {e}"))?;
 
         match self.index_mode {
             IndexMode::Block => {
@@ -104,7 +104,7 @@ impl HyperlaneMessageStore {
         let read_lock = self
             .db
             .read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {e}"))?;
         let cf = read_lock.cf_handle("messages").context("Missing CF")?;
         let message = read_lock
             .get_cf(cf, index.to_be_bytes())?
@@ -158,7 +158,7 @@ impl HyperlaneMessageStore {
         let mut write_lock = self
             .db
             .write()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {e}"))?;
         write_lock.drop_cf("messages")?;
         write_lock.drop_cf("messages_by_block")?;
         let opts = Options::default();
