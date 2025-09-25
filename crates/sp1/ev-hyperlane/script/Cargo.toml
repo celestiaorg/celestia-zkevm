@@ -20,7 +20,7 @@ alloy-provider = { workspace = true }
 anyhow = { workspace = true }
 bincode = { workspace = true }
 clap = { version = "4.0", features = ["cargo", "derive", "env"] }
-dirs = "5.0.1"
+dirs = { workspace = true }
 dotenvy = { workspace = true }
 ev-zkevm-types = { workspace = true }
 sp1-sdk = { workspace = true }

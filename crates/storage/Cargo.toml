@@ -10,8 +10,8 @@ test = []
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 bincode = { workspace = true }
-dirs = "5.0.1"
-dotenvy = "0.15.7"
+dirs = { workspace = true }
+dotenvy = { workspace = true }
 ev-zkevm-types = { workspace = true }
 hex = { workspace = true }
 rocksdb = "0.24.0"
@@ -21,4 +21,4 @@ thiserror = "1.0"
 tokio = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.8"
+tempfile = { workspace = true }
