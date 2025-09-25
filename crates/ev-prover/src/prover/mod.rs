@@ -37,7 +37,6 @@ pub trait ProgramProver {
         let stdin = self.build_stdin(input)?;
 
         let (pk, _vk) = self.prover().setup(cfg.elf);
-
         let proof: SP1ProofWithPublicValues = match cfg.proof_mode {
             SP1ProofMode::Core => self.prover().prove(&pk, &stdin).core().run()?,
             SP1ProofMode::Compressed => self.prover().prove(&pk, &stdin).compressed().run()?,
@@ -46,7 +45,6 @@ pub trait ProgramProver {
         };
 
         let output = self.post_process(proof.clone())?;
-
         Ok((proof, output))
     }
 

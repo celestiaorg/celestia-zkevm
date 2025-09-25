@@ -32,7 +32,7 @@ use tokio::{
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
 use crate::prover::{ProgramProver, ProverConfig};
-use crate::storage::{ProofStorage, RocksDbProofStorage};
+use storage::proofs::{ProofStorage, RocksDbProofStorage};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_EXEC_ELF: &[u8] = include_elf!("ev-exec-program");
@@ -420,12 +420,7 @@ impl BlockExecProver {
             .share_get_namespace_data(&extended_header, self.app.namespace)
             .await?;
 
-        let proofs: Vec<NamespaceProof> = namespace_data
-            .rows
-            .iter()
-            .filter(|row| row.proof.is_of_presence())
-            .map(|row| row.proof.clone())
-            .collect();
+        let proofs: Vec<NamespaceProof> = namespace_data.rows.iter().map(|row| row.proof.clone()).collect();
 
         let signed_data: Vec<SignedData> = event
             .blobs

@@ -16,7 +16,8 @@ bytes = { workspace = true }
 celestia-rpc = { workspace = true }
 celestia-types = { workspace = true }
 clap = { version = "4", features = ["derive"] }
-dirs = "5"
+dirs = { workspace = true }
+dotenvy = { workspace = true }
 ev-state-queries = { workspace = true }
 ev-types = { workspace = true, features = ["grpc"] }
 ev-zkevm-types = { workspace = true }
@@ -52,4 +53,4 @@ tonic-build = "0.10"
 walkdir = "2.5.0"
 
 [dev-dependencies]
-tempfile = "3.8"
+tempfile = { workspace = true }

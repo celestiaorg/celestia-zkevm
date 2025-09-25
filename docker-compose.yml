@@ -14,6 +14,7 @@ services:
     ports:
       - "26656:26656"
       - "26657:26657"
+      - "1317:1317"
       - "9090:9090"
     healthcheck:
       test: [
@@ -34,7 +35,7 @@ services:
       - celestia-zkevm-net
 
   celestia-bridge:
-    image: ghcr.io/celestiaorg/celestia-node:v0.27.0-arabica
+    image: ghcr.io/celestiaorg/celestia-node:v0.26.0-arabica
     container_name: celestia-bridge
     volumes:
       - ./testnet/celestia-node/init.sh:/scripts/init.sh:ro

@@ -93,7 +93,7 @@ impl CelestiaProofClient {
     /// Submit a zkISM proof message via Lumina
     async fn submit_zkism_message<M>(&self, message: M, message_type: &str) -> Result<ProofSubmissionResponse>
     where
-        M: celestia_grpc::IntoProtobufAny,
+        M: celestia_grpc::IntoProtobufAny + Send + 'static,
     {
         debug!(
             "Submitting {} message to Celestia via Lumina (endpoint: {}, chain: {})",

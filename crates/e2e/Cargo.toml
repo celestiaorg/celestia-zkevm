@@ -1,0 +1,24 @@
+[package]
+name = "e2e"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "message-prover"
+path = "src/bin/message.rs"
+
+[dependencies]
+alloy-primitives = { workspace = true }
+alloy-provider = { workspace = true }
+alloy-rpc-types = { workspace = true }
+alloy-sol-types = { workspace = true }
+anyhow = { workspace = true }
+dirs = { workspace = true }
+dotenvy = { workspace = true }
+ev-state-queries = { workspace = true }
+ev-zkevm-types = { workspace = true }
+sp1-sdk = { workspace = true }
+storage = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }
