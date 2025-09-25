@@ -110,7 +110,7 @@ pub fn main() {
             proof
                 .verify_complete_namespace(root, EMPTY_LEAVES, inputs.namespace.into())
                 .expect("Failed to verify proof");
-            continue;
+            break;
         }
         let share_count = (proof.end_idx() - proof.start_idx()) as usize;
         let end = cursor + share_count;
