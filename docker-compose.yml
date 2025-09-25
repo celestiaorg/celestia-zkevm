@@ -35,7 +35,7 @@ services:
       - celestia-zkevm-net
 
   celestia-bridge:
-    image: ghcr.io/celestiaorg/celestia-node:v0.25.0-arabica
+    image: ghcr.io/celestiaorg/celestia-node:v0.26.0-arabica
     container_name: celestia-bridge
     volumes:
       - ./testnet/celestia-node/init.sh:/scripts/init.sh:ro
@@ -59,7 +59,7 @@ services:
       - celestia-zkevm-net
 
   ev-node-evm-single:
-    image: ghcr.io/evstack/ev-node-evm-single:main
+    image: ghcr.io/evstack/ev-node-evm-single@sha256:8e19df666dafc072a36924b46511f0016ef189e119f9f0d85c182e5c8dd67559
     container_name: ev-node-evm-single
     entrypoint: /scripts/entrypoint.sh
     ports:
