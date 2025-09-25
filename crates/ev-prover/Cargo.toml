@@ -21,6 +21,7 @@ cosmrs = { version = "0.21", features = ["grpc", "cosmwasm"] }
 md5 = "0.7"
 clap = { version = "4", features = ["derive"] }
 dirs = "5"
+dotenvy = { workspace = true }
 ev-state-queries = { workspace = true }
 ev-types = { workspace = true, features = ["grpc"] }
 ev-zkevm-types = { workspace = true }

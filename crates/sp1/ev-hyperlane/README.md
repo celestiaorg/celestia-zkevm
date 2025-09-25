@@ -47,7 +47,7 @@ The `script` crate contains three binaries and depends on the `testdata` directo
 
 2. The `ev-hyperlane` binary can be run in both `--execute` and `--prove` mode. Execution mode will run the program without generating a proof.
 Proving mode will attempt to generate a proof for the program which can be verified using the programs verification key and public inputs.
-The binary accepts a number of flags, `contract` the contract Address of the MerkleTreeHook contract, `start_idx` the first nonce of messages in our local db for this proof, `end_idx` the last nonce of messages used for this proof, `target_height` the target evm block height that we are trying to generate a proof for, `rpc_url` of the reth/execution client.
+The binary accepts a number of flags, `contract` the contract Address of the MerkleTreeHook contract, `start_height` the height of the block that contains the first message in our local db for this proof, `target_height` the target evm block height containing the last message that we are trying to generate a proof for, `rpc_url` of the reth/execution client.
 
 Running the program in proving mode requires the `SP1_PROVER` and optionally the `NETWORK_PRIVATE_KEY` env variables to be set.
 See `.env.example` at the root of the repository.
@@ -55,7 +55,7 @@ See `.env.example` at the root of the repository.
 Run the `ev-hyperlane` binary in execution mode.
 
 ```shell
-RUST_LOG=info cargo run -p ev-hyperlane-script --release -- --execute --contract 0xFCb1d485ef46344029D9E8A7925925e146B3430E --start-idx 0 --end-idx 23 --target-height 268 --rpc-url http://127.0.0.1:8545
+RUST_LOG=info cargo run -p ev-hyperlane-script --release -- --execute --contract 0xFCb1d485ef46344029D9E8A7925925e146B3430E --start-height 0 --target-height 268 --rpc-url http://127.0.0.1:8545
 ```
 
 Run the `ev-hyperlane` binary in proving mode.

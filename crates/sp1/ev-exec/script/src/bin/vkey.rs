@@ -25,5 +25,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(path, encoded)?;
     println!("successfully wrote vkey to: {path}");
 
+    let path = "elfs/ev-exec-elf";
+    fs::write(path, EV_EXEC_ELF)?;
+    println!("successfully wrote elf to: {path}");
+
     Ok(())
 }

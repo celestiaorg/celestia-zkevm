@@ -41,11 +41,11 @@ pub async fn create_grpc_server(config: Config) -> Result<()> {
     // We have a service implementation for each prover that can run in isolation, but for our ZK ISM
     // we will want to send both proofs together in a single request.
 
-    let prover_serivce = ProverService::new(config)?;
+    let prover_service = ProverService::new(config)?;
 
     Server::builder()
         .add_service(reflection_service)
-        .add_service(ProverServer::new(prover_serivce))
+        .add_service(ProverServer::new(prover_service))
         .serve_with_incoming(TcpListenerStream::new(listener))
         .await?;
 
