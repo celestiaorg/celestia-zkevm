@@ -91,8 +91,7 @@ impl LuminaCompatClient {
                 })
             }
             Err(e) => Err(ProofSubmissionError::SubmissionFailed(format!(
-                "Failed to submit state transition proof: {}",
-                e
+                "Failed to submit state transition proof: {e}"
             ))),
         }
     }
@@ -155,8 +154,7 @@ impl LuminaCompatClient {
                 })
             }
             Err(e) => Err(ProofSubmissionError::SubmissionFailed(format!(
-                "Failed to submit state inclusion proof: {}",
-                e
+                "Failed to submit state inclusion proof: {e}"
             ))),
         }
     }

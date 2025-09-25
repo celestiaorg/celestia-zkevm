@@ -27,8 +27,6 @@ impl CelestiaTxClient {
     }
 
     /// Submit a state transition proof to Celestia
-    ///
-    /// This corresponds to MsgUpdateZKExecutionISM from celestia-app PR #5788
     pub async fn submit_state_transition_proof(
         &self,
         ism_id: String,
