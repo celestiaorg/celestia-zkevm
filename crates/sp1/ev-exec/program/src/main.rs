@@ -41,7 +41,6 @@ use std::sync::Arc;
 use alloy_consensus::{proofs, BlockHeader};
 use alloy_primitives::B256;
 use alloy_rlp::Decodable;
-use bytes::Bytes;
 use celestia_types::nmt::{NamespacedHash, EMPTY_LEAVES};
 use celestia_types::Blob;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
