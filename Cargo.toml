@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "crates/celestia-grpc-client",
     "crates/ev-prover",
     "crates/ev-state-queries",
     "crates/ev-zkevm-types",
