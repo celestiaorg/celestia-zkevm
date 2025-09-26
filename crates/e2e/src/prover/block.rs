@@ -197,8 +197,8 @@ pub async fn parallel_prover(
             namespace,
             proofs,
             executor_inputs: executor_inputs.clone(),
-            trusted_height: *current_trusted_height,
-            trusted_root: *current_trusted_root,
+            trusted_height: current_trusted_height,
+            trusted_root: current_trusted_root,
         };
 
         stdin.write(&input);
