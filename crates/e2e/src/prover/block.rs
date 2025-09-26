@@ -144,6 +144,9 @@ pub async fn parallel_prover(
     trusted_heights.push(*trusted_height);
     trusted_roots.push(*trusted_root);
 
+    let mut current_trusted_height = *trusted_height;
+    let mut current_trusted_root = *trusted_root;
+
     // before we generate proofs in parallel mode, we execute all blocks to
     // collect the trusted height and root to then supply them optimistically to the prover
     for block_number in start_height..(start_height + num_blocks) {
@@ -194,8 +197,8 @@ pub async fn parallel_prover(
             namespace,
             proofs,
             executor_inputs: executor_inputs.clone(),
-            trusted_height: *trusted_height,
-            trusted_root: *trusted_root,
+            trusted_height: *current_trusted_height,
+            trusted_root: *current_trusted_root,
         };
 
         stdin.write(&input);
@@ -209,6 +212,8 @@ pub async fn parallel_prover(
         let public_values: BlockExecOutput =
             bincode::deserialize(outputs.as_slice()).expect("Failed to deserialize public values");
 
+        current_trusted_height = public_values.new_height;
+        current_trusted_root = public_values.new_state_root.into();
         trusted_heights.push(public_values.new_height);
         trusted_roots.push(public_values.new_state_root.into());
     }
