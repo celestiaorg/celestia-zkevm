@@ -1,19 +1,16 @@
 package cmd
 
 import (
-	"encoding/json"
+	"fmt"
 	"log"
-	"os"
 	"strconv"
 
-	"cosmossdk.io/math"
 	"github.com/bcp-innovations/hyperlane-cosmos/util"
 	ismtypes "github.com/bcp-innovations/hyperlane-cosmos/x/core/01_interchain_security/types"
-	hooktypes "github.com/bcp-innovations/hyperlane-cosmos/x/core/02_post_dispatch/types"
-	coretypes "github.com/bcp-innovations/hyperlane-cosmos/x/core/types"
-	warptypes "github.com/bcp-innovations/hyperlane-cosmos/x/warp/types"
 	"github.com/celestiaorg/celestia-app/v6/app"
 	"github.com/celestiaorg/celestia-app/v6/app/encoding"
+	"github.com/ethereum/go-ethereum/ethclient"
+	evclient "github.com/evstack/ev-node/pkg/rpc/client"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -32,20 +29,55 @@ func NewRootCmd() *cobra.Command {
 		Short: "A CLI for deploying hyperlane cosmosnative infrastructure",
 		Long: `This CLI provides deployment functionality for hyperlane comosnative modules. 
 		It deploys basic core components and warp route collateral token for testing purposes.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
 		},
 	}
 
-	rootCmd.AddCommand(getDeployCmd())
+	rootCmd.AddCommand(getDeployNoopIsmStackCmd())
+	rootCmd.AddCommand(getDeployZKIsmStackCmd())
 	rootCmd.AddCommand(getEnrollRouterCmd())
 	return rootCmd
 }
 
-func getDeployCmd() *cobra.Command {
+func getDeployZKIsmStackCmd() *cobra.Command {
 	deployCmd := &cobra.Command{
-		Use:   "deploy [grpc-addr]",
-		Short: "Deploy cosmosnative hyperlane components to a remote service via gRPC",
+		Use:   "deploy-zkism [celestia-grpc] [evm-rpc] [ev-node-rpc]",
+		Short: "Deploy cosmosnative hyperlane components using a ZKExecutionIsm to a remote service via gRPC",
+		Args:  cobra.ExactArgs(3),
+		Run: func(cmd *cobra.Command, args []string) {
+			ctx := cmd.Context()
+			enc := encoding.MakeConfig(app.ModuleEncodingRegisters...)
+
+			grpcAddr := args[0]
+			grpcConn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+			if err != nil {
+				log.Fatalf("failed to connect to gRPC: %v", err)
+			}
+			defer grpcConn.Close()
+
+			broadcaster := NewBroadcaster(enc, grpcConn)
+
+			evmRpcAddr := args[1]
+			client, err := ethclient.Dial(fmt.Sprintf("http://%s", evmRpcAddr))
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			evnodeRpcAddr := args[2]
+			evnode := evclient.NewClient(fmt.Sprintf("http://%s", evnodeRpcAddr))
+
+			ismID := SetupZKIsm(ctx, broadcaster, client, evnode)
+			SetupWithIsm(ctx, broadcaster, ismID)
+		},
+	}
+	return deployCmd
+}
+
+func getDeployNoopIsmStackCmd() *cobra.Command {
+	deployCmd := &cobra.Command{
+		Use:   "deploy-noopism [celestia-grpc]",
+		Short: "Deploy cosmosnative hyperlane components using a NoopIsm to a remote service via gRPC",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			ctx := cmd.Context()
@@ -64,71 +96,16 @@ func getDeployCmd() *cobra.Command {
 			}
 
 			res := broadcaster.BroadcastTx(ctx, &msgCreateNoopISM)
-			ismID := parseISMFromEvents(res.Events)
+			ismID := parseIsmIDFromNoopISMEvents(res.Events)
 
-			msgCreateNoopHooks := hooktypes.MsgCreateNoopHook{
-				Owner: broadcaster.address.String(),
-			}
-
-			res = broadcaster.BroadcastTx(ctx, &msgCreateNoopHooks)
-			hooksID := parseHooksIDFromEvents(res.Events)
-
-			msgCreateMailBox := coretypes.MsgCreateMailbox{
-				Owner:        broadcaster.address.String(),
-				DefaultIsm:   ismID,
-				LocalDomain:  69420,
-				DefaultHook:  &hooksID,
-				RequiredHook: &hooksID,
-			}
-
-			res = broadcaster.BroadcastTx(ctx, &msgCreateMailBox)
-			mailboxID := parseMailboxIDFromEvents(res.Events)
-
-			msgCreateCollateralToken := warptypes.MsgCreateCollateralToken{
-				Owner:         broadcaster.address.String(),
-				OriginMailbox: mailboxID,
-				OriginDenom:   denom,
-			}
-
-			res = broadcaster.BroadcastTx(ctx, &msgCreateCollateralToken)
-			tokenID := parseCollateralTokenIDFromEvents(res.Events)
-
-			// set ism id on new collateral token (for some reason this can't be done on creation)
-			msgSetToken := warptypes.MsgSetToken{
-				Owner:    broadcaster.address.String(),
-				TokenId:  tokenID,
-				IsmId:    &ismID,
-				NewOwner: broadcaster.address.String(),
-			}
-
-			res = broadcaster.BroadcastTx(ctx, &msgSetToken)
-
-			hypConfig := &HyperlaneConfig{
-				IsmID:     ismID,
-				HooksID:   hooksID,
-				MailboxID: mailboxID,
-				TokenID:   tokenID,
-			}
-
-			out, err := json.MarshalIndent(hypConfig, "", "  ")
-			if err != nil {
-				log.Fatalf("failed to marshal config: %v", err)
-			}
-
-			outputPath := "hyperlane-cosmosnative.json"
-			err = os.WriteFile(outputPath, out, 0644)
-			if err != nil {
-				log.Fatalf("failed to write JSON file: %v", err)
-			}
-
-			cmd.Printf("successfully deployed Hyperlane: \n%s", string(out))
+			SetupWithIsm(ctx, broadcaster, ismID)
 		},
 	}
 	return deployCmd
 }
 
 func getEnrollRouterCmd() *cobra.Command {
-	deployCmd := &cobra.Command{
+	enrollRouterCmd := &cobra.Command{
 		Use:   "enroll-remote-router [grpc-addr] [token-id] [remote-domain] [remote-contract]",
 		Short: "Enroll the remote router contract address for a cosmosnative hyperlane warp route",
 		Args:  cobra.ExactArgs(4),
@@ -137,7 +114,6 @@ func getEnrollRouterCmd() *cobra.Command {
 			enc := encoding.MakeConfig(app.ModuleEncodingRegisters...)
 
 			grpcAddr := args[0]
-
 			grpcConn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 			if err != nil {
 				log.Fatalf("failed to connect to gRPC: %v", err)
@@ -156,21 +132,10 @@ func getEnrollRouterCmd() *cobra.Command {
 				log.Fatalf("failed to parse remote domain: %v", err)
 			}
 
-			msgEnrollRemoteRouter := warptypes.MsgEnrollRemoteRouter{
-				Owner:   broadcaster.address.String(),
-				TokenId: tokenID,
-				RemoteRouter: &warptypes.RemoteRouter{
-					ReceiverDomain:   uint32(domain),
-					ReceiverContract: args[3],
-					Gas:              math.ZeroInt(),
-				},
-			}
+			receiverContract := args[3]
 
-			res := broadcaster.BroadcastTx(ctx, &msgEnrollRemoteRouter)
-			recvContract := parseReceiverContractFromEvents(res.Events)
-
-			cmd.Printf("successfully registered remote router on Hyperlane cosmosnative: \n%s", recvContract)
+			SetupRemoteRouter(ctx, broadcaster, tokenID, uint32(domain), receiverContract)
 		},
 	}
-	return deployCmd
+	return enrollRouterCmd
 }

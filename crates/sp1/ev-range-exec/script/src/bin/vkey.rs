@@ -18,6 +18,9 @@ pub const EV_RANGE_EXEC_ELF: &[u8] = include_elf!("ev-range-exec-program");
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let prover = ProverClient::builder().cpu().build();
     let (_, vk) = prover.setup(EV_RANGE_EXEC_ELF);
+
+    let path = "testdata/vkeys/ev-range-exec-vkey-hash";
+    fs::write(path, vk.bytes32())?;
     println!("ev-range-exec-program vkey: {}", vk.bytes32());
 
     let encoded = bincode::serialize(&vk)?;
