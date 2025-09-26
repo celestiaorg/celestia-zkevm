@@ -56,8 +56,8 @@ pub struct AppContext {
 /// This type is wrapped in a RwLock by the AppContext such that it can be updated safely across concurrent tasks.
 /// Updates are made optimisticly using the EthClientExecutorInputs queried from the configured EVM full node.
 pub struct TrustedState {
-    pub height: u64,
-    pub root: FixedBytes<32>,
+    height: u64,
+    root: FixedBytes<32>,
 }
 
 impl TrustedState {

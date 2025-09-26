@@ -39,7 +39,6 @@ pub fn init() -> Result<()> {
 }
 
 pub async fn start() -> Result<()> {
-    dotenvy::dotenv().ok();
     let config_path = dirs::home_dir()
         .expect("cannot find home directory")
         .join(APP_HOME)

@@ -7,6 +7,7 @@ use ev_prover::commands::{
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
+    dotenvy::dotenv().ok();
 
     match cli.command {
         Commands::Init {} => commands::command::init()?,
