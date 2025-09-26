@@ -221,70 +221,24 @@ pub async fn parallel_prover(
             let proof_storage = proof_storage.clone();
             let trusted_heights = trusted_heights.clone();
             let trusted_roots = trusted_roots.clone();
+            let mut stdin = SP1Stdin::new();
 
             async move {
                 println!("\nProcessing block: {block_number}");
-                let blobs: Vec<Blob> = celestia_client
-                    .blob_get_all(block_number, &[namespace])
-                    .await
-                    .expect("Failed to get blobs")
-                    .unwrap_or_default();
-                println!("Got {} blobs for block: {}", blobs.len(), block_number);
-
-                let extended_header = celestia_client
-                    .header_get_by_height(block_number)
-                    .await
-                    .expect("Failed to get extended header");
-                let namespace_data = celestia_client
-                    .share_get_namespace_data(&extended_header, namespace)
-                    .await
-                    .expect("Failed to get namespace data");
-
-                let mut proofs: Vec<NamespaceProof> = Vec::new();
-                for row in namespace_data.rows {
-                    proofs.push(row.proof);
-                }
-                println!("Got NamespaceProofs, total: {}", proofs.len());
-
-                let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
-                for blob in blobs.as_slice() {
-                    let data = match SignedData::decode(blob.data.as_slice()) {
-                        Ok(data) => data.data.unwrap(),
-                        Err(_) => continue,
-                    };
-                    let height = data.metadata.unwrap().height;
-                    println!("Got SignedData for EVM block {height}");
-
-                    let client_executor_input = generate_client_executor_input(
-                        config::EVM_RPC_URL,
-                        height,
-                        chain_spec.clone(),
-                        genesis.clone(),
-                    )
-                    .await
-                    .expect("Failed to generate client executor input");
-                    executor_inputs.push(client_executor_input);
-                }
-
-                let mut stdin = SP1Stdin::new();
-                let trusted_height = *trusted_heights.get((block_number - start_height) as usize).unwrap();
-                let trusted_root = *trusted_roots.get((block_number - start_height) as usize).unwrap();
-
-                let input = BlockExecInput {
-                    header_raw: serde_cbor::to_vec(&extended_header.header).expect("Failed to serialize header"),
-                    dah: extended_header.dah,
-                    blobs_raw: serde_cbor::to_vec(&blobs).expect("Failed to serialize blobs"),
-                    pub_key: pub_key.clone(),
+                write_inputs(
+                    &mut stdin,
+                    &celestia_client,
+                    block_number,
                     namespace,
-                    proofs,
-                    executor_inputs: executor_inputs.clone(),
-                    trusted_height,
-                    trusted_root,
-                };
-
-                stdin.write(&input);
-
-                println!("Generating proof for block: {block_number}, trusted height: {trusted_height}");
+                    trusted_heights[(block_number - start_height) as usize],
+                    trusted_roots[(block_number - start_height) as usize],
+                    chain_spec.clone(),
+                    genesis.clone(),
+                    pub_key.clone(),
+                )
+                .await
+                .expect("Failed to write inputs");
+                println!("Generating proof for block: {block_number}");
                 let proof = client
                     .prove(&pk, &stdin)
                     .compressed()
@@ -382,52 +336,19 @@ pub async fn synchroneous_prover(
     // collect all proofs into a vec and return
     // later wrap them in g16
     for block_number in start_height..(start_height + num_blocks) {
-        println!("\nProcessing block: {block_number}");
-        let blobs: Vec<Blob> = celestia_client
-            .blob_get_all(block_number, &[namespace])
-            .await?
-            .unwrap_or_default();
-        println!("Got {} blobs for block: {}", blobs.len(), block_number);
-
-        let extended_header = celestia_client.header_get_by_height(block_number).await?;
-        let namespace_data = celestia_client
-            .share_get_namespace_data(&extended_header, namespace)
-            .await?;
-        let mut proofs: Vec<NamespaceProof> = Vec::new();
-        for row in namespace_data.rows {
-            proofs.push(row.proof);
-        }
-        println!("Got NamespaceProofs, total: {}", proofs.len());
-
-        let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
-        for blob in blobs.as_slice() {
-            let data = match SignedData::decode(blob.data.as_slice()) {
-                Ok(data) => data.data.unwrap(),
-                Err(_) => continue,
-            };
-            let height = data.metadata.unwrap().height;
-            println!("Got SignedData for EVM block {height}");
-
-            let client_executor_input =
-                generate_client_executor_input(config::EVM_RPC_URL, height, chain_spec.clone(), genesis.clone())
-                    .await?;
-            executor_inputs.push(client_executor_input);
-        }
-
         let mut stdin = SP1Stdin::new();
-        let input = BlockExecInput {
-            header_raw: serde_cbor::to_vec(&extended_header.header)?,
-            dah: extended_header.dah,
-            blobs_raw: serde_cbor::to_vec(&blobs)?,
-            pub_key: pub_key.clone(),
+        write_inputs(
+            &mut stdin,
+            &celestia_client,
+            block_number,
             namespace,
-            proofs,
-            executor_inputs: executor_inputs.clone(),
-            trusted_height: *trusted_height,
-            trusted_root: *trusted_root,
-        };
-
-        stdin.write(&input);
+            *trusted_height,
+            *trusted_root,
+            chain_spec.clone(),
+            genesis.clone(),
+            pub_key.clone(),
+        )
+        .await?;
         println!("Generating proof for block: {block_number}, trusted height: {trusted_height}");
         let proof = client
             .prove(&pk, &stdin)
@@ -480,4 +401,60 @@ pub async fn synchroneous_prover(
     println!("Target state root: {:?}", public_values.new_state_root);
 
     Ok(proof)
+}
+
+async fn write_inputs(
+    stdin: &mut SP1Stdin,
+    celestia_client: &Client,
+    block_number: u64,
+    namespace: Namespace,
+    trusted_height: u64,
+    trusted_root: FixedBytes<32>,
+    chain_spec: Arc<ChainSpec>,
+    genesis: Genesis,
+    pub_key: Vec<u8>,
+) -> Result<(), Box<dyn Error>> {
+    let blobs: Vec<Blob> = celestia_client
+        .blob_get_all(block_number, &[namespace])
+        .await?
+        .unwrap_or_default();
+    println!("Got {} blobs for block: {}", blobs.len(), block_number);
+
+    let extended_header = celestia_client.header_get_by_height(block_number).await?;
+    let namespace_data = celestia_client
+        .share_get_namespace_data(&extended_header, namespace)
+        .await?;
+    let mut proofs: Vec<NamespaceProof> = Vec::new();
+    for row in namespace_data.rows {
+        proofs.push(row.proof);
+    }
+    println!("Got NamespaceProofs, total: {}", proofs.len());
+
+    let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
+    for blob in blobs.as_slice() {
+        let data = match SignedData::decode(blob.data.as_slice()) {
+            Ok(data) => data.data.unwrap(),
+            Err(_) => continue,
+        };
+        let height = data.metadata.unwrap().height;
+        println!("Got SignedData for EVM block {height}");
+
+        let client_executor_input =
+            generate_client_executor_input(config::EVM_RPC_URL, height, chain_spec.clone(), genesis.clone()).await?;
+        executor_inputs.push(client_executor_input);
+    }
+
+    let input = BlockExecInput {
+        header_raw: serde_cbor::to_vec(&extended_header.header)?,
+        dah: extended_header.dah,
+        blobs_raw: serde_cbor::to_vec(&blobs)?,
+        pub_key: pub_key.clone(),
+        namespace,
+        proofs,
+        executor_inputs: executor_inputs.clone(),
+        trusted_height: trusted_height,
+        trusted_root: trusted_root,
+    };
+    stdin.write(&input);
+    Ok(())
 }
