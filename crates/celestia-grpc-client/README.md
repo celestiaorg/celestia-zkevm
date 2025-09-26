@@ -1,141 +1,245 @@
 # Celestia gRPC Client
 
-A Rust gRPC client for submitting state transition and state inclusion proofs to the Celestia consensus network. This crate reuses the [Lumina gRPC library](https://github.com/eigerco/lumina/tree/main/grpc) for underlying communication with Celestia validator nodes.
+A command-line tool for submitting zero-knowledge proofs to Celestia via gRPC. This tool enables the submission of state transition proofs and state inclusion proofs for the ZK Interchain Security Module (ISM).
 
-## Features
+## Overview
 
-- Submit state transition proofs for ZK execution ISM
-- Submit state inclusion proofs for message submission
-- Built on top of the Lumina gRPC library
-- Support for both direct Lumina integration and CosmRS transaction building
-- CLI tool for proof submission
-- Environment-based configuration
+The `proof_submitter` binary provides a CLI interface for:
+
+- **State Transition Proofs**: Submit proofs that verify EVM state transitions (MsgUpdateZKExecutionISM)
+- **State Inclusion Proofs**: Submit proofs that verify message inclusion in state (MsgSubmitMessages)
+
+## Installation
+
+### Build from Source
+
+```bash
+cargo build --release --bin proof_submitter
+```
+
+The binary will be available at `target/release/proof_submitter`.
+
+## Configuration
+
+The tool uses environment variables for configuration. Set the following variables:
+
+### Required Environment Variables
+
+```bash
+# Celestia private key (hex encoded, 64 characters)
+export CELESTIA_PRIVATE_KEY="your_private_key_here"
+
+# Celestia gRPC endpoint
+export CELESTIA_GRPC_ENDPOINT="http://localhost:9090"
+```
+
+### Optional Environment Variables
+
+```bash
+# Chain ID (default: celestia-zkevm-testnet)
+export CELESTIA_CHAIN_ID="celestia-zkevm-testnet"
+
+# Gas price (default: 1000)
+export CELESTIA_GAS_PRICE="1000"
+
+# Maximum gas limit (default: 200000)
+export CELESTIA_MAX_GAS="200000"
+
+# Confirmation timeout in seconds (default: 60)
+export CELESTIA_CONFIRMATION_TIMEOUT="60"
+```
 
 ## Usage
 
-### Library Usage
+### State Transition Proof Submission
 
-```rust
-use celestia_grpc_client::{
-    CelestiaProofClient, ProofSubmitter, StateTransitionProofMsg, StateInclusionProofMsg,
-    ClientConfig,
-};
+Submit a proof that verifies an EVM state transition:
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create client from environment variables
-    let client = CelestiaProofClient::from_env().await?;
+```bash
+proof_submitter state-transition \
+  --id "ism-001" \
+  --proof-file "proof.hex" \
+  --public-values-file "public_values.hex" \
+  --height 12345
+```
 
-    // Or create with custom config
-    let config = ClientConfig {
-        grpc_endpoint: "http://localhost:9090".to_string(),
-        private_key_hex: "your_private_key_hex".to_string(),
-        chain_id: "celestia-zkevm-testnet".to_string(),
-        gas_price: 1000,
-        max_gas: 200_000,
-        confirmation_timeout: 60,
-    };
-    let client = CelestiaProofClient::new(config).await?;
+**Parameters:**
+- `--id`: ISM identifier (string)
+- `--proof-file`: Path to hex-encoded proof file
+- `--public-values-file`: Path to hex-encoded public values file
+- `--height`: Block height for the state transition (u64)
 
-    // Submit state transition proof
-    let state_transition_proof = StateTransitionProofMsg::new(
-        "ism_id_123".to_string(),
-        1000, // height
-        proof_bytes,
-        public_values,
-    );
+### State Inclusion Proof Submission
 
-    let response = client.submit_state_transition_proof(state_transition_proof).await?;
-    println!("TX Hash: {}", response.tx_hash);
+Submit a proof that verifies message inclusion in state:
 
-    // Submit state inclusion proof
-    let state_inclusion_proof = StateInclusionProofMsg::new(
-        "ism_id_123".to_string(),
-        1000, // height
-        proof_bytes,
-        public_values,
-    );
+```bash
+proof_submitter state-inclusion \
+  --id "ism-001" \
+  --proof-file "inclusion_proof.hex" \
+  --public-values-file "inclusion_public_values.hex" \
+  --height 12345
+```
 
-    let response = client.submit_state_inclusion_proof(state_inclusion_proof).await?;
-    println!("TX Hash: {}", response.tx_hash);
+**Parameters:**
+- `--id`: ISM identifier (string)
+- `--proof-file`: Path to hex-encoded proof file
+- `--public-values-file`: Path to hex-encoded public values file
+- `--height`: Block height for the inclusion proof (u64)
 
-    Ok(())
+## File Format
+
+### Proof Files
+
+Proof files must contain hex-encoded binary data:
+
+```
+# Example proof.hex
+0x1234567890abcdef...
+```
+
+### Public Values Files
+
+Public values files must contain hex-encoded binary data:
+
+```
+# Example public_values.hex
+0xabcdef1234567890...
+```
+
+## Output
+
+On successful submission, the tool displays:
+
+```
+State transition proof submitted successfully!
+Transaction hash: ABC123...
+Block height: 12345
+Gas used: 150000
+```
+
+## Error Handling
+
+The tool provides detailed error messages for common issues:
+
+- **Missing environment variables**: Clear indication of which variables are required
+- **Invalid file paths**: File not found or unreadable
+- **Invalid hex encoding**: Malformed hex data in proof files
+- **gRPC connection errors**: Network connectivity issues
+- **Transaction failures**: Celestia-specific error messages
+
+## Examples
+
+### Complete Workflow
+
+1. **Set environment variables:**
+```bash
+export CELESTIA_PRIVATE_KEY="0123456789abcdef..."
+export CELESTIA_GRPC_ENDPOINT="http://localhost:9090"
+```
+
+2. **Prepare proof files:**
+```bash
+# Generate your proof and public values
+# Save as hex-encoded files
+echo "0x1234..." > proof.hex
+echo "0xabcd..." > public_values.hex
+```
+
+3. **Submit state transition proof:**
+```bash
+proof_submitter state-transition \
+  --id "evm-ism-001" \
+  --proof-file "proof.hex" \
+  --public-values-file "public_values.hex" \
+  --height 1000
+```
+
+4. **Submit state inclusion proof:**
+```bash
+proof_submitter state-inclusion \
+  --id "evm-ism-001" \
+  --proof-file "inclusion_proof.hex" \
+  --public-values-file "inclusion_public_values.hex" \
+  --height 1000
+```
+
+## Integration with EV Prover
+
+This tool is designed to work with the EV Prover service:
+
+1. **Generate proofs** using the EV Prover service
+2. **Extract proof data** from the prover's output
+3. **Submit proofs** using this CLI tool
+4. **Verify submission** through the transaction hash
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"CELESTIA_PRIVATE_KEY environment variable not set"**
+   - Ensure the private key is set and properly formatted (64 hex characters)
+
+2. **"Invalid hex encoding"**
+   - Verify proof files contain valid hex data
+   - Remove any whitespace or newlines from hex files
+
+3. **"Failed to connect to gRPC endpoint"**
+   - Check that Celestia node is running and accessible
+   - Verify the gRPC endpoint URL is correct
+
+4. **"Transaction failed"**
+   - Check account balance for gas fees
+   - Verify the proof data is valid
+   - Check Celestia node logs for detailed error information
+
+### Debug Mode
+
+Enable debug logging:
+
+```bash
+RUST_LOG=debug proof_submitter state-transition --id "test" --proof-file "proof.hex" --public-values-file "values.hex" --height 100
+```
+
+## Security Considerations
+
+- **Private Key Security**: Never commit private keys to version control
+- **Network Security**: Use secure connections (HTTPS/TLS) in production
+- **Proof Validation**: Always verify proofs before submission
+- **Gas Limits**: Set appropriate gas limits to prevent failed transactions
+
+## API Reference
+
+### Message Types
+
+#### StateTransitionProofMsg
+- `id`: ISM identifier
+- `height`: Block height
+- `proof`: ZK proof bytes
+- `public_values`: Public inputs/outputs
+
+#### StateInclusionProofMsg
+- `id`: ISM identifier  
+- `height`: Block height
+- `proof`: ZK proof bytes
+- `public_values`: Public inputs/outputs
+
+### Response Format
+
+```json
+{
+  "tx_hash": "string",
+  "height": 12345,
+  "gas_used": 150000,
+  "success": true,
+  "error_message": null
 }
 ```
 
-### CLI Usage
+## Contributing
 
-The crate includes a CLI tool for submitting proofs:
+See the main repository [CONTRIBUTING.md](../../docs/CONTRIBUTING.md) for guidelines.
 
-```bash
-# Set environment variables
-export CELESTIA_GRPC_ENDPOINT="http://localhost:9090"
-export CELESTIA_PRIVATE_KEY="your_private_key_hex"
-export CELESTIA_CHAIN_ID="celestia-zkevm-testnet"
+## License
 
-# Submit state transition proof
-cargo run --bin proof_submitter -- state-transition \
-    --id "ism_id_123" \
-    --proof-file "./proof.hex" \
-    --public-values-file "./public_values.hex" \
-    --height 1000
-
-# Submit state inclusion proof
-cargo run --bin proof_submitter -- state-inclusion \
-    --id "ism_id_123" \
-    --proof-file "./proof.hex" \
-    --public-values-file "./public_values.hex" \
-    --height 1000
-```
-
-## Environment Variables
-
-- `CELESTIA_GRPC_ENDPOINT`: Celestia validator gRPC endpoint (default: `http://localhost:9090`)
-- `CELESTIA_PRIVATE_KEY`: Private key for signing transactions (hex encoded, required)
-- `CELESTIA_CHAIN_ID`: Chain ID for the Celestia network (default: `celestia-zkevm-testnet`)
-- `CELESTIA_GAS_PRICE`: Gas price for transactions (default: `1000`)
-- `CELESTIA_MAX_GAS`: Maximum gas limit per transaction (default: `200000`)
-- `CELESTIA_CONFIRMATION_TIMEOUT`: Timeout for transaction confirmation in seconds (default: `60`)
-
-## Features
-
-- `cosmrs-support` (default): Enable CosmRS transaction building support
-- Without this feature, the client uses direct Lumina message submission
-
-## Dependencies
-
-This crate integrates with:
-- [Lumina gRPC](https://github.com/eigerco/lumina/tree/main/grpc) - For Celestia validator communication
-- [CosmRS](https://github.com/cosmos/cosmos-rust) - For Cosmos SDK transaction building (optional)
-- Celestia types from the workspace
-
-## Implementation Status
-
-**✅ Currently Working:**
-- Message structure validation based on actual Celestia PR definitions
-- Full Lumina gRPC client integration with real transaction submission
-- CLI interface with correct message fields
-- Type-safe proof message handling with protobuf encoding
-- Comprehensive error handling and validation
-- Real transaction hash and height extraction from Celestia responses
-
-**🚧 Ready for Production:**
-- Transactions submit successfully to Celestia via Lumina gRPC
-- Will succeed once Celestia's zkISM module handlers are deployed
-- Proper protobuf message encoding with `prost::Name` trait implementation
-
-**🔮 Future Enhancements:**
-- Gas usage reporting (currently returns 0 as TxInfo doesn't provide gas_used)
-- Integration with Celestia fee markets for dynamic gas estimation
-
-## Transaction Types
-
-The client supports the exact message types from Celestia PRs:
-
-1. **`MsgUpdateZKExecutionISM`** - State transition proof updates
-   - From [celestia-app#5788](https://github.com/celestiaorg/celestia-app/pull/5788)
-   - Fields: `id`, `height`, `proof`, `public_values`
-
-2. **`MsgSubmitMessages`** - State membership proof submission
-   - From [celestia-app#5790](https://github.com/celestiaorg/celestia-app/pull/5790)
-   - Fields: `id`, `height`, `proof`, `public_values`
+This project is part of the Celestia ecosystem. See the main repository for license information.
