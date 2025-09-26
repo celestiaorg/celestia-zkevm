@@ -202,7 +202,7 @@ pub async fn parallel_prover(
         };
 
         stdin.write(&input);
-        println!("Generating proof for block: {block_number}, trusted height: {trusted_height}");
+        println!("Generating proof for block: {block_number}, trusted height: {current_trusted_height}");
         let outputs = client
             .execute(&block_prover_elf, &stdin)
             .run()
@@ -290,9 +290,14 @@ pub async fn parallel_prover(
     let (pk, _) = client.setup(&range_prover_elf);
 
     // load all proofs from storage for range proof
+    println!("Loading block proofs from storage for range proof");
     let block_proofs = proof_storage
         .get_block_proofs_in_range(start_height, start_height + num_blocks - 1)
         .await?;
+    println!(
+        "Loaded {} block proofs from storage for range proof",
+        block_proofs.len()
+    );
 
     let vkeys = vec![vk.hash_u32(); block_proofs.len()];
 
@@ -307,13 +312,15 @@ pub async fn parallel_prover(
     };
     stdin.write(&input);
 
+    println!("Writing block proofs to stdin for range proof");
     for block_proof in &block_proofs {
-        let proof_deserialized: SP1ProofWithPublicValues = bincode::deserialize(block_proof.proof_data.as_slice())?;
-        let SP1Proof::Compressed(ref proof) = proof_deserialized.proof else {
+        let proof_deserialized: SP1Proof = bincode::deserialize(block_proof.proof_data.as_slice())?;
+        let SP1Proof::Compressed(ref proof) = proof_deserialized else {
             panic!()
         };
         stdin.write_proof(*proof.clone(), vk.vk.clone());
     }
+    println!("Wrote block proofs to stdin for range proof");
 
     // finally generate the range proof and return it
     let proof = client

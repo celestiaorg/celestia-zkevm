@@ -7,7 +7,7 @@ pub const TRUSTED_HEIGHT: u64 = 0;
 // height at wich to start proving blocks
 pub const START_HEIGHT: u64 = 2;
 // number of blocks to prove for block prover (from TRUSTED_HEIGHT onwards)
-pub const NUM_BLOCKS: u64 = 2;
+pub const NUM_BLOCKS: u64 = 1;
 // target height for message prover
 pub const TARGET_HEIGHT: u64 = 100;
 pub const TRUSTED_ROOT: &str = "0x2892acb3938e55f74887eb9624668f2c5f0d97fae9151d83dea3b70d5ea850b5";
