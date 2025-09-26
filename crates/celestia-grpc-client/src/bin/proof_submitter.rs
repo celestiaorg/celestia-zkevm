@@ -4,7 +4,6 @@ use anyhow::Result;
 use celestia_grpc_client::{CelestiaProofClient, ProofSubmitter, StateInclusionProofMsg, StateTransitionProofMsg};
 use clap::{Parser, Subcommand};
 use tracing::{info, Level};
-use tracing_subscriber;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

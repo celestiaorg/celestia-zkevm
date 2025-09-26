@@ -104,7 +104,7 @@ impl CelestiaProofClient {
         let tx_config = celestia_grpc::TxConfig {
             gas_limit: Some(self.config.max_gas),
             gas_price: Some(self.config.gas_price as f64),
-            memo: Some(format!("zkISM {} submission", message_type)),
+            memo: Some(format!("zkISM {message_type} submission")),
             ..Default::default()
         };
 
@@ -129,8 +129,7 @@ impl CelestiaProofClient {
             Err(e) => {
                 warn!("Failed to submit {} message: {}", message_type, e);
                 Err(ProofSubmissionError::SubmissionFailed(format!(
-                    "Failed to submit {}: {}",
-                    message_type, e
+                    "Failed to submit {message_type}: {e}"
                 )))
             }
         }
