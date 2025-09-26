@@ -98,9 +98,9 @@ pub async fn prove_blocks(
         else if prover_mode == "mock" {
             panic!("Recursive groth16 proofs are not supported in mock mode");
         }
-        // synchroneous mode (cuda, cpu)
+        // synchronous mode (cuda, cpu)
         else {
-            synchroneous_prover(start_height, &mut trusted_height, num_blocks, trusted_root).await?
+            synchronous_prover(start_height, &mut trusted_height, num_blocks, trusted_root).await?
         }
     };
     Ok(proof)
@@ -337,7 +337,7 @@ pub async fn parallel_prover(
     Ok(proof)
 }
 
-pub async fn synchroneous_prover(
+pub async fn synchronous_prover(
     start_height: u64,
     trusted_height: &mut u64,
     num_blocks: u64,
