@@ -89,11 +89,13 @@ pub async fn prove_blocks(
 ) -> Result<SP1ProofWithPublicValues, Box<dyn Error>> {
     dotenvy::dotenv().ok();
     let mut trusted_height = trusted_height;
-    let prover_mode = env::var("SP1_PROVER").unwrap_or("mock".to_string());
+    let prover_mode = env::var("SP1_PROVER").unwrap_or("cpu".to_string());
     let proof = {
         // parallel mode (network)
         if prover_mode == "network" {
             parallel_prover(start_height, &mut trusted_height, num_blocks, trusted_root).await?
+        } else if prover_mode == "mock" {
+            panic!("Recursive groth16 proofs are not supported in mock mode");
         }
         // synchroneous mode (cuda, cpu, mock)
         else {
