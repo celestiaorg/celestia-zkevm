@@ -16,7 +16,7 @@ use celestia_types::nmt::{Namespace, NamespaceProof};
 use ev_types::v1::get_block_request::Identifier;
 use ev_types::v1::store_service_client::StoreServiceClient;
 use ev_types::v1::{GetBlockRequest, SignedData};
-use ev_zkevm_types::programs::block::{BlockExecInput, BlockExecOutput};
+use ev_zkevm_types::programs::block::{BlockExecInput, BlockExecOutput, BlockRangeExecInput, BlockRangeExecOutput};
 use eyre::Context;
 use prost::Message;
 use reth_chainspec::ChainSpec;
@@ -24,7 +24,7 @@ use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
-use sp1_sdk::SP1Stdin;
+use sp1_sdk::{HashableKey, SP1Proof, SP1Stdin};
 use sp1_sdk::{ProverClient, SP1ProofWithPublicValues};
 
 mod config {
@@ -84,19 +84,21 @@ pub async fn prove_blocks(
     trusted_height: u64,
     num_blocks: u64,
     trusted_root: &mut FixedBytes<32>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<SP1ProofWithPublicValues, Box<dyn Error>> {
     dotenvy::dotenv().ok();
     let mut trusted_height = trusted_height;
     let prover_mode = env::var("SP1_PROVER").unwrap_or("mock".to_string());
     // parallel mode (network)
-    if prover_mode == "network" {
-        parallel_prover().await?;
-    }
-    // synchroneous mode (cuda, cpu, mock)
-    else {
-        synchroneous_prover(start_height, &mut trusted_height, num_blocks, trusted_root).await?;
-    }
-    Ok(())
+    let proof = {
+        if prover_mode == "network" {
+            panic!("Parallel prover is not implemented");
+        }
+        // synchroneous mode (cuda, cpu, mock)
+        else {
+            synchroneous_prover(start_height, &mut trusted_height, num_blocks, trusted_root).await?
+        }
+    };
+    Ok(proof)
 }
 
 pub async fn parallel_prover() -> Result<(), Box<dyn Error>> {
@@ -108,7 +110,7 @@ pub async fn synchroneous_prover(
     trusted_height: &mut u64,
     num_blocks: u64,
     trusted_root: &mut FixedBytes<32>,
-) -> Result<Vec<SP1ProofWithPublicValues>, Box<dyn Error>> {
+) -> Result<SP1ProofWithPublicValues, Box<dyn Error>> {
     let genesis_path = dirs::home_dir()
         .expect("cannot find home directory")
         .join(".ev-prover")
@@ -123,7 +125,7 @@ pub async fn synchroneous_prover(
     let pub_key = get_sequencer_pubkey().await?;
     let client = ProverClient::from_env();
     let block_prover_elf = fs::read("elfs/ev-exec-elf").expect("Failed to read ELF");
-    let (pk, _) = client.setup(&block_prover_elf);
+    let (pk, vk) = client.setup(&block_prover_elf);
 
     let mut block_proofs: Vec<SP1ProofWithPublicValues> = Vec::new();
     // loop and adjust inputs for each iteration,
@@ -179,7 +181,7 @@ pub async fn synchroneous_prover(
         println!("Generating proof for block: {block_number}, trusted height: {trusted_height}");
         let proof = client
             .prove(&pk, &stdin)
-            .groth16()
+            .compressed()
             .run()
             .expect("failed to generate proof");
         block_proofs.push(proof.clone());
@@ -192,8 +194,40 @@ pub async fn synchroneous_prover(
         println!("New state root: {:?}", *trusted_root);
     }
 
-    let last_proof = block_proofs.last().unwrap();
-    let public_values: BlockExecOutput = bincode::deserialize(last_proof.public_values.as_slice())?;
+    // reinitialize the prover client
+    let client = ProverClient::from_env();
+    let mut stdin = SP1Stdin::new();
+    let range_prover_elf = fs::read("elfs/ev-range-exec-elf").expect("Failed to read ELF");
+    let (pk, _) = client.setup(&range_prover_elf);
+
+    let vkeys = vec![vk.hash_u32(); block_proofs.len()];
+
+    let public_inputs = block_proofs
+        .iter()
+        .map(|proof| proof.public_values.to_vec())
+        .collect::<Vec<_>>();
+
+    let input = BlockRangeExecInput {
+        vkeys,
+        public_values: public_inputs,
+    };
+    stdin.write(&input);
+
+    for block_proof in &block_proofs {
+        let SP1Proof::Compressed(ref proof) = block_proof.proof else {
+            panic!()
+        };
+        stdin.write_proof(*proof.clone(), vk.vk.clone());
+    }
+
+    let proof = client
+        .prove(&pk, &stdin)
+        .groth16()
+        .run()
+        .expect("failed to generate proof");
+
+    let public_values: BlockRangeExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
     println!("Target state root: {:?}", public_values.new_state_root);
-    Ok(block_proofs)
+
+    Ok(proof)
 }
