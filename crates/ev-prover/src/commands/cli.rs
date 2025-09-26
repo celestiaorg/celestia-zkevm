@@ -15,7 +15,11 @@ pub enum Commands {
     Init {},
 
     /// Start the gRPC server
-    Start {},
+    Start {
+        /// Optionally backfill blocks starting from this Celestia height before subscribing to live events
+        #[arg(long = "from-height")]
+        from_height: Option<u64>,
+    },
 
     /// Show the service version
     Version {},

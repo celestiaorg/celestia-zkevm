@@ -10,7 +10,7 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Init {} => commands::command::init()?,
-        Commands::Start {} => commands::command::start().await?,
+        Commands::Start { from_height } => commands::command::start(from_height).await?,
         Commands::Version {} => commands::command::version(),
     }
 

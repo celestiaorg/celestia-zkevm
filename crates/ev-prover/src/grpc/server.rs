@@ -12,7 +12,7 @@ use crate::proto::celestia::prover::v1::prover_server::ProverServer;
 use crate::prover::programs::block::{AppContext, BlockExecProver};
 use crate::prover::service::ProverService;
 
-pub async fn create_grpc_server(config: Config) -> Result<()> {
+pub async fn create_grpc_server(config: Config, from_height: Option<u64>) -> Result<()> {
     let listener = TcpListener::bind(config.grpc_address.clone()).await?;
 
     let descriptor_bytes = include_bytes!("../../src/proto/descriptor.bin");
@@ -30,7 +30,7 @@ pub async fn create_grpc_server(config: Config) -> Result<()> {
     tokio::spawn({
         let block_prover = BlockExecProver::new(AppContext::from_config(config_clone)?)?;
         async move {
-            if let Err(e) = block_prover.run().await {
+            if let Err(e) = block_prover.run(from_height).await {
                 eprintln!("Block prover task failed: {e:?}");
             }
         }

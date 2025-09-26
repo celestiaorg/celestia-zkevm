@@ -28,6 +28,7 @@ use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPu
 use tokio::{
     sync::{mpsc, RwLock, Semaphore},
     task::JoinSet,
+    time::{sleep, Duration},
 };
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
@@ -241,6 +242,55 @@ impl BlockExecProver {
         Ok((client, subscription))
     }
 
+    async fn catch_up_from_height(
+        self: Arc<Self>,
+        client: Arc<Client>,
+        start_height: u64,
+        event_tx: mpsc::Sender<BlockEvent>,
+    ) -> Result<Option<u64>> {
+        let start_height = start_height.max(1);
+        let network_head = client
+            .header_network_head()
+            .await
+            .context("fetch network head for backfill")?;
+        let head_height = u64::from(network_head.height());
+
+        if start_height > head_height {
+            println!(
+                "Backfill start height {start_height} is above current network head {head_height}; waiting for live events",
+            );
+            return Ok(None);
+        }
+
+        println!("Starting historical backfill from height {start_height} to {head_height}",);
+
+        let namespaces = [self.app.namespace];
+        let mut last_processed = None;
+
+        for height in start_height..=head_height {
+            let blobs = loop {
+                match client.blob_get_all(height, &namespaces).await {
+                    Ok(result) => break result.unwrap_or_default(),
+                    Err(err) => {
+                        eprintln!("Failed to fetch blobs at height {height}: {err:#}; retrying in 1 second",);
+                        sleep(Duration::from_secs(1)).await;
+                    }
+                }
+            };
+
+            event_tx
+                .send(BlockEvent::new(height, blobs))
+                .await
+                .map_err(|_| anyhow::anyhow!("worker queue closed"))?;
+
+            last_processed = Some(height);
+        }
+
+        println!("Completed historical backfill up to height {head_height}",);
+
+        Ok(last_processed)
+    }
+
     /// Generates the state transition function (STF) input for a given EVM block number.
     async fn eth_client_executor_input(&self, block_number: u64) -> Result<EthClientExecutorInput> {
         let host_executor = EthHostExecutor::eth(self.app.chain_spec.clone(), None);
@@ -268,7 +318,7 @@ impl BlockExecProver {
     /// height. Events are fed into the pipeline via the WebSocket subscription, and
     /// proofs are generated concurrently while ensuring the trusted state is updated
     /// monotonically in block-height order.
-    pub async fn run(self: Arc<Self>) -> Result<()> {
+    pub async fn run(self: Arc<Self>, from_height: Option<u64>) -> Result<()> {
         let (client, mut subscription) = self.connect_and_subscribe().await?;
 
         // Queues for the 3-stage pipeline
@@ -394,14 +444,33 @@ impl BlockExecProver {
             }
         });
 
+        let mut next_live_height = from_height.unwrap_or(0).max(1);
+
+        if let Some(start_height) = from_height {
+            let event_tx_clone = event_tx.clone();
+            if let Some(last_height) = self
+                .clone()
+                .catch_up_from_height(client.clone(), start_height, event_tx_clone)
+                .await?
+            {
+                next_live_height = last_height.saturating_add(1);
+            }
+        }
+
         while let Some(result) = subscription.next().await {
             match result {
                 Ok(event) => {
+                    if event.height < next_live_height {
+                        continue;
+                    }
+
                     let blobs = event.blobs.unwrap_or_default();
                     event_tx
                         .send(BlockEvent::new(event.height, blobs))
                         .await
                         .map_err(|_| anyhow::anyhow!("worker queue closed"))?;
+
+                    next_live_height = event.height.saturating_add(1);
                 }
                 Err(e) => {
                     println!("Subscription error: {e}");

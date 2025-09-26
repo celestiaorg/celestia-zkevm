@@ -38,7 +38,7 @@ pub fn init() -> Result<()> {
     Ok(())
 }
 
-pub async fn start() -> Result<()> {
+pub async fn start(from_height: Option<u64>) -> Result<()> {
     let config_path = dirs::home_dir()
         .expect("cannot find home directory")
         .join(APP_HOME)
@@ -54,7 +54,7 @@ pub async fn start() -> Result<()> {
     let config: Config = serde_yaml::from_str(&config_yaml)?;
 
     println!("starting gRPC server at {}", config.grpc_address);
-    create_grpc_server(config).await?;
+    create_grpc_server(config, from_height).await?;
 
     Ok(())
 }
