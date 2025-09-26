@@ -87,7 +87,6 @@ pub async fn prove_blocks(
     num_blocks: u64,
     trusted_root: &mut FixedBytes<32>,
 ) -> Result<SP1ProofWithPublicValues, Box<dyn Error>> {
-    dotenvy::dotenv().ok();
     let mut trusted_height = trusted_height;
     let prover_mode = env::var("SP1_PROVER").unwrap_or("cpu".to_string());
     let proof = {
