@@ -115,20 +115,23 @@ pub async fn parallel_prover(
         .join("data")
         .join("proofs.db");
     let proof_storage = Arc::new(RocksDbProofStorage::new(storage_path)?);
+
     let genesis_path = dirs::home_dir()
         .expect("cannot find home directory")
         .join(".ev-prover")
         .join("config")
         .join("genesis.json");
     let (genesis, chain_spec) = load_chain_spec_from_genesis(genesis_path.to_str().unwrap())?;
+
     let namespace_hex = env::var("CELESTIA_NAMESPACE").expect("CELESTIA_NAMESPACE must be set");
     let namespace = Namespace::new_v0(&hex::decode(namespace_hex)?)?;
+
     let celestia_client = Client::new(config::CELESTIA_RPC_URL, None)
         .await
         .context("Failed creating Celestia RPC client")?;
     let pub_key = get_sequencer_pubkey().await?;
-    let block_prover_elf = fs::read("elfs/ev-exec-elf").expect("Failed to read ELF");
 
+    let block_prover_elf = fs::read("elfs/ev-exec-elf").expect("Failed to read ELF");
     let client = ProverClient::from_env();
     let (pk, vk) = client.setup(&block_prover_elf);
 
@@ -136,10 +139,9 @@ pub async fn parallel_prover(
     let mut trusted_roots = Vec::new();
     trusted_heights.push(*trusted_height);
     trusted_roots.push(*trusted_root);
-    // loop and adjust inputs for each iteration,
-    // collect all proofs into a vec and return
-    // later wrap them in g16
 
+    // before we generate proofs in parallel mode, we execute all blocks to
+    // collect the trusted height and root to then supply them optimistically to the prover
     for block_number in start_height..(start_height + num_blocks) {
         println!("\nProcessing block: {block_number}");
         let blobs: Vec<Blob> = celestia_client
@@ -207,6 +209,7 @@ pub async fn parallel_prover(
         trusted_roots.push(public_values.new_state_root.into());
     }
 
+    // now we can generate proofs in parallel
     let mut handles: Vec<JoinHandle<()>> = Vec::new();
     for block_number in start_height..(start_height + num_blocks) {
         let handle = tokio::spawn({
@@ -223,6 +226,8 @@ pub async fn parallel_prover(
             let trusted_roots = trusted_roots.clone();
             let mut stdin = SP1Stdin::new();
 
+            // spawn a tokio task for each block proof and join them to await all proofs before
+            // wrapping them in groth16
             async move {
                 println!("\nProcessing block: {block_number}");
                 write_inputs(
@@ -245,6 +250,8 @@ pub async fn parallel_prover(
                     .run()
                     .expect("failed to generate proof");
 
+                // store proof in proof storage
+                // later retrieved to generate range proof
                 proof_storage
                     .store_block_proof(
                         block_number,
@@ -261,17 +268,19 @@ pub async fn parallel_prover(
         handles.push(handle);
     }
 
-    // wait for all tasks to finish
+    // wait for all block proofs to be generated before
+    // continuing with the range proof
     for handle in handles {
         handle.await.expect("Task panicked");
     }
+
     // reinitialize the prover client
     let client = ProverClient::from_env();
     let mut stdin = SP1Stdin::new();
     let range_prover_elf = fs::read("elfs/ev-range-exec-elf").expect("Failed to read ELF");
     let (pk, _) = client.setup(&range_prover_elf);
 
-    // load all proofs from storage for range start_height to start_height + num_blocks - 1
+    // load all proofs from storage for range proof
     let block_proofs = proof_storage
         .get_block_proofs_in_range(start_height, start_height + num_blocks - 1)
         .await?;
@@ -297,6 +306,7 @@ pub async fn parallel_prover(
         stdin.write_proof(*proof.clone(), vk.vk.clone());
     }
 
+    // finally generate the range proof and return it
     let proof = client
         .prove(&pk, &stdin)
         .groth16()
@@ -304,7 +314,10 @@ pub async fn parallel_prover(
         .expect("failed to generate proof");
 
     let public_values: BlockRangeExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
-    println!("Target state root: {:?}", public_values.new_state_root);
+    println!(
+        "Final EVM state height: {:?} and root: {:?}, which should be used for proving messages using ./message.rs",
+        public_values.new_height, public_values.new_state_root
+    );
 
     Ok(proof)
 }
@@ -332,9 +345,9 @@ pub async fn synchroneous_prover(
     let (pk, vk) = client.setup(&block_prover_elf);
 
     let mut block_proofs: Vec<SP1ProofWithPublicValues> = Vec::new();
-    // loop and adjust inputs for each iteration,
+    // loop and adjust trusted state for each iteration,
     // collect all proofs into a vec and return
-    // later wrap them in g16
+    // later wrap them in groth16
     for block_number in start_height..(start_height + num_blocks) {
         let mut stdin = SP1Stdin::new();
         write_inputs(
@@ -403,6 +416,7 @@ pub async fn synchroneous_prover(
     Ok(proof)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn write_inputs(
     stdin: &mut SP1Stdin,
     celestia_client: &Client,
@@ -452,8 +466,8 @@ async fn write_inputs(
         namespace,
         proofs,
         executor_inputs: executor_inputs.clone(),
-        trusted_height: trusted_height,
-        trusted_root: trusted_root,
+        trusted_height,
+        trusted_root,
     };
     stdin.write(&input);
     Ok(())
