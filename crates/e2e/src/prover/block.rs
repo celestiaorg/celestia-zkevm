@@ -90,10 +90,10 @@ pub async fn prove_blocks(
     dotenvy::dotenv().ok();
     let mut trusted_height = trusted_height;
     let prover_mode = env::var("SP1_PROVER").unwrap_or("mock".to_string());
-    // parallel mode (network)
     let proof = {
+        // parallel mode (network)
         if prover_mode == "network" {
-            panic!("Parallel prover is not implemented");
+            parallel_prover(start_height, &mut trusted_height, num_blocks, trusted_root).await?
         }
         // synchroneous mode (cuda, cpu, mock)
         else {
