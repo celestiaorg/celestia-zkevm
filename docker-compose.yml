@@ -134,6 +134,7 @@ services:
     container_name: hyperlane-init
     volumes:
       - hyperlane:/home/hyperlane/
+      - ./testdata/vkeys:/home/hyperlane/testdata/vkeys:ro
     entrypoint: "scripts/docker-entrypoint.sh"
     depends_on:
       celestia-validator:

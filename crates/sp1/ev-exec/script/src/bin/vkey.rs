@@ -18,6 +18,9 @@ pub const EV_EXEC_ELF: &[u8] = include_elf!("ev-exec-program");
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let prover = ProverClient::builder().cpu().build();
     let (_, vk) = prover.setup(EV_EXEC_ELF);
+
+    let path = "testdata/vkeys/ev-exec-vkey-hash";
+    fs::write(path, vk.bytes32())?;
     println!("ev-exec-program vkey: {}", vk.bytes32());
 
     let encoded = bincode::serialize(&vk)?;
