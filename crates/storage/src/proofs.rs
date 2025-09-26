@@ -132,7 +132,7 @@ impl RocksDbProofStorage {
     fn get_cf(&self, name: &str) -> Result<&ColumnFamily, ProofStorageError> {
         self.db
             .cf_handle(name)
-            .ok_or_else(|| anyhow!("Column family {} not found", name).into())
+            .ok_or_else(|| anyhow!("Column family {name} not found").into())
     }
 
     fn serialize<T: Serialize>(&self, data: &T) -> Result<Vec<u8>, ProofStorageError> {
