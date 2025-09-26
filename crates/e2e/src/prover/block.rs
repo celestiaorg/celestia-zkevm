@@ -94,10 +94,12 @@ pub async fn prove_blocks(
         // parallel mode (network)
         if prover_mode == "network" {
             parallel_prover(start_height, &mut trusted_height, num_blocks, trusted_root).await?
-        } else if prover_mode == "mock" {
+        }
+        // mock mode is not possible for recursive groth16 proofs
+        else if prover_mode == "mock" {
             panic!("Recursive groth16 proofs are not supported in mock mode");
         }
-        // synchroneous mode (cuda, cpu, mock)
+        // synchroneous mode (cuda, cpu)
         else {
             synchroneous_prover(start_height, &mut trusted_height, num_blocks, trusted_root).await?
         }
