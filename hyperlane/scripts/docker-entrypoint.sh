@@ -16,8 +16,8 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
   echo "Deploying Hyperlane warp synthetic token EVM contracts..."
   hyperlane warp deploy --config ./configs/warp-config.yaml --registry ./registry --yes
 
-  echo "Deploying Hyperlane on cosmosnative..."
-  hyp deploy-zkism celestia-validator:9090 reth:8545 ev-node-evm-single:7331
+  echo "Deploying Hyperlane NoopISM stack on cosmosnative..."
+  hyp deploy-noopism celestia-validator:9090
 
   echo "Configuring remote router for warp route on EVM..."
   cast send 0x345a583028762De4d733852c9D4f419077093A48 \
@@ -34,6 +34,8 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 
   echo "Configuring remote router for warp route on cosmosnative..."
   hyp enroll-remote-router celestia-validator:9090 0x726f757465725f61707000000000000000000000000000010000000000000000 1234 0x000000000000000000000000345a583028762De4d733852c9D4f419077093A48
+
+  hyp setup-zkism celestia-validator:9090 reth:8545 ev-node-evm-single:7331
 else
   echo "Skipping deployment: $CONFIG_FILE already exists."
 fi

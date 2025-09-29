@@ -130,7 +130,7 @@ services:
       - celestia-zkevm-net
 
   hyperlane-init:
-    image: ghcr.io/celestiaorg/hyperlane-init:latest
+    image: ghcr.io/celestiaorg/hyperlane-init:test-zk-ism
     container_name: hyperlane-init
     volumes:
       - hyperlane:/home/hyperlane/
