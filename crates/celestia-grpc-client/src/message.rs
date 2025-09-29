@@ -83,7 +83,7 @@ impl MsgSubmitMessages {
 }
 
 impl Name for MsgUpdateZkExecutionIsm {
-    const NAME: &'static str = "MsgUpdateZkExecutionIsm";
+    const NAME: &'static str = "MsgUpdateZKExecutionISM";
     const PACKAGE: &'static str = "celestia.zkism.v1";
 }
 

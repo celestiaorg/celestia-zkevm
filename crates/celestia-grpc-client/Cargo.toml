@@ -35,6 +35,9 @@ tonic = "0.13"
 prost = "0.13"
 prost-types = "0.13"
 
+# TLS dependencies for rustls crypto provider
+rustls = { version = "0.23", features = ["aws_lc_rs"] }
+
 # CLI dependencies
 clap = { version = "4", features = ["derive"] }
 hex = { workspace = true }
