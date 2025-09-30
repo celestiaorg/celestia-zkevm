@@ -7,7 +7,6 @@
 pub mod client;
 pub mod error;
 pub mod message;
-// pub mod proto; // Commented out due to prost version conflicts
 pub mod types;
 
 pub use client::{CelestiaProofClient, ProofSubmitter};

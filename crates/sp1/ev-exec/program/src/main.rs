@@ -41,6 +41,7 @@ use std::sync::Arc;
 use alloy_consensus::{proofs, BlockHeader};
 use alloy_primitives::B256;
 use alloy_rlp::Decodable;
+use bytes::Bytes;
 use celestia_types::nmt::{NamespacedHash, EMPTY_LEAVES};
 use celestia_types::Blob;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
@@ -165,7 +166,7 @@ pub fn main() {
 
     let signed_data: Vec<SignedData> = blobs
         .into_iter()
-        .filter_map(|blob| SignedData::decode(blob.data.as_slice()).ok())
+        .filter_map(|blob| SignedData::decode(Bytes::from(blob.data)).ok())
         .collect();
 
     let mut tx_data: Vec<Data> = Vec::new();
@@ -177,9 +178,7 @@ pub fn main() {
             continue;
         }
 
-        let mut data_bytes = Vec::new();
-        prost::Message::encode(sd.data.as_ref().expect("SignedData must contain data"), &mut data_bytes)
-            .expect("Failed to encode data");
+        let data_bytes = sd.data.as_ref().expect("SignedData must contain data").encode_to_vec();
 
         verify_signature(&inputs.pub_key, &data_bytes, &sd.signature).expect("Sequencer signature verification failed");
 

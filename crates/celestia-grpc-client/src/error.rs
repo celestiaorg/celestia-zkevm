@@ -35,8 +35,4 @@ pub enum ProofSubmissionError {
 
     #[error("Tendermint error: {0}")]
     Tendermint(String),
-
-    #[cfg(feature = "cosmrs-support")]
-    #[error("CosmRS error: {0}")]
-    CosmRs(#[from] cosmrs::Error),
 }

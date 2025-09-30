@@ -28,9 +28,6 @@ celestia-types = { git = "https://github.com/eigerco/lumina", branch = "main" }
 tendermint = { workspace = true }
 tendermint-proto = { workspace = true }
 
-# Optional cosmrs for transaction building
-cosmrs = { version = "0.21", optional = true, features = ["grpc", "cosmwasm"] }
-
 # gRPC and protobuf dependencies
 tonic = "0.13"
 prost = "0.13"
@@ -48,8 +45,6 @@ tracing-subscriber = "0.3"
 md5 = "0.7"
 
 [features]
-default = ["cosmrs-support"]
-cosmrs-support = ["cosmrs"]
 
 [dev-dependencies]
 tempfile = "3.8"

@@ -2,7 +2,6 @@ use prost::Name;
 use serde::{Deserialize, Serialize};
 
 /// Message for updating ZK Execution ISM (corresponds to MsgUpdateZKExecutionISM)
-/// From celestia-app PR #5788: proto/celestia/zkism/v1/tx.proto
 #[derive(Clone, Serialize, Deserialize, prost::Message)]
 pub struct MsgUpdateZkExecutionIsm {
     /// ISM identifier
@@ -34,7 +33,6 @@ pub struct MsgUpdateZkExecutionIsmResponse {
 }
 
 /// Message for submitting messages with state membership proof (corresponds to MsgSubmitMessages)
-/// From celestia-app PR #5790: proto/celestia/zkism/v1/tx.proto
 #[derive(Clone, Serialize, Deserialize, prost::Message)]
 pub struct MsgSubmitMessages {
     /// ISM identifier
