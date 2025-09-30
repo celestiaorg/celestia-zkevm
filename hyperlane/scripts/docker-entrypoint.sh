@@ -1,7 +1,15 @@
 #!/bin/bash
 
+# The following docker-entrypoint script performs deployment of Hyperlane infrastructure 
+# on both ev-reth and celestia.
+# To minimise proving time in the docker env in this repository we first deploy
+# a noop ism stack on celestia and finally overwrite this with a new zk ism deployment.
+# This ensures that the initial trusted root used in the zk ism is the same as the 
+# latest block's state root in ev-reth.
+
 set -euo pipefail
 
+# HYP_KEY is the priv key of the EVM account used for Hyperlane contract deployment
 export HYP_KEY=0x82bfcfadbf1712f6550d8d2c00a39f05b33ec78939d0167be2a737d691f33a6a
 
 CONFIG_FILE="hyperlane-cosmosnative.json"
