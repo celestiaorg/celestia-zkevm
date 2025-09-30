@@ -204,10 +204,11 @@ mod tests {
     fn test_state_transition_proof_message_structure() {
         // Test the new message structure based on actual Celestia PR #5788
         let proof_msg = StateTransitionProofMsg::new(
-            "".to_string(), // Empty ISM ID should be validated
-            100,            // height
-            vec![1, 2, 3],  // proof
-            vec![4, 5, 6],  // public_values
+            "".to_string(),            // Empty ISM ID should be validated
+            100,                       // height
+            vec![1, 2, 3],             // proof
+            vec![4, 5, 6],             // public_values
+            "test_signer".to_string(), // signer
         );
 
         // Test the new field structure
@@ -215,16 +216,18 @@ mod tests {
         assert_eq!(proof_msg.height, 100);
         assert_eq!(proof_msg.proof, vec![1, 2, 3]);
         assert_eq!(proof_msg.public_values, vec![4, 5, 6]);
+        assert_eq!(proof_msg.signer, "test_signer");
     }
 
     #[test]
     fn test_state_inclusion_proof_message_structure() {
         // Test the new message structure based on actual Celestia PR #5790
         let proof_msg = StateInclusionProofMsg::new(
-            "test-ism".to_string(), // ISM ID
-            200,                    // height
-            vec![7, 8, 9],          // proof
-            vec![10, 11, 12],       // public_values
+            "test-ism".to_string(),    // ISM ID
+            200,                       // height
+            vec![7, 8, 9],             // proof
+            vec![10, 11, 12],          // public_values
+            "test_signer".to_string(), // signer
         );
 
         // Test the new field structure
@@ -241,6 +244,7 @@ mod tests {
             1000,
             vec![0xff, 0xee, 0xdd],
             vec![0x01, 0x02, 0x03],
+            "test_signer".to_string(),
         );
 
         // Test that the message can be serialized (this validates the structure)

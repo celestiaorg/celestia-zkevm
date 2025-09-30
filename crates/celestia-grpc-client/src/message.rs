@@ -17,6 +17,9 @@ pub struct MsgUpdateZkExecutionIsm {
     /// Public values/inputs for proof verification
     #[prost(bytes = "vec", tag = "4")]
     pub public_values: Vec<u8>,
+    /// The tx signer
+    #[prost(string, tag = "5")]
+    pub signer: String,
 }
 
 /// Response for MsgUpdateZKExecutionISM
@@ -46,6 +49,9 @@ pub struct MsgSubmitMessages {
     /// Public values/inputs for proof verification
     #[prost(bytes = "vec", tag = "4")]
     pub public_values: Vec<u8>,
+    /// The tx signer
+    #[prost(string, tag = "5")]
+    pub signer: String,
 }
 
 /// Response for MsgSubmitMessages
@@ -60,24 +66,26 @@ pub type StateInclusionProofMsg = MsgSubmitMessages;
 
 impl MsgUpdateZkExecutionIsm {
     /// Create a new ZK execution ISM update message
-    pub fn new(id: String, height: u64, proof: Vec<u8>, public_values: Vec<u8>) -> Self {
+    pub fn new(id: String, height: u64, proof: Vec<u8>, public_values: Vec<u8>, signer: String) -> Self {
         Self {
             id,
             height,
             proof,
             public_values,
+            signer,
         }
     }
 }
 
 impl MsgSubmitMessages {
     /// Create a new message submission with state membership proof
-    pub fn new(id: String, height: u64, proof: Vec<u8>, public_values: Vec<u8>) -> Self {
+    pub fn new(id: String, height: u64, proof: Vec<u8>, public_values: Vec<u8>, signer: String) -> Self {
         Self {
             id,
             height,
             proof,
             public_values,
+            signer,
         }
     }
 }
