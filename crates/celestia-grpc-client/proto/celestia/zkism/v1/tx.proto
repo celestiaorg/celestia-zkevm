@@ -21,6 +21,8 @@ message MsgUpdateZKExecutionISM {
   bytes proof = 3;
   // Public values/inputs for proof verification
   bytes public_values = 4;
+  // The tx signer
+  string signer = 5;
 }
 
 // MsgUpdateZKExecutionISMResponse is the response for UpdateZKExecutionISM.
@@ -41,6 +43,8 @@ message MsgSubmitMessages {
   bytes proof = 3;
   // Public values/inputs for proof verification
   bytes public_values = 4;
+  // The tx signer
+  string signer = 5;
 }
 
 // MsgSubmitMessagesResponse is the response for SubmitMessages.
