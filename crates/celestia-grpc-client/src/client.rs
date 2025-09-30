@@ -235,6 +235,7 @@ mod tests {
         assert_eq!(proof_msg.height, 200);
         assert_eq!(proof_msg.proof, vec![7, 8, 9]);
         assert_eq!(proof_msg.public_values, vec![10, 11, 12]);
+        assert_eq!(proof_msg.signer, "test_signer");
     }
 
     #[test]
@@ -257,6 +258,7 @@ mod tests {
         assert_eq!(deserialized.height, proof_msg.height);
         assert_eq!(deserialized.proof, proof_msg.proof);
         assert_eq!(deserialized.public_values, proof_msg.public_values);
+        assert_eq!(deserialized.signer, proof_msg.signer);
     }
 
     #[test]
