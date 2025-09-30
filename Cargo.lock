@@ -2203,6 +2203,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bech32",
  "bytes",
  "celestia-grpc",
  "celestia-types 0.15.0",

@@ -28,8 +28,14 @@ pub struct CelestiaProofClient {
 
 impl CelestiaProofClient {
     /// Create a new Celestia proof client
-    pub async fn new(config: ClientConfig) -> Result<Self> {
+    pub async fn new(mut config: ClientConfig) -> Result<Self> {
         debug!("Creating Celestia proof client with endpoint: {}", config.grpc_endpoint);
+
+        // Derive and cache the signer address if not already set
+        if config.signer_address.is_empty() {
+            config.signer_address = ClientConfig::derive_signer_address(&config.private_key_hex)?;
+            debug!("Derived signer address: {}", config.signer_address);
+        }
 
         let grpc_client = GrpcClient::builder()
             .url(&config.grpc_endpoint)
@@ -50,6 +56,7 @@ impl CelestiaProofClient {
             private_key_hex: std::env::var("CELESTIA_PRIVATE_KEY").map_err(|_| {
                 ProofSubmissionError::Configuration("CELESTIA_PRIVATE_KEY environment variable not set".to_string())
             })?,
+            signer_address: String::new(), // Will be derived in new()
             chain_id: std::env::var("CELESTIA_CHAIN_ID").unwrap_or_else(|_| "celestia-zkevm-testnet".to_string()),
             gas_price: std::env::var("CELESTIA_GAS_PRICE")
                 .unwrap_or_else(|_| "1000".to_string())
@@ -90,36 +97,9 @@ impl CelestiaProofClient {
         &self.config.grpc_endpoint
     }
 
-    /// Get the signer address from the private key
-    pub fn signer_address(&self) -> Result<String> {
-        // Derive the address from the private key
-        let private_key_bytes =
-            hex::decode(&self.config.private_key_hex).context("Failed to decode private key hex")?;
-
-        // Use secp256k1 to derive the public key and address
-        use k256::elliptic_curve::sec1::ToEncodedPoint;
-        use k256::SecretKey;
-
-        use k256::elliptic_curve::consts::U32;
-        use k256::elliptic_curve::generic_array::GenericArray;
-
-        let private_key_array: GenericArray<u8, U32> = GenericArray::clone_from_slice(&private_key_bytes);
-        let secret_key = SecretKey::from_bytes(&private_key_array).context("Failed to create secret key from bytes")?;
-
-        let public_key = secret_key.public_key();
-        let public_key_bytes = public_key.to_encoded_point(false);
-
-        // For Cosmos SDK, we need to hash the public key and take the first 20 bytes
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(&public_key_bytes.as_bytes()[1..]); // Skip the 0x04 prefix
-        let hash = hasher.finalize();
-
-        // Take first 20 bytes for the address
-        let address_bytes = &hash[..20];
-        let address = hex::encode(address_bytes);
-
-        Ok(address)
+    /// Get the cached bech32-encoded signer address
+    pub fn signer_address(&self) -> &str {
+        &self.config.signer_address
     }
 
     /// Submit a zkISM proof message via Lumina
@@ -132,7 +112,6 @@ impl CelestiaProofClient {
             message_type, self.config.grpc_endpoint, self.config.chain_id
         );
 
-        // Create transaction config
         let tx_config = celestia_grpc::TxConfig {
             gas_limit: Some(self.config.max_gas),
             gas_price: Some(self.config.gas_price as f64),
@@ -140,7 +119,6 @@ impl CelestiaProofClient {
             ..Default::default()
         };
 
-        // Submit via Lumina
         match self.grpc_client.submit_message(message, tx_config).await {
             Ok(tx_info) => {
                 info!(
@@ -225,6 +203,7 @@ mod tests {
         ClientConfig {
             grpc_endpoint: "http://localhost:9090".to_string(),
             private_key_hex: "0123456789abcdef".repeat(8), // 64 hex chars
+            signer_address: String::new(),                 // Will be derived
             chain_id: "test-chain".to_string(),
             gas_price: 1000,
             max_gas: 200_000,

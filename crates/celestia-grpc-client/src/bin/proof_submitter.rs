@@ -72,7 +72,7 @@ async fn main() -> Result<()> {
 
             let proof = read_hex_file(proof_file)?;
             let public_values = read_hex_file(public_values_file)?;
-            let signer_address = client.signer_address()?;
+            let signer_address = client.signer_address().to_string();
 
             let proof_msg = StateTransitionProofMsg::new(id.clone(), *height, proof, public_values, signer_address);
 
@@ -92,7 +92,7 @@ async fn main() -> Result<()> {
 
             let proof = read_hex_file(proof_file)?;
             let public_values = read_hex_file(public_values_file)?;
-            let signer_address = client.signer_address()?;
+            let signer_address = client.signer_address().to_string();
 
             let proof_msg = StateInclusionProofMsg::new(id.clone(), *height, proof, public_values, signer_address);
 
