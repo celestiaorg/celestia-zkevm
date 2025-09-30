@@ -117,6 +117,39 @@ func SetupWithIsm(ctx context.Context, broadcaster *Broadcaster, ismID util.HexA
 	writeConfig(cfg)
 }
 
+func OverwriteIsm(ctx context.Context, broadcaster *Broadcaster, ismID util.HexAddress, mailbox coretypes.Mailbox, token warptypes.WrappedHypToken) {
+	msgSetMailbox := coretypes.MsgSetMailbox{
+		Owner:             broadcaster.address.String(),
+		MailboxId:         mailbox.Id,
+		DefaultIsm:        &ismID,
+		RenounceOwnership: false,
+	}
+
+	tokenID, err := util.DecodeHexAddress(token.Id)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// set ism id on new collateral token (for some reason this can't be done on creation)
+	msgSetToken := warptypes.MsgSetToken{
+		Owner:    broadcaster.address.String(),
+		TokenId:  tokenID,
+		IsmId:    &ismID,
+		NewOwner: broadcaster.address.String(),
+	}
+
+	broadcaster.BroadcastTx(ctx, &msgSetMailbox, &msgSetToken)
+
+	cfg := &HyperlaneConfig{
+		IsmID:     ismID,
+		HooksID:   *mailbox.RequiredHook,
+		MailboxID: mailbox.Id,
+		TokenID:   tokenID,
+	}
+
+	writeConfig(cfg)
+}
+
 // SetupRemoteRouter links the provided token identifier on the cosmosnative deployment with the receiver contract on the counterparty.
 // For example: if the provided token identifier is a collateral token (e.g. utia), the receiverContract is expected to be the
 // contract address for the corresponding synthetic token on the counterparty.
