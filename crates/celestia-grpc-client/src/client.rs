@@ -90,6 +90,38 @@ impl CelestiaProofClient {
         &self.config.grpc_endpoint
     }
 
+    /// Get the signer address from the private key
+    pub fn signer_address(&self) -> Result<String> {
+        // Derive the address from the private key
+        let private_key_bytes =
+            hex::decode(&self.config.private_key_hex).context("Failed to decode private key hex")?;
+
+        // Use secp256k1 to derive the public key and address
+        use k256::elliptic_curve::sec1::ToEncodedPoint;
+        use k256::SecretKey;
+
+        use k256::elliptic_curve::consts::U32;
+        use k256::elliptic_curve::generic_array::GenericArray;
+
+        let private_key_array: GenericArray<u8, U32> = GenericArray::clone_from_slice(&private_key_bytes);
+        let secret_key = SecretKey::from_bytes(&private_key_array).context("Failed to create secret key from bytes")?;
+
+        let public_key = secret_key.public_key();
+        let public_key_bytes = public_key.to_encoded_point(false);
+
+        // For Cosmos SDK, we need to hash the public key and take the first 20 bytes
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(&public_key_bytes.as_bytes()[1..]); // Skip the 0x04 prefix
+        let hash = hasher.finalize();
+
+        // Take first 20 bytes for the address
+        let address_bytes = &hash[..20];
+        let address = hex::encode(address_bytes);
+
+        Ok(address)
+    }
+
     /// Submit a zkISM proof message via Lumina
     async fn submit_zkism_message<M>(&self, message: M, message_type: &str) -> Result<ProofSubmissionResponse>
     where

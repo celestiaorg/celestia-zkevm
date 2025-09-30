@@ -21,6 +21,7 @@ tracing = { workspace = true }
 # Crypto dependencies
 k256 = "0.13"
 ed25519-dalek = { workspace = true }
+sha2 = "0.10"
 
 # Celestia dependencies - use same version as lumina-grpc to avoid conflicts
 celestia-types = { git = "https://github.com/eigerco/lumina", branch = "main" }
