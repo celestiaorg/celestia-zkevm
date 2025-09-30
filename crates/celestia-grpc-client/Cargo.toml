@@ -6,7 +6,7 @@ description = "gRPC client for submitting proofs to Celestia consensus network"
 
 [dependencies]
 # Lumina gRPC library for Celestia interaction
-celestia-grpc = { git = "https://github.com/eigerco/lumina", branch = "main" }
+celestia-grpc = { workspace = true }
 
 # Core dependencies
 anyhow = {workspace = true}
@@ -24,7 +24,7 @@ ed25519-dalek = { workspace = true }
 sha2 = "0.10"
 
 # Celestia dependencies - use same version as lumina-grpc to avoid conflicts
-celestia-types = { git = "https://github.com/eigerco/lumina", branch = "main" }
+celestia-types = { workspace = true }
 tendermint = { workspace = true }
 tendermint-proto = { workspace = true }
 

@@ -2165,7 +2165,8 @@ dependencies = [
 [[package]]
 name = "celestia-grpc"
 version = "0.8.0"
-source = "git+https://github.com/eigerco/lumina?branch=main#f113605a054e1f57dce9ab4d6a9ab85d80425a91"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7809cf69c02b02a910bfc21a0e4b501db0d4a39d15925d1929bd7a7a88cd1ee"
 dependencies = [
  "bytes",
  "celestia-grpc-macros",
@@ -2204,7 +2205,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "celestia-grpc",
- "celestia-types 0.16.0",
+ "celestia-types 0.15.0",
  "clap",
  "ed25519-dalek",
  "hex",
@@ -2232,7 +2233,8 @@ dependencies = [
 [[package]]
 name = "celestia-grpc-macros"
 version = "0.4.0"
-source = "git+https://github.com/eigerco/lumina?branch=main#f113605a054e1f57dce9ab4d6a9ab85d80425a91"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ef7fd561015d53344524bf35c15aee37cd12a77b4ed30fcb9d44b527a54040b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2258,7 +2260,8 @@ dependencies = [
 [[package]]
 name = "celestia-proto"
 version = "0.10.0"
-source = "git+https://github.com/eigerco/lumina?branch=main#f113605a054e1f57dce9ab4d6a9ab85d80425a91"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1a6bc833fe0048c158f4740cb4b08cbfb6f407f2bf8ff369d3f6ade932d628f"
 dependencies = [
  "bytes",
  "prost 0.13.5",
@@ -2326,7 +2329,8 @@ dependencies = [
 [[package]]
 name = "celestia-types"
 version = "0.16.0"
-source = "git+https://github.com/eigerco/lumina?branch=main#f113605a054e1f57dce9ab4d6a9ab85d80425a91"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68d248009d2b38857ad5d0b6d6c754754132b19e836ba205bdda14631065fa98"
 dependencies = [
  "base64 0.22.1",
  "bech32",
@@ -2340,9 +2344,7 @@ dependencies = [
  "getrandom 0.2.16",
  "k256",
  "leopard-codec 0.2.0",
- "libp2p-identity",
  "lumina-utils 0.4.0",
- "multiaddr",
  "multihash",
  "nmt-rs",
  "prost 0.13.5",
@@ -5033,7 +5035,8 @@ dependencies = [
 [[package]]
 name = "lumina-utils"
 version = "0.4.0"
-source = "git+https://github.com/eigerco/lumina?branch=main#f113605a054e1f57dce9ab4d6a9ab85d80425a91"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6be0fedf4b4ddbdd34a2541f36b63daa004064b5465b7b9f52ebdc5fe1c64187"
 dependencies = [
  "futures",
  "gloo-timers",
