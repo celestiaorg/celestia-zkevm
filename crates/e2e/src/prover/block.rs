@@ -182,6 +182,7 @@ pub async fn parallel_prover(
                 Ok(data) => data.data.unwrap(),
                 Err(_) => continue,
             };
+            
             let height = data.metadata.unwrap().height;
             println!("Got SignedData for EVM block {height}");
 
@@ -189,6 +190,7 @@ pub async fn parallel_prover(
                 generate_client_executor_input(config::EVM_RPC_URL, height, chain_spec.clone(), genesis.clone())
                     .await
                     .expect("Failed to generate client executor input");
+                    
             executor_inputs.push(client_executor_input);
         }
 
