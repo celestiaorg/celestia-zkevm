@@ -12,7 +12,6 @@ use e2e::{
     prover::block::prove_blocks,
 };
 use ev_state_queries::MockStateQueryProvider;
-use ev_zkevm_types::programs::block::BlockRangeExecOutput;
 use sp1_sdk::{EnvProver, ProverClient};
 use std::{
     str::FromStr,
