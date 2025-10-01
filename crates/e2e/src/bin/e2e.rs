@@ -53,8 +53,7 @@ async fn main() {
     .await
     .expect("Failed to prove blocks");
 
-    let block_proof_outputs: BlockRangeExecOutput = bincode::deserialize(block_proof.public_values.as_slice()).unwrap();
-    let celestia_target_height = block_proof_outputs.new_height;
+    let celestia_target_height = START_HEIGHT + NUM_BLOCKS - 1;
 
     let block_proof_msg = MsgUpdateZkExecutionIsm::new(
         "0x726f757465725f69736d000000000000000000000000002a0000000000000000".to_string(),
