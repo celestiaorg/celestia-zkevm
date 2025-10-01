@@ -90,7 +90,7 @@ services:
   
   reth:
     container_name: reth
-    image: ghcr.io/evstack/ev-reth:latest
+    image: ghcr.io/evstack/ev-reth:latest@sha256:3f06830fbc218ffad1bcbd620536242e722cda563c0a39d62ee52fc36f7a7a49
     ports:
       - "9001:9001" # metrics
       - "30303:30303" # eth/66 peering
