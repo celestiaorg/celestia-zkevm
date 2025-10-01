@@ -150,25 +150,30 @@ pub async fn parallel_prover(
     // collect the trusted height and root to then supply them optimistically to the prover
     for block_number in start_height..(start_height + num_blocks) {
         println!("\nProcessing block: {block_number}");
+        
         let blobs: Vec<Blob> = celestia_client
             .blob_get_all(block_number, &[namespace])
             .await
             .expect("Failed to get blobs")
             .unwrap_or_default();
+        
         println!("Got {} blobs for block: {}", blobs.len(), block_number);
 
         let extended_header = celestia_client
             .header_get_by_height(block_number)
             .await
             .expect("Failed to get extended header");
+        
         let namespace_data = celestia_client
             .share_get_namespace_data(&extended_header, namespace)
             .await
             .expect("Failed to get namespace data");
+        
         let mut proofs: Vec<NamespaceProof> = Vec::new();
         for row in namespace_data.rows {
             proofs.push(row.proof);
         }
+        
         println!("Got NamespaceProofs, total: {}", proofs.len());
 
         let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
