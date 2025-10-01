@@ -6,6 +6,7 @@ on:
     paths:
       - '**/Dockerfile'
       - '.github/workflows/docker.yml'
+      - 'hyperlane/**'
 
 jobs:
   build-and-push:
