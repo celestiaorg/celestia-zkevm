@@ -9,12 +9,12 @@ description = "gRPC client for submitting proofs to Celestia consensus network"
 celestia-grpc = { workspace = true }
 
 # Core dependencies
-anyhow = {workspace = true}
-async-trait = "0.1"
+anyhow = { workspace = true }
+async-trait = { workspace = true }
 bytes = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-thiserror = "1.0"
+thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 

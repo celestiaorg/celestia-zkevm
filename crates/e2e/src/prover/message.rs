@@ -16,7 +16,7 @@ use ev_zkevm_types::{
         HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof, HyperlaneBranchProofInputs, HyperlaneMessageInputs,
     },
 };
-use sp1_sdk::{ProverClient, SP1ProofWithPublicValues, SP1Stdin};
+use sp1_sdk::{EnvProver, SP1ProofWithPublicValues, SP1Stdin};
 use storage::hyperlane::{StoredHyperlaneMessage, message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use tempfile::TempDir;
 
@@ -26,6 +26,7 @@ pub async fn prove_messages(
     target_height: u64,
     evm_provider: &DefaultProvider,
     state_query_provider: &dyn StateQueryProvider,
+    client: Arc<EnvProver>,
 ) -> Result<SP1ProofWithPublicValues> {
     let tmp = TempDir::new().expect("cannot create temp directory");
     let state_root = state_query_provider
@@ -111,7 +112,6 @@ pub async fn prove_messages(
     // generate and return the Groth16 proof
     let mut stdin = SP1Stdin::new();
     stdin.write(&input);
-    let client = ProverClient::from_env();
     let ev_hyperlane_elf = fs::read("elfs/ev-hyperlane-elf").expect("Failed to read ELF");
     let (pk, vk) = client.setup(&ev_hyperlane_elf);
     let proof = client
