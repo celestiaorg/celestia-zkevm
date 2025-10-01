@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-alloy = { workspace = true }
 alloy-consensus = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }

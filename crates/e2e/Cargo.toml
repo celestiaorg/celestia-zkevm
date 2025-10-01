@@ -28,15 +28,12 @@ celestia-grpc-client = { path = "../celestia-grpc-client" }
 celestia-rpc = { workspace = true }
 celestia-types = { workspace = true }
 chrono = { workspace = true }
-cosmrs = { version = "0.21", features = ["grpc", "cosmwasm"] }
 dirs = { workspace = true }
 dotenvy = { workspace = true }
-ev-prover = { workspace = true }
 ev-state-queries = { workspace = true }
 ev-types = { workspace = true, features = ["grpc"] }
 ev-zkevm-types = { workspace = true }
 eyre = { workspace = true }
-md5 = { workspace = true }
 prost = { workspace = true }
 reth-chainspec = { workspace = true }
 rsp-client-executor = { workspace = true }
