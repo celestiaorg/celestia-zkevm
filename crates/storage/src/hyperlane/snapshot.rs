@@ -42,7 +42,7 @@ impl HyperlaneSnapshotStore {
         let write_lock = self
             .db
             .write()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {e}"))?;
         let cf = write_lock
             .cf_handle("snapshots")
             .context("Missing snapshots column family")?;
@@ -77,7 +77,7 @@ impl HyperlaneSnapshotStore {
         let read_lock = self
             .db
             .read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {e}"))?;
         let cf = read_lock.cf_handle("snapshots").context("Missing CF")?;
         let mut iter = read_lock.iterator_cf(cf, IteratorMode::End);
         if let Some(Ok((k, _))) = iter.next() {
@@ -93,7 +93,7 @@ impl HyperlaneSnapshotStore {
         let mut write_lock = self
             .db
             .write()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {e}"))?;
         write_lock.drop_cf("snapshots")?;
         let opts = Options::default();
         write_lock.create_cf("snapshots", &opts)?;
