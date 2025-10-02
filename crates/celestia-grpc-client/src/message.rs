@@ -52,6 +52,29 @@ pub struct MsgSubmitMessages {
     pub signer: String,
 }
 
+#[derive(Clone, Serialize, Deserialize, prost::Message)]
+pub struct MsgProcessMessage {
+    #[prost(string, tag = "1")]
+    pub mailbox_id: String,
+    #[prost(string, tag = "2")]
+    pub relayer: String,
+    #[prost(string, tag = "3")]
+    pub metadata: String,
+    #[prost(string, tag = "4")]
+    pub message: String,
+}
+
+impl MsgProcessMessage {
+    pub fn new(mailbox_id: String, relayer: String, metadata: String, message: String) -> Self {
+        Self {
+            mailbox_id,
+            relayer,
+            metadata,
+            message,
+        }
+    }
+}
+
 /// Response for MsgSubmitMessages
 #[derive(Clone, Serialize, Deserialize, prost::Message)]
 pub struct MsgSubmitMessagesResponse {
@@ -86,6 +109,11 @@ impl MsgSubmitMessages {
             signer,
         }
     }
+}
+
+impl Name for MsgProcessMessage {
+    const NAME: &'static str = "MsgProcessMessage";
+    const PACKAGE: &'static str = "hyperlane.v1";
 }
 
 impl Name for MsgUpdateZkExecutionIsm {

@@ -27,7 +27,7 @@ pub async fn prove_messages(
     evm_provider: &DefaultProvider,
     state_query_provider: &dyn StateQueryProvider,
     client: Arc<EnvProver>,
-) -> Result<SP1ProofWithPublicValues> {
+) -> Result<(SP1ProofWithPublicValues, Vec<StoredHyperlaneMessage>)> {
     let tmp = TempDir::new().expect("cannot create temp directory");
     let state_root = state_query_provider
         .get_state_root(target_height)
@@ -122,5 +122,5 @@ pub async fn prove_messages(
     // could be removed but this is just a test so doesn't really matter
     // might actually be better to keep this in for sanity
     client.verify(&proof, &vk).expect("failed to verify proof");
-    Ok(proof)
+    Ok((proof, messages))
 }
