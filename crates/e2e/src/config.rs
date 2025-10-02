@@ -4,7 +4,6 @@ pub const MAILBOX_ADDRESS: &str = "0xb1c938f5ba4b3593377f399e12175e8db0c787ff";
 pub const MERKLE_TREE_ADDRESS: &str = "0xfcb1d485ef46344029d9e8a7925925e146b3430e";
 // initial trusted evm height for block prover
 pub const TRUSTED_HEIGHT: u64 = 165;
-// celestia start height for block prover
 // target height for message prover
 pub const TARGET_HEIGHT: u64 = 190;
 // trusted evm root for block prover

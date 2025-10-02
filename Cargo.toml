@@ -37,6 +37,8 @@ bytes = "1.10.1"
 celestia-grpc = "0.8.0"
 celestia-rpc = "=0.13.0"
 celestia-types = "=0.15.0"
+chrono = "0.4"
+cosmrs = { version = "0.22", features = ["grpc", "cosmwasm"] }
 dirs = "5.0.1"
 dotenvy = "0.15.7"
 ed25519-dalek = { version = "2.1.0", features = ["alloc", "serde"] }
