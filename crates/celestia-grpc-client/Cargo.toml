@@ -37,5 +37,5 @@ tempfile = "3.8"
 tokio-test = "0.4"
 
 [[bin]]
-name = "proof_submitter"
-path = "src/bin/proof_submitter.rs"
+name = "client"
+path = "src/bin/client.rs"
