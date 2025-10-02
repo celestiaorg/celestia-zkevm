@@ -45,7 +45,7 @@ async fn main() {
         ..Default::default()
     };
 
-    let trusted_inclusion_height = inclusion_height(TRUSTED_HEIGHT).await.unwrap();
+    let trusted_inclusion_height = inclusion_height(TRUSTED_HEIGHT).await.unwrap() + 1;
     let target_inclusion_height = inclusion_height(TARGET_HEIGHT).await.unwrap();
     let num_blocks = target_inclusion_height - trusted_inclusion_height + 1;
     let block_proof = prove_blocks(
@@ -162,13 +162,6 @@ async fn wait_for_tx(grpc_client: &GrpcClient, tx_hash: Hash) -> anyhow::Result<
     Err(anyhow::anyhow!("Timeout waiting for tx {tx_hash:?}"))
 }
 
-/*
-I use this command
-
-grpcurl -plaintext -d '{"key": "rhb/230/d"}' localhost:7331 evnode.v1.StoreService.GetMetadata
-
-to figure out the celestia height for an evm block. The result is the base64 little-endian encoded celestia height.
-*/
 
 async fn inclusion_height(block_number: u64) -> anyhow::Result<u64> {
     let mut client = StoreServiceClient::connect(e2e::config::SEQUENCER_URL).await?;
