@@ -26,6 +26,7 @@ async fn main() {
     .expect("Failed to prove blocks");
 }
 
+// todo: find a place for this function and remove it from the binaries
 async fn inclusion_height(block_number: u64) -> anyhow::Result<u64> {
     let mut client = StoreServiceClient::connect(e2e::config::SEQUENCER_URL).await?;
     let req = GetMetadataRequest {
