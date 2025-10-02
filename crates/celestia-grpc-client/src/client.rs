@@ -1,5 +1,8 @@
-use crate::error::{ProofSubmissionError, Result};
+use crate::error::{IsmClientError, Result};
 use crate::message::{StateInclusionProofMsg, StateTransitionProofMsg};
+use crate::proto::celestia::zkism::v1::{
+    query_client::QueryClient, QueryIsmRequest, QueryIsmResponse, QueryIsmsRequest, QueryIsmsResponse,
+};
 use crate::types::{ClientConfig, ProofSubmissionResponse};
 
 use anyhow::Context;
@@ -21,12 +24,12 @@ pub trait ProofSubmitter {
 }
 
 /// Celestia gRPC client for proof submission
-pub struct CelestiaProofClient {
+pub struct CelestiaIsmClient {
     grpc_client: GrpcClient,
     config: ClientConfig,
 }
 
-impl CelestiaProofClient {
+impl CelestiaIsmClient {
     /// Create a new Celestia proof client
     pub async fn new(mut config: ClientConfig) -> Result<Self> {
         debug!("Creating Celestia proof client with endpoint: {}", config.grpc_endpoint);
@@ -54,24 +57,22 @@ impl CelestiaProofClient {
             grpc_endpoint: std::env::var("CELESTIA_GRPC_ENDPOINT")
                 .unwrap_or_else(|_| "http://localhost:9090".to_string()),
             private_key_hex: std::env::var("CELESTIA_PRIVATE_KEY").map_err(|_| {
-                ProofSubmissionError::Configuration("CELESTIA_PRIVATE_KEY environment variable not set".to_string())
+                IsmClientError::Configuration("CELESTIA_PRIVATE_KEY environment variable not set".to_string())
             })?,
             signer_address: String::new(), // Will be derived in new()
             chain_id: std::env::var("CELESTIA_CHAIN_ID").unwrap_or_else(|_| "celestia-zkevm-testnet".to_string()),
             gas_price: std::env::var("CELESTIA_GAS_PRICE")
                 .unwrap_or_else(|_| "1000".to_string())
                 .parse()
-                .map_err(|_| ProofSubmissionError::Configuration("Invalid CELESTIA_GAS_PRICE".to_string()))?,
+                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_GAS_PRICE".to_string()))?,
             max_gas: std::env::var("CELESTIA_MAX_GAS")
                 .unwrap_or_else(|_| "200000".to_string())
                 .parse()
-                .map_err(|_| ProofSubmissionError::Configuration("Invalid CELESTIA_MAX_GAS".to_string()))?,
+                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_MAX_GAS".to_string()))?,
             confirmation_timeout: std::env::var("CELESTIA_CONFIRMATION_TIMEOUT")
                 .unwrap_or_else(|_| "60".to_string())
                 .parse()
-                .map_err(|_| {
-                    ProofSubmissionError::Configuration("Invalid CELESTIA_CONFIRMATION_TIMEOUT".to_string())
-                })?,
+                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_CONFIRMATION_TIMEOUT".to_string()))?,
         };
 
         Self::new(config).await
@@ -100,6 +101,18 @@ impl CelestiaProofClient {
     /// Get the cached bech32-encoded signer address
     pub fn signer_address(&self) -> &str {
         &self.config.signer_address
+    }
+
+    pub async fn ism(&self, req: QueryIsmRequest) -> Result<QueryIsmResponse> {
+        let mut client = QueryClient::connect(self.config().grpc_endpoint.clone()).await?;
+        let resp = client.ism(tonic::Request::new(req)).await?;
+        Ok(resp.into_inner())
+    }
+
+    pub async fn isms(&self, req: QueryIsmsRequest) -> Result<QueryIsmsResponse> {
+        let mut client = QueryClient::connect(self.config().grpc_endpoint.clone()).await?;
+        let resp = client.isms(tonic::Request::new(req)).await?;
+        Ok(resp.into_inner())
     }
 
     /// Submit a zkISM proof message via Lumina
@@ -138,7 +151,7 @@ impl CelestiaProofClient {
             }
             Err(e) => {
                 warn!("Failed to submit {} message: {}", message_type, e);
-                Err(ProofSubmissionError::SubmissionFailed(format!(
+                Err(IsmClientError::SubmissionFailed(format!(
                     "Failed to submit {message_type}: {e}"
                 )))
             }
@@ -147,7 +160,7 @@ impl CelestiaProofClient {
 }
 
 #[async_trait]
-impl ProofSubmitter for CelestiaProofClient {
+impl ProofSubmitter for CelestiaIsmClient {
     async fn submit_state_transition_proof(
         &self,
         proof_msg: StateTransitionProofMsg,
@@ -159,13 +172,11 @@ impl ProofSubmitter for CelestiaProofClient {
 
         // Validate proof message
         if proof_msg.proof.is_empty() {
-            return Err(ProofSubmissionError::InvalidProof(
-                "Proof data cannot be empty".to_string(),
-            ));
+            return Err(IsmClientError::InvalidProof("Proof data cannot be empty".to_string()));
         }
 
         if proof_msg.id.is_empty() {
-            return Err(ProofSubmissionError::InvalidProof("ISM ID cannot be empty".to_string()));
+            return Err(IsmClientError::InvalidProof("ISM ID cannot be empty".to_string()));
         }
 
         // Submit via Lumina
@@ -180,13 +191,11 @@ impl ProofSubmitter for CelestiaProofClient {
 
         // Validate proof message
         if proof_msg.proof.is_empty() {
-            return Err(ProofSubmissionError::InvalidProof(
-                "Proof data cannot be empty".to_string(),
-            ));
+            return Err(IsmClientError::InvalidProof("Proof data cannot be empty".to_string()));
         }
 
         if proof_msg.id.is_empty() {
-            return Err(ProofSubmissionError::InvalidProof("ISM ID cannot be empty".to_string()));
+            return Err(IsmClientError::InvalidProof("ISM ID cannot be empty".to_string()));
         }
 
         // Submit via Lumina

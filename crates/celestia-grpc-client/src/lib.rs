@@ -10,8 +10,8 @@ pub mod message;
 pub mod proto;
 pub mod types;
 
-pub use client::{CelestiaProofClient, ProofSubmitter};
-pub use error::{ProofSubmissionError, Result};
+pub use client::{CelestiaIsmClient, ProofSubmitter};
+pub use error::{IsmClientError, Result};
 pub use message::{
     MsgSubmitMessages, MsgSubmitMessagesResponse, MsgUpdateZkExecutionIsm, MsgUpdateZkExecutionIsmResponse,
     StateInclusionProofMsg, StateTransitionProofMsg,
