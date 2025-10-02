@@ -205,6 +205,8 @@ impl ProofSubmitter for CelestiaIsmClient {
 
 #[cfg(test)]
 mod tests {
+    use prost::Message;
+
     use super::*;
 
     #[allow(dead_code)]
@@ -269,11 +271,13 @@ mod tests {
         );
 
         // Test that the message can be serialized (this validates the structure)
-        let serialized = serde_json::to_vec(&proof_msg).expect("Should serialize");
+        let serialized = proof_msg.encode_to_vec();
         assert!(!serialized.is_empty());
 
         // Test deserialization
-        let deserialized: StateTransitionProofMsg = serde_json::from_slice(&serialized).expect("Should deserialize");
+        let deserialized: StateTransitionProofMsg =
+            StateTransitionProofMsg::decode(serialized.as_slice()).expect("failed to decode");
+
         assert_eq!(deserialized.id, proof_msg.id);
         assert_eq!(deserialized.height, proof_msg.height);
         assert_eq!(deserialized.proof, proof_msg.proof);

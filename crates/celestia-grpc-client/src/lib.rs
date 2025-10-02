@@ -1,8 +1,8 @@
-//! Celestia gRPC Client for Proof Submission
+//! Celestia gRPC Client for x/zkism
 //!
-//! This crate provides a gRPC client for submitting state transition and state inclusion
-//! proofs to the Celestia consensus network. It reuses the Lumina gRPC library for
-//! underlying communication with Celestia validator nodes.
+//! This crate provides a gRPC client for the x/zkism Celestia module.
+//! In supports transaction submission for both state transition and state inclusion proofs
+//! as well as gRPC module queries.
 
 pub mod client;
 pub mod error;
@@ -12,8 +12,8 @@ pub mod types;
 
 pub use client::{CelestiaIsmClient, ProofSubmitter};
 pub use error::{IsmClientError, Result};
-pub use message::{
+pub use message::{StateInclusionProofMsg, StateTransitionProofMsg};
+pub use proto::celestia::zkism::v1::{
     MsgSubmitMessages, MsgSubmitMessagesResponse, MsgUpdateZkExecutionIsm, MsgUpdateZkExecutionIsmResponse,
-    StateInclusionProofMsg, StateTransitionProofMsg,
 };
 pub use types::ProofSubmissionResponse;
