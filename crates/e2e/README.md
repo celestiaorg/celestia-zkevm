@@ -7,12 +7,12 @@ In order to generate a message proof for submission to the ZK ISM, ensure that t
 make start
 ```
 
-Run `transfer` to bridge from Celestia to EVM, wait a few seconds and run `transfer-back` to emit a hyperlane mailbox event on EVM.
+Run `make transfer` to bridge from Celestia to EVM, wait a few seconds and run `make transfer-back` to emit a hyperlane mailbox event on EVM.
 ```bash
 make transfer
 make transfer-back
 ```
-The output of `transfer-back` will include the EVM block height at which the event was emitted. This is our `TARGET_HEIGHT` in `e2e/src/config.rs`.
+The output of `make transfer-back` will include the EVM block height at which the event was emitted. This is our `TARGET_HEIGHT` in `e2e/src/config.rs`.
 
 Find the ZKISM trusted state on Celestia:
 ```bash
