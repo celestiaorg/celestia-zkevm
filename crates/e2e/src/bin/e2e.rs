@@ -165,7 +165,7 @@ async fn wait_for_tx(grpc_client: &GrpcClient, tx_hash: Hash) -> anyhow::Result<
 async fn inclusion_height(block_number: u64) -> anyhow::Result<u64> {
     let mut client = StoreServiceClient::connect(e2e::config::SEQUENCER_URL).await?;
     let req = GetMetadataRequest {
-        key: format!("rhb/{}/d", block_number),
+        key: format!("rhb/{block_number}/d"),
     };
 
     let resp = client.get_metadata(req).await?;
