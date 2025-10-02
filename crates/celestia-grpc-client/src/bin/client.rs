@@ -51,7 +51,7 @@ enum Commands {
         #[arg(long)]
         id: String,
     },
-    QueryISMs {},
+    QueryISMS {},
 }
 
 #[tokio::main]
@@ -122,7 +122,7 @@ async fn main() -> Result<()> {
 
             println!("Response = {:?}", response.into_inner());
         }
-        Commands::QueryISMs {} => {
+        Commands::QueryISMS {} => {
             info!("Querying zk isms");
 
             let mut query_client = QueryClient::connect("http://127.0.0.1:9090").await?;

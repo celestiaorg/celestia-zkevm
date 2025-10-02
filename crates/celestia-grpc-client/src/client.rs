@@ -8,6 +8,10 @@ use crate::types::{ClientConfig, ProofSubmissionResponse};
 use anyhow::Context;
 use async_trait::async_trait;
 use celestia_grpc::GrpcClient;
+use tonic::{
+    transport::{Channel, Endpoint},
+    Request,
+};
 use tracing::{debug, info, warn};
 
 /// Trait for proof submission operations
@@ -25,8 +29,9 @@ pub trait ProofSubmitter {
 
 /// Celestia gRPC client for proof submission
 pub struct CelestiaIsmClient {
-    grpc_client: GrpcClient,
     config: ClientConfig,
+    channel: Channel,
+    tx_client: GrpcClient,
 }
 
 impl CelestiaIsmClient {
@@ -40,7 +45,14 @@ impl CelestiaIsmClient {
             debug!("Derived signer address: {}", config.signer_address);
         }
 
-        let grpc_client = GrpcClient::builder()
+        // optional: set timeouts, concurrency limits, TLS, etc.
+        let endpoint = Endpoint::from_shared(config.grpc_endpoint.clone())?
+            .connect_timeout(std::time::Duration::from_secs(15))
+            .tcp_nodelay(true);
+
+        let channel = endpoint.connect().await?;
+
+        let tx_client = GrpcClient::builder()
             .url(&config.grpc_endpoint)
             .private_key_hex(&config.private_key_hex)
             .build()
@@ -48,7 +60,11 @@ impl CelestiaIsmClient {
 
         info!("Successfully created Celestia proof client");
 
-        Ok(Self { grpc_client, config })
+        Ok(Self {
+            config,
+            channel,
+            tx_client,
+        })
     }
 
     /// Create a client from environment variables
@@ -80,7 +96,7 @@ impl CelestiaIsmClient {
 
     /// Get the gRPC client reference for direct access to Lumina functionality
     pub fn grpc_client(&self) -> &GrpcClient {
-        &self.grpc_client
+        &self.tx_client
     }
 
     /// Get the client configuration
@@ -104,14 +120,14 @@ impl CelestiaIsmClient {
     }
 
     pub async fn ism(&self, req: QueryIsmRequest) -> Result<QueryIsmResponse> {
-        let mut client = QueryClient::connect(self.config().grpc_endpoint.clone()).await?;
-        let resp = client.ism(tonic::Request::new(req)).await?;
+        let mut client = QueryClient::new(self.channel.clone());
+        let resp = client.ism(Request::new(req)).await?;
         Ok(resp.into_inner())
     }
 
     pub async fn isms(&self, req: QueryIsmsRequest) -> Result<QueryIsmsResponse> {
-        let mut client = QueryClient::connect(self.config().grpc_endpoint.clone()).await?;
-        let resp = client.isms(tonic::Request::new(req)).await?;
+        let mut client = QueryClient::new(self.channel.clone());
+        let resp = client.isms(Request::new(req)).await?;
         Ok(resp.into_inner())
     }
 
@@ -132,7 +148,7 @@ impl CelestiaIsmClient {
             ..Default::default()
         };
 
-        match self.grpc_client.submit_message(message, tx_config).await {
+        match self.tx_client.submit_message(message, tx_config).await {
             Ok(tx_info) => {
                 info!(
                     "Successfully submitted {} message: tx_hash={}, height={}",
