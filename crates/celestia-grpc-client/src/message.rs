@@ -113,7 +113,7 @@ impl MsgSubmitMessages {
 
 impl Name for MsgProcessMessage {
     const NAME: &'static str = "MsgProcessMessage";
-    const PACKAGE: &'static str = "hyperlane.v1";
+    const PACKAGE: &'static str = "hyperlane.core.v1";
 }
 
 impl Name for MsgUpdateZkExecutionIsm {

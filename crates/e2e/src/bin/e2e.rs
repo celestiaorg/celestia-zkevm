@@ -56,7 +56,7 @@ async fn main() {
     let celestia_target_height = START_HEIGHT + NUM_BLOCKS - 1;
 
     let block_proof_msg = MsgUpdateZkExecutionIsm::new(
-        "0x726f757465725f69736d000000000000000000000000002a0000000000000000".to_string(),
+        "0x726f757465725f69736d000000000000000000000000002a0000000000000001".to_string(),
         celestia_target_height,
         block_proof.bytes(),
         block_proof.public_values.as_slice().to_vec(),
@@ -88,7 +88,7 @@ async fn main() {
     .unwrap();
 
     let message_proof_msg = MsgSubmitMessages::new(
-        "0x726f757465725f69736d000000000000000000000000002a0000000000000000".to_string(),
+        "0x726f757465725f69736d000000000000000000000000002a0000000000000001".to_string(),
         TARGET_HEIGHT,
         message_proof.0.bytes(),
         message_proof.0.public_values.as_slice().to_vec(),
@@ -162,7 +162,7 @@ async fn wait_for_tx(grpc_client: &GrpcClient, tx_hash: Hash) -> anyhow::Result<
 /*
 I use this command
 
-grpcurl -plaintext -d '{"key": "rhb/2000/d"}' localhost:7331 evnode.v1.StoreService.GetMetadata
+grpcurl -plaintext -d '{"key": "rhb/230/d"}' localhost:7331 evnode.v1.StoreService.GetMetadata
 
 to figure out the celestia height for an evm block. The result is the base64 little-endian encoded celestia height.
 */
