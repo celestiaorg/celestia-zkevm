@@ -35,3 +35,10 @@ curl -s -X POST http://127.0.0.1:8545 \
 ```
 
 Update `e2e/src/config.rs` TRUSTED_ROOT and TRUSTED_HEIGHT to match the ones in the ZKISM.
+
+**The corresponding inclusion heights on Celestia are derived from the TRUSTED and TARGET EVM heights in the config.**
+
+Now set your `SP1_PROVER` in the workspace `.env` to `cpu`, `cuda` or `network` and run:
+```bash
+cargo run --bin e2e -p e2e --release
+```

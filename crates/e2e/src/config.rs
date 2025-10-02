@@ -13,4 +13,5 @@ pub const TARGET_HEIGHT: u64 = 230;
 // trusted evm root for block prover
 pub const TRUSTED_ROOT: &str = "0xc1e771f973da5b71bc1bce5ceac9ad9d87ddf6066e326a5fb77e003b21a9d1f3";
 pub const EV_RPC: &str = "http://127.0.0.1:8545";
+pub const SEQUENCER_URL: &str = "http://127.0.0.1:7331";
 pub const EV_WS: &str = "ws://127.0.0.1:8546";

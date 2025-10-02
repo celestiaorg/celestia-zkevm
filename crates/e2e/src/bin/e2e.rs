@@ -8,10 +8,11 @@ use e2e::{
     prover::message::prove_messages,
 };
 use e2e::{
-    config::{NUM_BLOCKS, START_HEIGHT, TRUSTED_HEIGHT, TRUSTED_ROOT},
+    config::{TRUSTED_HEIGHT, TRUSTED_ROOT},
     prover::block::prove_blocks,
 };
 use ev_state_queries::MockStateQueryProvider;
+use ev_types::v1::{GetMetadataRequest, store_service_client::StoreServiceClient};
 use ev_zkevm_types::hyperlane::encode_hyperlane_message;
 use sp1_sdk::{EnvProver, ProverClient};
 use std::{
@@ -43,21 +44,23 @@ async fn main() {
         memo: Some("zkISM state transition proof submission".to_string()),
         ..Default::default()
     };
+
+    let trusted_inclusion_height = inclusion_height(TRUSTED_HEIGHT).await.unwrap();
+    let target_inclusion_height = inclusion_height(TARGET_HEIGHT).await.unwrap();
+    let num_blocks = target_inclusion_height - trusted_inclusion_height + 1;
     let block_proof = prove_blocks(
-        START_HEIGHT,
+        trusted_inclusion_height,
         TRUSTED_HEIGHT,
-        NUM_BLOCKS,
+        num_blocks,
         &mut FixedBytes::from_hex(TRUSTED_ROOT).unwrap(),
         client.clone(),
     )
     .await
     .expect("Failed to prove blocks");
 
-    let celestia_target_height = START_HEIGHT + NUM_BLOCKS - 1;
-
     let block_proof_msg = MsgUpdateZkExecutionIsm::new(
         "0x726f757465725f69736d000000000000000000000000002a0000000000000001".to_string(),
-        celestia_target_height,
+        target_inclusion_height,
         block_proof.bytes(),
         block_proof.public_values.as_slice().to_vec(),
         "celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q".to_string(),
@@ -166,3 +169,15 @@ grpcurl -plaintext -d '{"key": "rhb/230/d"}' localhost:7331 evnode.v1.StoreServi
 
 to figure out the celestia height for an evm block. The result is the base64 little-endian encoded celestia height.
 */
+
+async fn inclusion_height(block_number: u64) -> anyhow::Result<u64> {
+    let mut client = StoreServiceClient::connect(e2e::config::SEQUENCER_URL).await?;
+    let req = GetMetadataRequest {
+        key: format!("rhb/{}/d", block_number),
+    };
+
+    let resp = client.get_metadata(req).await?;
+    let height = u64::from_le_bytes(resp.into_inner().value[..8].try_into()?);
+
+    Ok(height)
+}
