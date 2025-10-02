@@ -5,7 +5,7 @@ use e2e::{
     config::{TARGET_HEIGHT, TRUSTED_HEIGHT, TRUSTED_ROOT},
     prover::block::prove_blocks,
 };
-use ev_types::v1::{store_service_client::StoreServiceClient, GetMetadataRequest};
+use ev_types::v1::{GetMetadataRequest, store_service_client::StoreServiceClient};
 use sp1_sdk::ProverClient;
 
 #[tokio::main]
