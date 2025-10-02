@@ -55,7 +55,7 @@ async fn main() {
     let celestia_target_height = START_HEIGHT + NUM_BLOCKS - 1;
 
     let block_proof_msg = MsgUpdateZkExecutionIsm::new(
-        "0x726f757465725f69736d000000000000000000000000002a0000000000000000".to_string(),
+        "0x726f757465725f69736d000000000000000000000000002a0000000000000001".to_string(),
         celestia_target_height,
         block_proof.bytes(),
         block_proof.public_values.as_slice().to_vec(),
@@ -87,7 +87,7 @@ async fn main() {
     .unwrap();
 
     let message_proof_msg = MsgSubmitMessages::new(
-        "0x726f757465725f69736d000000000000000000000000002a0000000000000000".to_string(),
+        "0x726f757465725f69736d000000000000000000000000002a0000000000000001".to_string(),
         TARGET_HEIGHT,
         message_proof.bytes(),
         message_proof.public_values.as_slice().to_vec(),
