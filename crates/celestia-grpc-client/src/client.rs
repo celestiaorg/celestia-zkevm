@@ -94,8 +94,8 @@ impl CelestiaIsmClient {
         Self::new(config).await
     }
 
-    /// Get the gRPC client reference for direct access to Lumina functionality
-    pub fn grpc_client(&self) -> &GrpcClient {
+    /// Get the gRPC tx client reference for direct access to Lumina functionality
+    pub fn tx_client(&self) -> &GrpcClient {
         &self.tx_client
     }
 
