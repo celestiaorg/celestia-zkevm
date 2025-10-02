@@ -1,7 +1,9 @@
 #!/usr/bin/env cargo
 
 use anyhow::Result;
-use celestia_grpc_client::{CelestiaProofClient, ProofSubmitter, StateInclusionProofMsg, StateTransitionProofMsg};
+use celestia_grpc_client::{
+    proto, CelestiaProofClient, ProofSubmitter, StateInclusionProofMsg, StateTransitionProofMsg,
+};
 use clap::{Parser, Subcommand};
 use tracing::{info, Level};
 
@@ -43,6 +45,11 @@ enum Commands {
         /// Block height for inclusion proof
         #[arg(long)]
         height: u64,
+    },
+    QueryISM {
+        /// ISM identifier
+        #[arg(long)]
+        id: String,
     },
 }
 
@@ -101,6 +108,19 @@ async fn main() -> Result<()> {
             println!("Transaction hash: {}", response.tx_hash);
             println!("Block height: {}", response.height);
             println!("Gas used: {}", response.gas_used);
+        }
+        Commands::QueryISM { id } => {
+            info!("Querying ism with id: {id}");
+
+            let mut query_client =
+                proto::celestia::zkism::v1::query_client::QueryClient::connect("http://127.0.0.1:9090").await?;
+
+            let query_msg = proto::celestia::zkism::v1::QueryIsmRequest { id: id.clone() };
+
+            let request = tonic::Request::new(query_msg);
+            let response = query_client.ism(request).await?;
+
+            println!("Response = {:?}", response.into_inner());
         }
     }
 

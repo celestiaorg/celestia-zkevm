@@ -7,6 +7,7 @@
 pub mod client;
 pub mod error;
 pub mod message;
+pub mod proto;
 pub mod types;
 
 pub use client::{CelestiaProofClient, ProofSubmitter};
