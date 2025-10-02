@@ -2389,10 +2389,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "145052bdd345b87320e369255277e3fb5152762ad123a901ef5c262dd38fe8d2"
 dependencies = [
  "iana-time-zone",
- "js-sys",
  "num-traits",
  "serde",
- "wasm-bindgen",
  "windows-link 0.2.0",
 ]
 
@@ -3079,7 +3077,6 @@ dependencies = [
  "celestia-grpc-client",
  "celestia-rpc",
  "celestia-types 0.15.0",
- "chrono",
  "dirs",
  "dotenvy",
  "ev-state-queries",

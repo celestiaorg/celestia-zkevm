@@ -28,7 +28,6 @@ celestia-grpc = { workspace = true }
 celestia-grpc-client = { path = "../celestia-grpc-client" }
 celestia-rpc = { workspace = true }
 celestia-types = { workspace = true }
-chrono = { workspace = true }
 dirs = { workspace = true }
 dotenvy = { workspace = true }
 ev-state-queries = { workspace = true }
