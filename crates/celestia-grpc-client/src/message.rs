@@ -1,85 +1,5 @@
+use crate::{proto::celestia::zkism::v1::MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm};
 use prost::Name;
-use serde::{Deserialize, Serialize};
-
-/// Message for updating ZK Execution ISM (corresponds to MsgUpdateZKExecutionISM)
-#[derive(Clone, Serialize, Deserialize, prost::Message)]
-pub struct MsgUpdateZkExecutionIsm {
-    /// ISM identifier
-    #[prost(string, tag = "1")]
-    pub id: String,
-    /// Block height for the state transition
-    #[prost(uint64, tag = "2")]
-    pub height: u64,
-    /// ZK proof bytes
-    #[prost(bytes = "vec", tag = "3")]
-    pub proof: Vec<u8>,
-    /// Public values/inputs for proof verification
-    #[prost(bytes = "vec", tag = "4")]
-    pub public_values: Vec<u8>,
-    /// The tx signer
-    #[prost(string, tag = "5")]
-    pub signer: String,
-}
-
-/// Response for MsgUpdateZKExecutionISM
-#[derive(Clone, Serialize, Deserialize, prost::Message)]
-pub struct MsgUpdateZkExecutionIsmResponse {
-    /// Updated state root
-    #[prost(string, tag = "1")]
-    pub state_root: String,
-    /// Block height
-    #[prost(uint64, tag = "2")]
-    pub height: u64,
-}
-
-/// Message for submitting messages with state membership proof (corresponds to MsgSubmitMessages)
-#[derive(Clone, Serialize, Deserialize, prost::Message)]
-pub struct MsgSubmitMessages {
-    /// ISM identifier
-    #[prost(string, tag = "1")]
-    pub id: String,
-    /// Block height for the state membership proof
-    #[prost(uint64, tag = "2")]
-    pub height: u64,
-    /// ZK proof bytes for state membership
-    #[prost(bytes = "vec", tag = "3")]
-    pub proof: Vec<u8>,
-    /// Public values/inputs for proof verification
-    #[prost(bytes = "vec", tag = "4")]
-    pub public_values: Vec<u8>,
-    /// The tx signer
-    #[prost(string, tag = "5")]
-    pub signer: String,
-}
-
-#[derive(Clone, Serialize, Deserialize, prost::Message)]
-pub struct MsgProcessMessage {
-    #[prost(string, tag = "1")]
-    pub mailbox_id: String,
-    #[prost(string, tag = "2")]
-    pub relayer: String,
-    #[prost(string, tag = "3")]
-    pub metadata: String,
-    #[prost(string, tag = "4")]
-    pub message: String,
-}
-
-impl MsgProcessMessage {
-    pub fn new(mailbox_id: String, relayer: String, metadata: String, message: String) -> Self {
-        Self {
-            mailbox_id,
-            relayer,
-            metadata,
-            message,
-        }
-    }
-}
-
-/// Response for MsgSubmitMessages
-#[derive(Clone, Serialize, Deserialize, prost::Message)]
-pub struct MsgSubmitMessagesResponse {
-    // Empty response according to the protobuf definition
-}
 
 // Legacy aliases for backward compatibility
 pub type StateTransitionProofMsg = MsgUpdateZkExecutionIsm;
@@ -107,6 +27,17 @@ impl MsgSubmitMessages {
             proof,
             public_values,
             signer,
+        }
+    }
+}
+
+impl MsgProcessMessage {
+    pub fn new(mailbox_id: String, relayer: String, metadata: String, message: String) -> Self {
+        Self {
+            mailbox_id,
+            relayer,
+            metadata,
+            message,
         }
     }
 }

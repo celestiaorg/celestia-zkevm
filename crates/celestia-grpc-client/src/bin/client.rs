@@ -1,8 +1,10 @@
 #!/usr/bin/env cargo
 
 use anyhow::Result;
-use celestia_grpc_client::{CelestiaProofClient, ProofSubmitter, StateInclusionProofMsg, StateTransitionProofMsg};
+use celestia_grpc_client::proto::celestia::zkism::v1::{query_client::QueryClient, QueryIsmRequest, QueryIsmsRequest};
+use celestia_grpc_client::{CelestiaIsmClient, ProofSubmitter, StateInclusionProofMsg, StateTransitionProofMsg};
 use clap::{Parser, Subcommand};
+use tonic::Request;
 use tracing::{info, Level};
 
 #[derive(Parser)]
@@ -44,6 +46,12 @@ enum Commands {
         #[arg(long)]
         height: u64,
     },
+    QueryISM {
+        /// ISM identifier
+        #[arg(long)]
+        id: String,
+    },
+    QueryISMS {},
 }
 
 #[tokio::main]
@@ -59,7 +67,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Create client from environment variables
-    let client = CelestiaProofClient::from_env().await?;
+    let client = CelestiaIsmClient::from_env().await?;
 
     match &cli.command {
         Commands::StateTransition {
@@ -101,6 +109,30 @@ async fn main() -> Result<()> {
             println!("Transaction hash: {}", response.tx_hash);
             println!("Block height: {}", response.height);
             println!("Gas used: {}", response.gas_used);
+        }
+        Commands::QueryISM { id } => {
+            info!("Querying zk ism with id: {id}");
+
+            let mut query_client = QueryClient::connect("http://127.0.0.1:9090").await?;
+
+            let query_msg = QueryIsmRequest { id: id.clone() };
+
+            let request = tonic::Request::new(query_msg);
+            let response = query_client.ism(request).await?;
+
+            println!("Response = {:?}", response.into_inner());
+        }
+        Commands::QueryISMS {} => {
+            info!("Querying zk isms");
+
+            let mut query_client = QueryClient::connect("http://127.0.0.1:9090").await?;
+
+            let query_msg = QueryIsmsRequest { pagination: None };
+
+            let request = Request::new(query_msg);
+            let response = query_client.isms(request).await?;
+
+            println!("Response = {:?}", response.into_inner());
         }
     }
 

@@ -1,5 +1,8 @@
 #![allow(unused)]
 
+// This config is an E2E artifact and still used when run the block or message binary
+// The e2e binary however is fully automated and does not require any manual intervention
+// besides setting the TARGET_HEIGHT, which is to be removed soon (this comment will be updated)
 pub const MAILBOX_ADDRESS: &str = "0xb1c938f5ba4b3593377f399e12175e8db0c787ff";
 pub const MERKLE_TREE_ADDRESS: &str = "0xfcb1d485ef46344029d9e8a7925925e146b3430e";
 // initial trusted evm height for block prover

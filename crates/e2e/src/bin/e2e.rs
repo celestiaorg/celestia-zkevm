@@ -1,15 +1,16 @@
 use alloy_primitives::{FixedBytes, hex::FromHex};
 use alloy_provider::ProviderBuilder;
 use celestia_grpc::GrpcClient;
-use celestia_grpc_client::{MsgSubmitMessages, MsgUpdateZkExecutionIsm, message::MsgProcessMessage};
+use celestia_grpc_client::{
+    MsgSubmitMessages, MsgUpdateZkExecutionIsm, ProofSubmitter,
+    client::CelestiaIsmClient,
+    proto::celestia::zkism::v1::{MsgProcessMessage, QueryIsmRequest},
+};
 use celestia_types::hash::Hash;
+use e2e::prover::block::prove_blocks;
 use e2e::{
     config::{EV_RPC, TARGET_HEIGHT},
     prover::message::prove_messages,
-};
-use e2e::{
-    config::{TRUSTED_HEIGHT, TRUSTED_ROOT},
-    prover::block::prove_blocks,
 };
 use ev_state_queries::MockStateQueryProvider;
 use ev_types::v1::{GetMetadataRequest, store_service_client::StoreServiceClient};
@@ -30,6 +31,20 @@ async fn main() {
         .expect("Failed to set default crypto provider");
     dotenvy::dotenv().ok();
 
+    // instantiate ISM client for submitting payloads and querying state
+    let ism_client = CelestiaIsmClient::from_env().await.unwrap();
+
+    let ism = ism_client
+        .ism(QueryIsmRequest {
+            id: "0x726f7465725f69736d00000000000000000000000000002a0000000000000001".to_string(),
+        })
+        .await
+        .unwrap();
+
+    let ism = ism.ism.expect("ZKISM not found");
+    let ism_trusted_root_hex = alloy::hex::encode(ism.state_root);
+    let ism_trusted_height = ism.height;
+
     // 1. submit block proof message
     let grpc_client = GrpcClient::builder()
         .url("http://localhost:9090")
@@ -45,14 +60,14 @@ async fn main() {
         ..Default::default()
     };
 
-    let trusted_inclusion_height = inclusion_height(TRUSTED_HEIGHT).await.unwrap() + 1;
+    let trusted_inclusion_height = inclusion_height(ism_trusted_height).await.unwrap() + 1;
     let target_inclusion_height = inclusion_height(TARGET_HEIGHT).await.unwrap();
     let num_blocks = target_inclusion_height - trusted_inclusion_height + 1;
     let block_proof = prove_blocks(
         trusted_inclusion_height,
-        TRUSTED_HEIGHT,
+        ism_trusted_height,
         num_blocks,
-        &mut FixedBytes::from_hex(TRUSTED_ROOT).unwrap(),
+        &mut FixedBytes::from_hex(ism_trusted_root_hex).unwrap(),
         client.clone(),
     )
     .await
@@ -66,19 +81,7 @@ async fn main() {
         "celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q".to_string(),
     );
 
-    match grpc_client.submit_message(block_proof_msg, tx_config.clone()).await {
-        Ok(tx_info) => {
-            println!(
-                "Successfully submitted state transition proof: tx_hash={}, height={}",
-                tx_info.hash,
-                tx_info.height.value()
-            );
-            wait_for_tx(&grpc_client, tx_info.hash).await.unwrap();
-        }
-        Err(e) => {
-            panic!("Failed to submit state transition proof: {e}");
-        }
-    }
+    ism_client.submit_state_transition_proof(block_proof_msg).await.unwrap();
 
     let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
     let message_proof = prove_messages(
@@ -98,20 +101,10 @@ async fn main() {
         "celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q".to_string(),
     );
 
-    // 2. submit message proof message
-    match grpc_client.submit_message(message_proof_msg, tx_config.clone()).await {
-        Ok(tx_info) => {
-            println!(
-                "Successfully submitted message proof: tx_hash={}, height={}",
-                tx_info.hash,
-                tx_info.height.value()
-            );
-            wait_for_tx(&grpc_client, tx_info.hash).await.unwrap();
-        }
-        Err(e) => {
-            panic!("Failed to submit message proof: {e}");
-        }
-    }
+    ism_client
+        .submit_state_inclusion_proof(message_proof_msg)
+        .await
+        .unwrap();
 
     // submit all now verified messages to hyperlane
     for message in message_proof.1 {
