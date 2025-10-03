@@ -17,9 +17,7 @@ use ev_types::v1::{GetMetadataRequest, store_service_client::StoreServiceClient}
 use ev_zkevm_types::hyperlane::encode_hyperlane_message;
 use sp1_sdk::{EnvProver, ProverClient};
 use std::{
-    str::FromStr,
-    sync::Arc,
-    time::{Duration, Instant},
+    env, str::FromStr, sync::Arc, time::{Duration, Instant}
 };
 use tokio::time::sleep;
 use url::Url;
@@ -30,6 +28,8 @@ async fn main() {
         .install_default()
         .expect("Failed to set default crypto provider");
     dotenvy::dotenv().ok();
+
+    let celestia_private_key = env::var("CELESTIA_PRIVATE_KEY").expect("Missing env variable CELESTIA_PRIVATE_KEY");
 
     // instantiate ISM client for submitting payloads and querying state
     let ism_client = CelestiaIsmClient::from_env().await.unwrap();
@@ -48,7 +48,7 @@ async fn main() {
     // 1. submit block proof message
     let grpc_client = GrpcClient::builder()
         .url("http://localhost:9090")
-        .private_key_hex("6e30efb1d3ebd30d1ba08c8d5fc9b190e08394009dc1dd787a69e60c33288a8c")
+        .private_key_hex(&celestia_private_key)
         .build()
         .unwrap();
 
