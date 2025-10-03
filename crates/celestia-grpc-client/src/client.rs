@@ -1,5 +1,5 @@
 use crate::error::{IsmClientError, Result};
-use crate::message::{StateInclusionProofMsg, StateTransitionProofMsg};
+use crate::message::{HyperlaneMessage, StateInclusionProofMsg, StateTransitionProofMsg};
 use crate::proto::celestia::zkism::v1::{
     query_client::QueryClient, QueryIsmRequest, QueryIsmResponse, QueryIsmsRequest, QueryIsmsResponse,
 };
@@ -25,6 +25,9 @@ pub trait ProofSubmitter {
 
     /// Submit a state inclusion proof to Celestia
     async fn submit_state_inclusion_proof(&self, proof_msg: StateInclusionProofMsg) -> Result<ProofSubmissionResponse>;
+
+    /// Process a Hyperlane message
+    async fn process_hyperlane_message(&self, message: HyperlaneMessage) -> Result<ProofSubmissionResponse>;
 }
 
 /// Celestia gRPC client for proof submission
@@ -216,6 +219,13 @@ impl ProofSubmitter for CelestiaIsmClient {
 
         // Submit via Lumina
         self.submit_zkism_message(proof_msg, "MsgSubmitMessages").await
+    }
+
+    async fn process_hyperlane_message(&self, message: HyperlaneMessage) -> Result<ProofSubmissionResponse> {
+        info!("Processing Hyperlane message for ISM id: {}", message.mailbox_id);
+
+        // Submit via Lumina
+        self.submit_zkism_message(message, "MsgProcessMessage").await
     }
 }
 

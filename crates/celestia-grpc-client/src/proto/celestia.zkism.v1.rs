@@ -260,8 +260,10 @@ pub struct MsgProcessMessage {
     #[prost(string, tag = "4")]
     pub message: String,
 }
-
-// todo: add the response type for MsgProcessMessage
+/// MsgProcessMessageResponse is the response type for SubmitMessages.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct MsgProcessMessageResponse {}
 
 /// MsgUpdateParams is the request type for UpdateParams.
 #[allow(clippy::derive_partial_eq_without_eq)]

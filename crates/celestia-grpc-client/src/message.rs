@@ -4,6 +4,7 @@ use prost::Name;
 // Legacy aliases for backward compatibility
 pub type StateTransitionProofMsg = MsgUpdateZkExecutionIsm;
 pub type StateInclusionProofMsg = MsgSubmitMessages;
+pub type HyperlaneMessage = MsgProcessMessage;
 
 impl MsgUpdateZkExecutionIsm {
     /// Create a new ZK execution ISM update message

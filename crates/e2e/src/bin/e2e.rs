@@ -1,12 +1,10 @@
 use alloy_primitives::{FixedBytes, hex::FromHex};
 use alloy_provider::ProviderBuilder;
-use celestia_grpc::GrpcClient;
 use celestia_grpc_client::{
     MsgSubmitMessages, MsgUpdateZkExecutionIsm, ProofSubmitter,
     client::CelestiaIsmClient,
     proto::celestia::zkism::v1::{MsgProcessMessage, QueryIsmRequest},
 };
-use celestia_types::hash::Hash;
 use e2e::prover::block::prove_blocks;
 use e2e::{
     config::{EV_RPC, TARGET_HEIGHT},
@@ -16,10 +14,7 @@ use ev_state_queries::MockStateQueryProvider;
 use ev_types::v1::{GetMetadataRequest, store_service_client::StoreServiceClient};
 use ev_zkevm_types::hyperlane::encode_hyperlane_message;
 use sp1_sdk::{EnvProver, ProverClient};
-use std::{
-    env, str::FromStr, sync::Arc, time::{Duration, Instant}
-};
-use tokio::time::sleep;
+use std::{str::FromStr, sync::Arc};
 use url::Url;
 
 #[tokio::main]
@@ -28,8 +23,6 @@ async fn main() {
         .install_default()
         .expect("Failed to set default crypto provider");
     dotenvy::dotenv().ok();
-
-    let celestia_private_key = env::var("CELESTIA_PRIVATE_KEY").expect("Missing env variable CELESTIA_PRIVATE_KEY");
 
     // instantiate ISM client for submitting payloads and querying state
     let ism_client = CelestiaIsmClient::from_env().await.unwrap();
@@ -45,21 +38,7 @@ async fn main() {
     let ism_trusted_root_hex = alloy::hex::encode(ism.state_root);
     let ism_trusted_height = ism.height;
 
-    // 1. submit block proof message
-    let grpc_client = GrpcClient::builder()
-        .url("http://localhost:9090")
-        .private_key_hex(&celestia_private_key)
-        .build()
-        .unwrap();
-
     let client: Arc<EnvProver> = Arc::new(ProverClient::from_env());
-    let tx_config = celestia_grpc::TxConfig {
-        gas_limit: Some(200000u64),
-        gas_price: Some(1000_f64),
-        memo: Some("zkISM state transition proof submission".to_string()),
-        ..Default::default()
-    };
-
     let trusted_inclusion_height = inclusion_height(ism_trusted_height).await.unwrap() + 1;
     let target_inclusion_height = inclusion_height(TARGET_HEIGHT).await.unwrap();
     let num_blocks = target_inclusion_height - trusted_inclusion_height + 1;
@@ -81,7 +60,8 @@ async fn main() {
         "celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q".to_string(),
     );
 
-    ism_client.submit_state_transition_proof(block_proof_msg).await.unwrap();
+    let response = ism_client.submit_state_transition_proof(block_proof_msg).await.unwrap();
+    assert!(response.success);
 
     let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
     let message_proof = prove_messages(
@@ -101,10 +81,11 @@ async fn main() {
         "celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q".to_string(),
     );
 
-    ism_client
+    let response = ism_client
         .submit_state_inclusion_proof(message_proof_msg)
         .await
         .unwrap();
+    assert!(response.success);
 
     // submit all now verified messages to hyperlane
     for message in message_proof.1 {
@@ -115,44 +96,9 @@ async fn main() {
             alloy::hex::encode(vec![]),
             message_hex,
         );
-        match grpc_client.submit_message(msg, tx_config.clone()).await {
-            Ok(tx_info) => {
-                println!(
-                    "Successfully submitted message to hyperlane: tx_hash={}, height={}",
-                    tx_info.hash,
-                    tx_info.height.value()
-                );
-                wait_for_tx(&grpc_client, tx_info.hash).await.unwrap();
-            }
-            Err(e) => {
-                panic!("Failed to submit message to hyperlane: {e}");
-            }
-        }
+        let response = ism_client.process_hyperlane_message(msg).await.unwrap();
+        assert!(response.success);
     }
-}
-
-async fn wait_for_tx(grpc_client: &GrpcClient, tx_hash: Hash) -> anyhow::Result<()> {
-    let deadline = Instant::now() + Duration::from_secs(60);
-    while Instant::now() < deadline {
-        let mut attempts = 0;
-        match grpc_client.get_tx(tx_hash).await {
-            Ok(tx) => {
-                println!("Tx {} succeeded! Response: {:?}", tx_hash, tx.tx_response);
-                return Ok(());
-            }
-            Err(e) => {
-                println!("Tx {tx_hash} not found on chain: {e:?}");
-            }
-        }
-
-        attempts += 1;
-        if attempts > 12 {
-            return Err(anyhow::anyhow!("Timeout waiting for tx {tx_hash:?}"));
-        }
-        sleep(Duration::from_secs(5)).await;
-    }
-
-    Err(anyhow::anyhow!("Timeout waiting for tx {tx_hash:?}"))
 }
 
 // todo: find a place for this function and remove it from the binaries
