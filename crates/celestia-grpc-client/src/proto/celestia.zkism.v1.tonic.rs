@@ -442,20 +442,6 @@ pub mod msg_client {
                 .insert(GrpcMethod::new("celestia.zkism.v1.Msg", "SubmitMessages"));
             self.inner.unary(req, path, codec).await
         }
-        pub async fn process_message(
-            &mut self,
-            request: impl tonic::IntoRequest<super::MsgProcessMessage>,
-        ) -> std::result::Result<tonic::Response<super::MsgProcessMessageResponse>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(tonic::Code::Unknown, format!("Service was not ready: {}", e.into()))
-            })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/hyperlane.core.v1.Msg/MsgProcessMessage");
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("hyperlane.core.v1.Msg", "MsgProcessMessage"));
-            self.inner.unary(req, path, codec).await
-        }
         pub async fn update_params(
             &mut self,
             request: impl tonic::IntoRequest<super::MsgUpdateParams>,
@@ -491,10 +477,6 @@ pub mod msg_server {
             &self,
             request: tonic::Request<super::MsgSubmitMessages>,
         ) -> std::result::Result<tonic::Response<super::MsgSubmitMessagesResponse>, tonic::Status>;
-        async fn process_message(
-            &self,
-            request: tonic::Request<super::MsgProcessMessage>,
-        ) -> std::result::Result<tonic::Response<super::MsgProcessMessageResponse>, tonic::Status>;
         async fn update_params(
             &self,
             request: tonic::Request<super::MsgUpdateParams>,
@@ -617,34 +599,6 @@ pub mod msg_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = UpdateZKExecutionISMSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(accept_compression_encodings, send_compression_encodings)
-                            .apply_max_message_size_config(max_decoding_message_size, max_encoding_message_size);
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/hyperlane.core.v1.Msg/MsgProcessMessage" => {
-                    #[allow(non_camel_case_types)]
-                    struct MsgProcessMessageSvc<T: Msg>(pub Arc<T>);
-                    impl<T: Msg> tonic::server::UnaryService<super::MsgProcessMessage> for MsgProcessMessageSvc<T> {
-                        type Response = super::MsgProcessMessageResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
-                        fn call(&mut self, request: tonic::Request<super::MsgProcessMessage>) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move { <T as Msg>::process_message(&inner, request).await };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = MsgProcessMessageSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(accept_compression_encodings, send_compression_encodings)

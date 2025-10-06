@@ -1,4 +1,4 @@
-use crate::{proto::celestia::zkism::v1::MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm};
+use crate::{MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm};
 use prost::Name;
 
 // Legacy aliases for backward compatibility
@@ -19,6 +19,11 @@ impl MsgUpdateZkExecutionIsm {
     }
 }
 
+impl Name for MsgUpdateZkExecutionIsm {
+    const NAME: &'static str = "MsgUpdateZKExecutionISM";
+    const PACKAGE: &'static str = "celestia.zkism.v1";
+}
+
 impl MsgSubmitMessages {
     /// Create a new message submission with state membership proof
     pub fn new(id: String, height: u64, proof: Vec<u8>, public_values: Vec<u8>, signer: String) -> Self {
@@ -30,6 +35,11 @@ impl MsgSubmitMessages {
             signer,
         }
     }
+}
+
+impl Name for MsgSubmitMessages {
+    const NAME: &'static str = "MsgSubmitMessages";
+    const PACKAGE: &'static str = "celestia.zkism.v1";
 }
 
 impl MsgProcessMessage {
@@ -46,14 +56,4 @@ impl MsgProcessMessage {
 impl Name for MsgProcessMessage {
     const NAME: &'static str = "MsgProcessMessage";
     const PACKAGE: &'static str = "hyperlane.core.v1";
-}
-
-impl Name for MsgUpdateZkExecutionIsm {
-    const NAME: &'static str = "MsgUpdateZKExecutionISM";
-    const PACKAGE: &'static str = "celestia.zkism.v1";
-}
-
-impl Name for MsgSubmitMessages {
-    const NAME: &'static str = "MsgSubmitMessages";
-    const PACKAGE: &'static str = "celestia.zkism.v1";
 }

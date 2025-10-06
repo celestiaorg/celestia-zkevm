@@ -2,11 +2,11 @@
 name = "celestia-grpc-client"
 version = "0.1.0"
 edition = "2021"
-description = "gRPC client for submitting proofs to Celestia consensus network"
+description = "gRPC client for Celestia consensus network and zk ism"
 
 [dependencies]
 anyhow = { workspace = true }
-async-trait = "0.1"
+async-trait = { workspace = true }
 bech32 = { workspace = true }
 bytes = { workspace = true }
 celestia-grpc = { workspace = true }
@@ -24,7 +24,7 @@ serde_json = { workspace = true }
 sha2 = "0.10"
 tendermint = { workspace = true }
 tendermint-proto = { workspace = true }
-thiserror = "1.0"
+thiserror = { workspace = true }
 tokio = { workspace = true }
 tonic = "0.12"
 tracing = { workspace = true }

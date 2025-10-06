@@ -16,4 +16,5 @@ pub use message::{StateInclusionProofMsg, StateTransitionProofMsg};
 pub use proto::celestia::zkism::v1::{
     MsgSubmitMessages, MsgSubmitMessagesResponse, MsgUpdateZkExecutionIsm, MsgUpdateZkExecutionIsmResponse,
 };
+pub use proto::hyperlane::core::v1::MsgProcessMessage;
 pub use types::ProofSubmissionResponse;
