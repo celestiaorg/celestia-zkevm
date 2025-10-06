@@ -12,7 +12,7 @@ pub mod types;
 
 pub use client::{CelestiaIsmClient, ProofSubmitter};
 pub use error::{IsmClientError, Result};
-pub use message::{StateInclusionProofMsg, StateTransitionProofMsg};
+pub use message::{MsgWarpTransfer, StateInclusionProofMsg, StateTransitionProofMsg};
 pub use proto::celestia::zkism::v1::{
     MsgSubmitMessages, MsgSubmitMessagesResponse, MsgUpdateZkExecutionIsm, MsgUpdateZkExecutionIsmResponse,
 };

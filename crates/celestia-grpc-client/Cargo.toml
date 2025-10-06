@@ -39,3 +39,7 @@ tokio-test = "0.4"
 [[bin]]
 name = "client"
 path = "src/bin/client.rs"
+
+[[bin]]
+name = "warp_transfer"
+path = "src/bin/warp_transfer.rs"
