@@ -18,3 +18,11 @@ pub mod cosmos {
         }
     }
 }
+
+pub mod hyperlane {
+    pub mod warp {
+        pub mod v1 {
+            include!("hyperlane.warp.v1.rs");
+        }
+    }
+}

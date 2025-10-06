@@ -6,46 +6,8 @@ pub type StateTransitionProofMsg = MsgUpdateZkExecutionIsm;
 pub type StateInclusionProofMsg = MsgSubmitMessages;
 pub type HyperlaneMessage = MsgProcessMessage;
 
-/// Message for Hyperlane Warp token transfers
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MsgWarpTransfer {
-    /// Sender address (bech32 encoded)
-    #[prost(string, tag = "1")]
-    pub sender: String,
-    /// Token ID (32 bytes hex encoded)
-    #[prost(string, tag = "2")]
-    pub token_id: String,
-    /// Destination domain ID
-    #[prost(uint32, tag = "3")]
-    pub destination_domain: u32,
-    /// Recipient address (hex encoded)
-    #[prost(string, tag = "4")]
-    pub recipient: String,
-    /// Amount to transfer (as string)
-    #[prost(string, tag = "5")]
-    pub amount: String,
-    /// Custom hook ID (optional)
-    #[prost(string, optional, tag = "6")]
-    pub custom_hook_id: Option<String>,
-    /// Gas limit (as string)
-    #[prost(string, tag = "7")]
-    pub gas_limit: String,
-    /// Maximum fee
-    #[prost(message, optional, tag = "8")]
-    pub max_fee: Option<Coin>,
-    /// Custom hook metadata
-    #[prost(string, tag = "9")]
-    pub custom_hook_metadata: String,
-}
-
-/// Coin message for fees
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Coin {
-    #[prost(string, tag = "1")]
-    pub denom: String,
-    #[prost(string, tag = "2")]
-    pub amount: String,
-}
+// Use the generated MsgRemoteTransfer from hyperlane warp proto
+pub use crate::proto::hyperlane::warp::v1::MsgRemoteTransfer as MsgWarpTransfer;
 
 impl MsgUpdateZkExecutionIsm {
     /// Create a new ZK execution ISM update message
@@ -99,6 +61,7 @@ impl Name for MsgSubmitMessages {
     const PACKAGE: &'static str = "celestia.zkism.v1";
 }
 
+// Helper implementation for MsgWarpTransfer (which is now MsgRemoteTransfer)
 impl MsgWarpTransfer {
     /// Create a new warp transfer message
     pub fn new(
@@ -109,13 +72,15 @@ impl MsgWarpTransfer {
         amount: String,
         max_hyperlane_fee: String,
     ) -> Self {
+        use crate::proto::cosmos::base::v1beta1::Coin;
+
         Self {
             sender,
             token_id,
             destination_domain,
             recipient,
             amount,
-            custom_hook_id: None,
+            custom_hook_id: String::new(),
             gas_limit: "0".to_string(),
             max_fee: Some(Coin {
                 denom: "utia".to_string(),
@@ -129,9 +94,4 @@ impl MsgWarpTransfer {
 impl Name for MsgWarpTransfer {
     const NAME: &'static str = "MsgRemoteTransfer";
     const PACKAGE: &'static str = "hyperlane.warp.v1";
-}
-
-impl Name for Coin {
-    const NAME: &'static str = "Coin";
-    const PACKAGE: &'static str = "cosmos.base.v1beta1";
 }
