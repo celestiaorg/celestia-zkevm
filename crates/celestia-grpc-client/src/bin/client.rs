@@ -114,14 +114,14 @@ async fn main() -> Result<()> {
 
             let query_msg = QueryIsmRequest { id: id.clone() };
             let response = client.ism(query_msg).await?;
-            println!("Response = {:?}", response);
+            println!("Response = {response:?}");
         }
         Commands::QueryISMS {} => {
             info!("Querying zk isms");
 
             let query_msg = QueryIsmsRequest { pagination: None };
             let response = client.isms(query_msg).await?;
-            println!("Response = {:?}", response);
+            println!("Response = {response:?}");
         }
     }
 
