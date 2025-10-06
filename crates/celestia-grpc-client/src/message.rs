@@ -63,7 +63,6 @@ impl Name for MsgSubmitMessages {
 
 // Helper implementation for MsgWarpTransfer (which is now MsgRemoteTransfer)
 impl MsgWarpTransfer {
-    /// Create a new warp transfer message
     pub fn new(
         sender: String,
         token_id: String,
