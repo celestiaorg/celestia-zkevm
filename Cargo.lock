@@ -2176,7 +2176,7 @@ dependencies = [
  "tempfile",
  "tendermint",
  "tendermint-proto",
- "thiserror 1.0.69",
+ "thiserror 2.0.17",
  "tokio",
  "tokio-test",
  "tonic 0.12.3",
@@ -2346,8 +2346,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "145052bdd345b87320e369255277e3fb5152762ad123a901ef5c262dd38fe8d2"
 dependencies = [
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-link 0.2.0",
 ]
 
@@ -3029,11 +3031,13 @@ dependencies = [
  "alloy-sol-types",
  "anyhow",
  "bincode",
+ "celestia-grpc",
+ "celestia-grpc-client",
  "celestia-rpc",
  "celestia-types 0.15.0",
+ "chrono",
  "dirs",
  "dotenvy",
- "ev-prover",
  "ev-state-queries",
  "ev-types",
  "ev-zkevm-types",
@@ -3044,11 +3048,14 @@ dependencies = [
  "rsp-host-executor",
  "rsp-primitives",
  "rsp-rpc-db",
+ "rustls 0.23.32",
+ "serde",
  "serde_cbor",
  "serde_json",
  "sp1-sdk",
  "storage",
  "tempfile",
+ "tendermint-proto",
  "tokio",
  "url",
 ]
@@ -3423,7 +3430,6 @@ dependencies = [
 name = "ev-state-queries"
 version = "0.1.0"
 dependencies = [
- "alloy",
  "alloy-consensus",
  "alloy-primitives",
  "alloy-provider",
@@ -8979,7 +8985,6 @@ dependencies = [
  "async-trait",
  "bincode",
  "dirs",
- "dotenvy",
  "ev-zkevm-types",
  "hex",
  "rocksdb",

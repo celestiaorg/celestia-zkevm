@@ -1,11 +1,6 @@
 // This endpoint generates a block proof for a range (trusted_height, target_height)
 // and wraps it recursively into a single groth16 proof using the ev-range-exec program.
 
-use std::env;
-use std::error::Error;
-use std::fs;
-use std::sync::Arc;
-
 use alloy_genesis::Genesis as AlloyGenesis;
 use alloy_primitives::{FixedBytes, hex};
 use alloy_provider::ProviderBuilder;
@@ -24,8 +19,11 @@ use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
-use sp1_sdk::{HashableKey, SP1Proof, SP1Stdin};
-use sp1_sdk::{ProverClient, SP1ProofWithPublicValues};
+use sp1_sdk::{EnvProver, HashableKey, SP1Proof, SP1ProofWithPublicValues, SP1Stdin};
+use std::env;
+use std::error::Error;
+use std::fs;
+use std::sync::Arc;
 use storage::proofs::{ProofStorage, RocksDbProofStorage};
 use tokio::task::JoinHandle;
 
@@ -86,13 +84,14 @@ pub async fn prove_blocks(
     trusted_height: u64,
     num_blocks: u64,
     trusted_root: &mut FixedBytes<32>,
+    client: Arc<EnvProver>,
 ) -> Result<SP1ProofWithPublicValues, Box<dyn Error>> {
     let mut trusted_height = trusted_height;
     let prover_mode = env::var("SP1_PROVER").unwrap_or("cpu".to_string());
     let proof = {
         // parallel mode (network)
         if prover_mode == "network" {
-            parallel_prover(start_height, &mut trusted_height, num_blocks, trusted_root).await?
+            parallel_prover(start_height, &mut trusted_height, num_blocks, trusted_root, client).await?
         }
         // mock mode is not possible for recursive groth16 proofs
         else if prover_mode == "mock" {
@@ -100,7 +99,7 @@ pub async fn prove_blocks(
         }
         // synchronous mode (cuda, cpu)
         else {
-            synchronous_prover(start_height, &mut trusted_height, num_blocks, trusted_root).await?
+            synchronous_prover(start_height, &mut trusted_height, num_blocks, trusted_root, client).await?
         }
     };
     Ok(proof)
@@ -111,6 +110,7 @@ pub async fn parallel_prover(
     trusted_height: &mut u64,
     num_blocks: u64,
     trusted_root: &mut FixedBytes<32>,
+    client: Arc<EnvProver>,
 ) -> Result<SP1ProofWithPublicValues, Box<dyn Error>> {
     let storage_path = dirs::home_dir()
         .expect("cannot find home directory")
@@ -135,8 +135,7 @@ pub async fn parallel_prover(
     let pub_key = get_sequencer_pubkey().await?;
 
     let block_prover_elf = fs::read("elfs/ev-exec-elf").expect("Failed to read ELF");
-    let client = ProverClient::from_env();
-    let (pk, vk) = client.setup(&block_prover_elf);
+    let (pk, vk) = (*client).setup(&block_prover_elf);
 
     let mut trusted_heights = Vec::new();
     let mut trusted_roots = Vec::new();
@@ -150,30 +149,25 @@ pub async fn parallel_prover(
     // collect the trusted height and root to then supply them optimistically to the prover
     for block_number in start_height..(start_height + num_blocks) {
         println!("\nProcessing block: {block_number}");
-        
         let blobs: Vec<Blob> = celestia_client
             .blob_get_all(block_number, &[namespace])
             .await
             .expect("Failed to get blobs")
             .unwrap_or_default();
-        
         println!("Got {} blobs for block: {}", blobs.len(), block_number);
 
         let extended_header = celestia_client
             .header_get_by_height(block_number)
             .await
             .expect("Failed to get extended header");
-        
         let namespace_data = celestia_client
             .share_get_namespace_data(&extended_header, namespace)
             .await
             .expect("Failed to get namespace data");
-        
         let mut proofs: Vec<NamespaceProof> = Vec::new();
         for row in namespace_data.rows {
             proofs.push(row.proof);
         }
-        
         println!("Got NamespaceProofs, total: {}", proofs.len());
 
         let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
@@ -182,7 +176,6 @@ pub async fn parallel_prover(
                 Ok(data) => data.data.unwrap(),
                 Err(_) => continue,
             };
-            
             let height = data.metadata.unwrap().height;
             println!("Got SignedData for EVM block {height}");
 
@@ -190,7 +183,6 @@ pub async fn parallel_prover(
                 generate_client_executor_input(config::EVM_RPC_URL, height, chain_spec.clone(), genesis.clone())
                     .await
                     .expect("Failed to generate client executor input");
-                    
             executor_inputs.push(client_executor_input);
         }
 
@@ -235,7 +227,6 @@ pub async fn parallel_prover(
             let genesis = genesis.clone();
             let pub_key = pub_key.clone();
             let pk = pk.clone();
-            let client = ProverClient::from_env();
             let proof_storage = proof_storage.clone();
             let trusted_heights = trusted_heights.clone();
             let trusted_roots = trusted_roots.clone();
@@ -243,6 +234,7 @@ pub async fn parallel_prover(
 
             // spawn a tokio task for each block proof and join them to await all proofs before
             // wrapping them in groth16
+            let client_clone = client.clone();
             async move {
                 println!("\nProcessing block: {block_number}");
                 write_inputs(
@@ -259,7 +251,7 @@ pub async fn parallel_prover(
                 .await
                 .expect("Failed to write inputs");
                 println!("Generating proof for block: {block_number}");
-                let proof = client
+                let proof = client_clone
                     .prove(&pk, &stdin)
                     .compressed()
                     .run()
@@ -290,10 +282,9 @@ pub async fn parallel_prover(
     }
 
     // reinitialize the prover client
-    let client = ProverClient::from_env();
     let mut stdin = SP1Stdin::new();
     let range_prover_elf = fs::read("elfs/ev-range-exec-elf").expect("Failed to read ELF");
-    let (pk, _) = client.setup(&range_prover_elf);
+    let (pk, _) = client.clone().setup(&range_prover_elf);
 
     // load all proofs from storage for range proof
     println!("Loading block proofs from storage for range proof");
@@ -330,6 +321,7 @@ pub async fn parallel_prover(
 
     // finally generate the range proof and return it
     let proof = client
+        .clone()
         .prove(&pk, &stdin)
         .groth16()
         .run()
@@ -349,6 +341,7 @@ pub async fn synchronous_prover(
     trusted_height: &mut u64,
     num_blocks: u64,
     trusted_root: &mut FixedBytes<32>,
+    client: Arc<EnvProver>,
 ) -> Result<SP1ProofWithPublicValues, Box<dyn Error>> {
     let genesis_path = dirs::home_dir()
         .expect("cannot find home directory")
@@ -362,9 +355,8 @@ pub async fn synchronous_prover(
         .await
         .context("Failed creating Celestia RPC client")?;
     let pub_key = get_sequencer_pubkey().await?;
-    let client = ProverClient::from_env();
     let block_prover_elf = fs::read("elfs/ev-exec-elf").expect("Failed to read ELF");
-    let (pk, vk) = client.setup(&block_prover_elf);
+    let (pk, vk) = client.clone().setup(&block_prover_elf);
 
     let mut block_proofs: Vec<SP1ProofWithPublicValues> = Vec::new();
     // loop and adjust trusted state for each iteration,
@@ -386,6 +378,7 @@ pub async fn synchronous_prover(
         .await?;
         println!("Generating proof for block: {block_number}, trusted height: {trusted_height}");
         let proof = client
+            .clone()
             .prove(&pk, &stdin)
             .compressed()
             .run()
@@ -401,10 +394,9 @@ pub async fn synchronous_prover(
     }
 
     // reinitialize the prover client
-    let client = ProverClient::from_env();
     let mut stdin = SP1Stdin::new();
     let range_prover_elf = fs::read("elfs/ev-range-exec-elf").expect("Failed to read ELF");
-    let (pk, _) = client.setup(&range_prover_elf);
+    let (pk, _) = client.clone().setup(&range_prover_elf);
 
     let vkeys = vec![vk.hash_u32(); block_proofs.len()];
 
@@ -427,6 +419,7 @@ pub async fn synchronous_prover(
     }
 
     let proof = client
+        .clone()
         .prove(&pk, &stdin)
         .groth16()
         .run()
