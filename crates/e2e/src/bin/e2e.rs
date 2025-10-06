@@ -1,9 +1,8 @@
 use alloy_primitives::{FixedBytes, hex::FromHex};
 use alloy_provider::ProviderBuilder;
 use celestia_grpc_client::{
-    MsgSubmitMessages, MsgUpdateZkExecutionIsm, ProofSubmitter,
+    MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm, ProofSubmitter, QueryIsmRequest,
     client::CelestiaIsmClient,
-    proto::celestia::zkism::v1::{MsgProcessMessage, QueryIsmRequest},
 };
 use e2e::prover::block::prove_blocks;
 use e2e::{

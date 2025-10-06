@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 /// Response from proof submission
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProofSubmissionResponse {
+pub struct TxResponse {
     /// Transaction hash
     pub tx_hash: String,
     /// Block height where transaction was included
