@@ -13,13 +13,18 @@ option go_package = "github.com/celestiaorg/celestia-app/x/zkism/types";
 service Msg {
   option (cosmos.msg.v1.service) = true;
 
-  // CreateZKExecutionISM defines the rpc method for creating a new ZK execution ISM.
-  rpc CreateZKExecutionISM(MsgCreateZKExecutionISM) returns (MsgCreateZKExecutionISMResponse);
+  // CreateZKExecutionISM defines the rpc method for creating a new ZK execution
+  // ISM.
+  rpc CreateZKExecutionISM(MsgCreateZKExecutionISM)
+      returns (MsgCreateZKExecutionISMResponse);
 
-  // UpdateZKExecutionISM defines the rpc method for updating an existing ZK execution ISM.
-  rpc UpdateZKExecutionISM(MsgUpdateZKExecutionISM) returns (MsgUpdateZKExecutionISMResponse);
+  // UpdateZKExecutionISM defines the rpc method for updating an existing ZK
+  // execution ISM.
+  rpc UpdateZKExecutionISM(MsgUpdateZKExecutionISM)
+      returns (MsgUpdateZKExecutionISMResponse);
 
-  // SubmitMessages defines the rpc method for verifying state membership of messages.
+  // SubmitMessages defines the rpc method for verifying state membership of
+  // messages.
   rpc SubmitMessages(MsgSubmitMessages) returns (MsgSubmitMessagesResponse);
 
   // UpdateParams defines the rpc method for updating the module parameters.
@@ -48,11 +53,13 @@ message MsgCreateZKExecutionISM {
   bytes state_membership_vkey = 8;
 }
 
-// MsgCreateZKExecutionISMResponse is the response type for CreateZKExecutionISM.
+// MsgCreateZKExecutionISMResponse is the response type for
+// CreateZKExecutionISM.
 message MsgCreateZKExecutionISMResponse {
   string id = 1 [
-    (gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress",
-    (gogoproto.nullable)   = false
+    (gogoproto.customtype) =
+        "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress",
+    (gogoproto.nullable) = false
   ];
 }
 
@@ -62,8 +69,9 @@ message MsgUpdateZKExecutionISM {
 
   // ism identifier
   string id = 1 [
-    (gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress",
-    (gogoproto.nullable)   = false
+    (gogoproto.customtype) =
+        "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress",
+    (gogoproto.nullable) = false
   ];
   // height is the Celestia height associated with the state transition update.
   uint64 height = 2;
@@ -75,7 +83,8 @@ message MsgUpdateZKExecutionISM {
   string signer = 5;
 }
 
-// MsgUpdateZKExecutionISMResponse is the response type for UpdateZKExecutionISM.
+// MsgUpdateZKExecutionISMResponse is the response type for
+// UpdateZKExecutionISM.
 message MsgUpdateZKExecutionISMResponse {
   // updated ism trusted state root (hex-encoded)
   string state_root = 1;
@@ -89,10 +98,12 @@ message MsgSubmitMessages {
 
   // ism identifier
   string id = 1 [
-    (gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress",
-    (gogoproto.nullable)   = false
+    (gogoproto.customtype) =
+        "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress",
+    (gogoproto.nullable) = false
   ];
-  // height is the EVM application height associated with the state transition update.
+  // height is the EVM application height associated with the state transition
+  // update.
   uint64 height = 2;
   // proof is the ZK proof bytes (groth16).
   bytes proof = 3;
@@ -109,12 +120,13 @@ message MsgSubmitMessagesResponse {}
 message MsgUpdateParams {
   option (cosmos.msg.v1.signer) = "authority";
 
-  // authority is the address that controls the module (defaults to x/gov unless overwritten).
-  string authority = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // authority is the address that controls the module (defaults to x/gov unless
+  // overwritten).
+  string authority = 1 [ (cosmos_proto.scalar) = "cosmos.AddressString" ];
   // params defines the x/zkism parameters to update.
   //
   // NOTE: All parameters must be supplied.
-  Params params = 2 [(gogoproto.nullable) = false];
+  Params params = 2 [ (gogoproto.nullable) = false ];
 };
 
 // MsgUpdateParamsResponse defines the response type for UpdateParams.
