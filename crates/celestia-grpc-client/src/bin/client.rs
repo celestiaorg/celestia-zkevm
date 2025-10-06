@@ -1,10 +1,9 @@
 #!/usr/bin/env cargo
 
 use anyhow::Result;
-use celestia_grpc_client::proto::celestia::zkism::v1::{query_client::QueryClient, QueryIsmRequest, QueryIsmsRequest};
+use celestia_grpc_client::proto::celestia::zkism::v1::{QueryIsmRequest, QueryIsmsRequest};
 use celestia_grpc_client::{CelestiaIsmClient, ProofSubmitter, StateInclusionProofMsg, StateTransitionProofMsg};
 use clap::{Parser, Subcommand};
-use tonic::Request;
 use tracing::{info, Level};
 
 #[derive(Parser)]
@@ -113,26 +112,16 @@ async fn main() -> Result<()> {
         Commands::QueryISM { id } => {
             info!("Querying zk ism with id: {id}");
 
-            let mut query_client = QueryClient::connect("http://127.0.0.1:9090").await?;
-
             let query_msg = QueryIsmRequest { id: id.clone() };
-
-            let request = tonic::Request::new(query_msg);
-            let response = query_client.ism(request).await?;
-
-            println!("Response = {:?}", response.into_inner());
+            let response = client.ism(query_msg).await?;
+            println!("Response = {:?}", response);
         }
         Commands::QueryISMS {} => {
             info!("Querying zk isms");
 
-            let mut query_client = QueryClient::connect("http://127.0.0.1:9090").await?;
-
             let query_msg = QueryIsmsRequest { pagination: None };
-
-            let request = Request::new(query_msg);
-            let response = query_client.isms(request).await?;
-
-            println!("Response = {:?}", response.into_inner());
+            let response = client.isms(query_msg).await?;
+            println!("Response = {:?}", response);
         }
     }
 
