@@ -2,41 +2,32 @@
 name = "celestia-grpc-client"
 version = "0.1.0"
 edition = "2021"
-description = "gRPC client for submitting proofs to Celestia consensus network"
+description = "gRPC client for Celestia consensus network and zk ism"
 
 [dependencies]
-# Lumina gRPC library for Celestia interaction
-celestia-grpc = { workspace = true }
-
-# Core dependencies
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+bech32 = { workspace = true }
 bytes = { workspace = true }
+celestia-grpc = { workspace = true }
+celestia-types = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+k256 = "0.13"
+md5 = "0.7"
+prost = "0.13"
+prost-types = "0.13"
+rustls = { version = "0.23", features = ["aws_lc_rs"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-thiserror = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
-
-# Crypto dependencies
-k256 = "0.13"
 sha2 = "0.10"
-bech32 = { workspace = true }
-
-# Celestia dependencies - use same version as lumina-grpc to avoid conflicts
 tendermint = { workspace = true }
 tendermint-proto = { workspace = true }
-
-# gRPC and protobuf dependencies
-tonic = "0.13"
-prost = "0.13"
-
-# TLS dependencies for rustls crypto provider
-rustls = { version = "0.23", features = ["aws_lc_rs"] }
-
-# CLI dependencies
-clap = { version = "4", features = ["derive"] }
-hex = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tonic = "0.12"
+tracing = { workspace = true }
 tracing-subscriber = "0.3"
 
 [features]
@@ -45,10 +36,6 @@ tracing-subscriber = "0.3"
 tempfile = "3.8"
 tokio-test = "0.4"
 
-[build-dependencies]
-tonic-build = "0.13"
-prost-build = "0.13"
-
 [[bin]]
-name = "proof_submitter"
-path = "src/bin/proof_submitter.rs"
+name = "client"
+path = "src/bin/client.rs"

@@ -1,10 +1,17 @@
-use crate::error::{ProofSubmissionError, Result};
+use crate::error::{IsmClientError, Result};
 use crate::message::{StateInclusionProofMsg, StateTransitionProofMsg};
+use crate::proto::celestia::zkism::v1::{
+    query_client::QueryClient, QueryIsmRequest, QueryIsmResponse, QueryIsmsRequest, QueryIsmsResponse,
+};
 use crate::types::{ClientConfig, ProofSubmissionResponse};
 
 use anyhow::Context;
 use async_trait::async_trait;
 use celestia_grpc::GrpcClient;
+use tonic::{
+    transport::{Channel, Endpoint},
+    Request,
+};
 use tracing::{debug, info, warn};
 
 /// Trait for proof submission operations
@@ -21,12 +28,13 @@ pub trait ProofSubmitter {
 }
 
 /// Celestia gRPC client for proof submission
-pub struct CelestiaProofClient {
-    grpc_client: GrpcClient,
+pub struct CelestiaIsmClient {
     config: ClientConfig,
+    channel: Channel,
+    tx_client: GrpcClient,
 }
 
-impl CelestiaProofClient {
+impl CelestiaIsmClient {
     /// Create a new Celestia proof client
     pub async fn new(mut config: ClientConfig) -> Result<Self> {
         debug!("Creating Celestia proof client with endpoint: {}", config.grpc_endpoint);
@@ -37,7 +45,14 @@ impl CelestiaProofClient {
             debug!("Derived signer address: {}", config.signer_address);
         }
 
-        let grpc_client = GrpcClient::builder()
+        // optional: set timeouts, concurrency limits, TLS, etc.
+        let endpoint = Endpoint::from_shared(config.grpc_endpoint.clone())?
+            .connect_timeout(std::time::Duration::from_secs(15))
+            .tcp_nodelay(true);
+
+        let channel = endpoint.connect().await?;
+
+        let tx_client = GrpcClient::builder()
             .url(&config.grpc_endpoint)
             .private_key_hex(&config.private_key_hex)
             .build()
@@ -45,7 +60,11 @@ impl CelestiaProofClient {
 
         info!("Successfully created Celestia proof client");
 
-        Ok(Self { grpc_client, config })
+        Ok(Self {
+            config,
+            channel,
+            tx_client,
+        })
     }
 
     /// Create a client from environment variables
@@ -54,32 +73,30 @@ impl CelestiaProofClient {
             grpc_endpoint: std::env::var("CELESTIA_GRPC_ENDPOINT")
                 .unwrap_or_else(|_| "http://localhost:9090".to_string()),
             private_key_hex: std::env::var("CELESTIA_PRIVATE_KEY").map_err(|_| {
-                ProofSubmissionError::Configuration("CELESTIA_PRIVATE_KEY environment variable not set".to_string())
+                IsmClientError::Configuration("CELESTIA_PRIVATE_KEY environment variable not set".to_string())
             })?,
             signer_address: String::new(), // Will be derived in new()
             chain_id: std::env::var("CELESTIA_CHAIN_ID").unwrap_or_else(|_| "celestia-zkevm-testnet".to_string()),
             gas_price: std::env::var("CELESTIA_GAS_PRICE")
                 .unwrap_or_else(|_| "1000".to_string())
                 .parse()
-                .map_err(|_| ProofSubmissionError::Configuration("Invalid CELESTIA_GAS_PRICE".to_string()))?,
+                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_GAS_PRICE".to_string()))?,
             max_gas: std::env::var("CELESTIA_MAX_GAS")
                 .unwrap_or_else(|_| "200000".to_string())
                 .parse()
-                .map_err(|_| ProofSubmissionError::Configuration("Invalid CELESTIA_MAX_GAS".to_string()))?,
+                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_MAX_GAS".to_string()))?,
             confirmation_timeout: std::env::var("CELESTIA_CONFIRMATION_TIMEOUT")
                 .unwrap_or_else(|_| "60".to_string())
                 .parse()
-                .map_err(|_| {
-                    ProofSubmissionError::Configuration("Invalid CELESTIA_CONFIRMATION_TIMEOUT".to_string())
-                })?,
+                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_CONFIRMATION_TIMEOUT".to_string()))?,
         };
 
         Self::new(config).await
     }
 
-    /// Get the gRPC client reference for direct access to Lumina functionality
-    pub fn grpc_client(&self) -> &GrpcClient {
-        &self.grpc_client
+    /// Get the gRPC tx client reference for direct access to Lumina functionality
+    pub fn tx_client(&self) -> &GrpcClient {
+        &self.tx_client
     }
 
     /// Get the client configuration
@@ -102,6 +119,18 @@ impl CelestiaProofClient {
         &self.config.signer_address
     }
 
+    pub async fn ism(&self, req: QueryIsmRequest) -> Result<QueryIsmResponse> {
+        let mut client = QueryClient::new(self.channel.clone());
+        let resp = client.ism(Request::new(req)).await?;
+        Ok(resp.into_inner())
+    }
+
+    pub async fn isms(&self, req: QueryIsmsRequest) -> Result<QueryIsmsResponse> {
+        let mut client = QueryClient::new(self.channel.clone());
+        let resp = client.isms(Request::new(req)).await?;
+        Ok(resp.into_inner())
+    }
+
     /// Submit a zkISM proof message via Lumina
     async fn submit_zkism_message<M>(&self, message: M, message_type: &str) -> Result<ProofSubmissionResponse>
     where
@@ -119,7 +148,7 @@ impl CelestiaProofClient {
             ..Default::default()
         };
 
-        match self.grpc_client.submit_message(message, tx_config).await {
+        match self.tx_client.submit_message(message, tx_config).await {
             Ok(tx_info) => {
                 info!(
                     "Successfully submitted {} message: tx_hash={}, height={}",
@@ -138,7 +167,7 @@ impl CelestiaProofClient {
             }
             Err(e) => {
                 warn!("Failed to submit {} message: {}", message_type, e);
-                Err(ProofSubmissionError::SubmissionFailed(format!(
+                Err(IsmClientError::SubmissionFailed(format!(
                     "Failed to submit {message_type}: {e}"
                 )))
             }
@@ -147,7 +176,7 @@ impl CelestiaProofClient {
 }
 
 #[async_trait]
-impl ProofSubmitter for CelestiaProofClient {
+impl ProofSubmitter for CelestiaIsmClient {
     async fn submit_state_transition_proof(
         &self,
         proof_msg: StateTransitionProofMsg,
@@ -159,13 +188,11 @@ impl ProofSubmitter for CelestiaProofClient {
 
         // Validate proof message
         if proof_msg.proof.is_empty() {
-            return Err(ProofSubmissionError::InvalidProof(
-                "Proof data cannot be empty".to_string(),
-            ));
+            return Err(IsmClientError::InvalidProof("Proof data cannot be empty".to_string()));
         }
 
         if proof_msg.id.is_empty() {
-            return Err(ProofSubmissionError::InvalidProof("ISM ID cannot be empty".to_string()));
+            return Err(IsmClientError::InvalidProof("ISM ID cannot be empty".to_string()));
         }
 
         // Submit via Lumina
@@ -180,13 +207,11 @@ impl ProofSubmitter for CelestiaProofClient {
 
         // Validate proof message
         if proof_msg.proof.is_empty() {
-            return Err(ProofSubmissionError::InvalidProof(
-                "Proof data cannot be empty".to_string(),
-            ));
+            return Err(IsmClientError::InvalidProof("Proof data cannot be empty".to_string()));
         }
 
         if proof_msg.id.is_empty() {
-            return Err(ProofSubmissionError::InvalidProof("ISM ID cannot be empty".to_string()));
+            return Err(IsmClientError::InvalidProof("ISM ID cannot be empty".to_string()));
         }
 
         // Submit via Lumina
@@ -196,6 +221,8 @@ impl ProofSubmitter for CelestiaProofClient {
 
 #[cfg(test)]
 mod tests {
+    use prost::Message;
+
     use super::*;
 
     #[allow(dead_code)]
@@ -260,11 +287,13 @@ mod tests {
         );
 
         // Test that the message can be serialized (this validates the structure)
-        let serialized = serde_json::to_vec(&proof_msg).expect("Should serialize");
+        let serialized = proof_msg.encode_to_vec();
         assert!(!serialized.is_empty());
 
         // Test deserialization
-        let deserialized: StateTransitionProofMsg = serde_json::from_slice(&serialized).expect("Should deserialize");
+        let deserialized: StateTransitionProofMsg =
+            StateTransitionProofMsg::decode(serialized.as_slice()).expect("failed to decode");
+
         assert_eq!(deserialized.id, proof_msg.id);
         assert_eq!(deserialized.height, proof_msg.height);
         assert_eq!(deserialized.proof, proof_msg.proof);

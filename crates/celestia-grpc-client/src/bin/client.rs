@@ -1,7 +1,8 @@
 #!/usr/bin/env cargo
 
 use anyhow::Result;
-use celestia_grpc_client::{CelestiaProofClient, ProofSubmitter, StateInclusionProofMsg, StateTransitionProofMsg};
+use celestia_grpc_client::proto::celestia::zkism::v1::{QueryIsmRequest, QueryIsmsRequest};
+use celestia_grpc_client::{CelestiaIsmClient, ProofSubmitter, StateInclusionProofMsg, StateTransitionProofMsg};
 use clap::{Parser, Subcommand};
 use tracing::{info, Level};
 
@@ -44,6 +45,12 @@ enum Commands {
         #[arg(long)]
         height: u64,
     },
+    QueryISM {
+        /// ISM identifier
+        #[arg(long)]
+        id: String,
+    },
+    QueryISMS {},
 }
 
 #[tokio::main]
@@ -59,7 +66,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Create client from environment variables
-    let client = CelestiaProofClient::from_env().await?;
+    let client = CelestiaIsmClient::from_env().await?;
 
     match &cli.command {
         Commands::StateTransition {
@@ -101,6 +108,20 @@ async fn main() -> Result<()> {
             println!("Transaction hash: {}", response.tx_hash);
             println!("Block height: {}", response.height);
             println!("Gas used: {}", response.gas_used);
+        }
+        Commands::QueryISM { id } => {
+            info!("Querying zk ism with id: {id}");
+
+            let query_msg = QueryIsmRequest { id: id.clone() };
+            let response = client.ism(query_msg).await?;
+            println!("Response = {response:?}");
+        }
+        Commands::QueryISMS {} => {
+            info!("Querying zk isms");
+
+            let query_msg = QueryIsmsRequest { pagination: None };
+            let response = client.isms(query_msg).await?;
+            println!("Response = {response:?}");
         }
     }
 
