@@ -7,7 +7,8 @@ use crate::types::{ClientConfig, TxResponse};
 
 use anyhow::Context;
 use async_trait::async_trait;
-use celestia_grpc::GrpcClient;
+use celestia_grpc::{GrpcClient, IntoProtobufAny};
+use prost::Message;
 use tonic::{
     transport::{Channel, Endpoint},
     Request,
@@ -134,7 +135,7 @@ impl CelestiaIsmClient {
     /// Sign and send a tx to Celestia including the provided message.
     pub async fn send_tx<M>(&self, message: M) -> Result<TxResponse>
     where
-        M: celestia_grpc::IntoProtobufAny + Send + Clone + 'static,
+        M: Message + IntoProtobufAny + Send + Clone + 'static,
     {
         let message_type = message.clone().into_any().type_url;
         debug!(
