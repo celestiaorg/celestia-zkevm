@@ -145,7 +145,7 @@ impl CelestiaIsmClient {
         let tx_config = celestia_grpc::TxConfig {
             gas_limit: Some(self.config.max_gas),
             gas_price: Some(self.config.gas_price as f64),
-            memo: Some(format!("celestia-zkism-client")),
+            memo: Some("celestia-zkism-client".to_string()),
             ..Default::default()
         };
 

@@ -48,18 +48,19 @@ enum Commands {
         height: u64,
     },
     Transfer {
-        /// ISM identifier
+        /// The sender address (must be the tx signer)
         #[arg(long)]
         sender: String,
-        /// Proof file path (hex encoded)
+        /// The Hyperlane warp token identifier
         #[arg(long)]
         token_id: String,
-        /// Public values file path (hex encoded)
+        /// The destination domain for the transfer (e.g. 1234)
         #[arg(long)]
         domain: u32,
-        /// Block height for inclusion proof
+        /// The recipient address on the counterparty
         #[arg(long)]
         recipient: String,
+        // The token amount
         #[arg(long)]
         amount: String,
     },
