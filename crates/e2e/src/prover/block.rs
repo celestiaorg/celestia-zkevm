@@ -362,7 +362,7 @@ pub async fn synchronous_prover(
     // loop and adjust trusted state for each iteration,
     // collect all proofs into a vec and return
     // later wrap them in groth16
-    for block_number in start_height..(start_height + num_blocks) {
+    for block_number in start_height..=(start_height + num_blocks) {
         let mut stdin = SP1Stdin::new();
         write_inputs(
             &mut stdin,

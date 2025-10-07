@@ -35,8 +35,8 @@ async fn main() {
     let trusted_height = ism.height;
 
     let client: Arc<EnvProver> = Arc::new(ProverClient::from_env());
-    let start_height = inclusion_height(trusted_height).await.unwrap() + 1;
     let target_inclusion_height = inclusion_height(TARGET_HEIGHT).await.unwrap();
+    let start_height = inclusion_height(trusted_height).await.unwrap() + 1;
     let num_blocks = target_inclusion_height - start_height;
     let block_proof = prove_blocks(
         start_height,
@@ -53,7 +53,7 @@ async fn main() {
         target_inclusion_height,
         block_proof.bytes(),
         block_proof.public_values.as_slice().to_vec(),
-        ism_client.signer_address().to_string(),
+        "celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q".to_string(),
     );
 
     let response = ism_client.submit_state_transition_proof(block_proof_msg).await.unwrap();
@@ -74,7 +74,7 @@ async fn main() {
         TARGET_HEIGHT,
         message_proof.0.bytes(),
         message_proof.0.public_values.as_slice().to_vec(),
-        ism_client.signer_address().to_string(),
+        "celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q".to_string(),
     );
 
     let response = ism_client

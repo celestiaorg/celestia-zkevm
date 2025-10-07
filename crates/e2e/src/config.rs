@@ -3,7 +3,7 @@
 pub mod e2e {
     pub const ISM_ID: &str = "0x726f757465725f69736d000000000000000000000000002a0000000000000001";
     // target height for message prover
-    pub const TARGET_HEIGHT: u64 = 198;
+    pub const TARGET_HEIGHT: u64 = 194;
     pub const SEQUENCER_URL: &str = "http://127.0.0.1:7331";
 }
 
