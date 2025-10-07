@@ -118,7 +118,7 @@ impl HyperlaneBranchProof {
             let key_nibbles = Nibbles::unpack(digest_keccak(&key_bytes));
             // Verify exclusion proof for empty branch nodes
             if proof.value == Uint::from(0) {
-                if verify_proof(storage_root, key_nibbles.clone(), None, &proof.proof).is_err() {
+                if verify_proof(storage_root, key_nibbles, None, &proof.proof).is_err() {
                     println!("Failed to verify exclusion (zero) proof for key: {key}");
                     return Ok(false);
                 }
