@@ -3391,6 +3391,8 @@ dependencies = [
  "tonic 0.10.2",
  "tonic-build 0.10.2",
  "tonic-reflection",
+ "tracing",
+ "tracing-subscriber",
  "walkdir",
 ]
 

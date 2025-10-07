@@ -13,10 +13,14 @@ use storage::{
     proofs::RocksDbProofStorage,
 };
 use tempfile::TempDir;
+use tracing_subscriber::EnvFilter;
 
 #[tokio::test]
 async fn test_run_message_prover() {
     dotenvy::dotenv().ok();
+    // Configure logging for ev-prover
+    let filter = EnvFilter::new("ev-prover=debug,sp1_core=warn,sp1_runtime=warn,sp1_sdk=warn,sp1_vm=warn");
+    tracing_subscriber::fmt().with_env_filter(filter).init();
     let tmp = TempDir::new().expect("cannot create temp directory");
     let snapshot_storage_path = dirs::home_dir()
         .expect("cannot find home directory")
