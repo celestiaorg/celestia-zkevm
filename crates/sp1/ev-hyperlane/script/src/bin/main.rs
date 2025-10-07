@@ -108,7 +108,6 @@ async fn write_proof_inputs(stdin: &mut SP1Stdin, args: &Args) -> Result<()> {
     for height in args.start_height..=args.target_height {
         let block_messages = message_db.get_by_block(height as u64).unwrap();
         for block_message in block_messages {
-            println!("Height: {}", height);
             messages.push(block_message);
         }
     }
