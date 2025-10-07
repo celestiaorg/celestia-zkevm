@@ -6,6 +6,7 @@ use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server;
 use tonic_reflection::server::Builder as ReflectionBuilder;
+use tracing::{debug, error};
 
 use crate::config::config::Config;
 use crate::proto::celestia::prover::v1::prover_server::ProverServer;
@@ -13,6 +14,7 @@ use crate::prover::programs::block::{AppContext, BlockExecProver};
 use crate::prover::service::ProverService;
 
 pub async fn create_grpc_server(config: Config) -> Result<()> {
+    tracing_subscriber::fmt::init();
     let listener = TcpListener::bind(config.grpc_address.clone()).await?;
 
     let descriptor_bytes = include_bytes!("../../src/proto/descriptor.bin");
@@ -25,13 +27,13 @@ pub async fn create_grpc_server(config: Config) -> Result<()> {
     // https://github.com/evstack/ev-node/issues/2603
     let mut config_clone = config.clone();
     config_clone.pub_key = public_key().await?;
-    println!("Successfully got pubkey from evnode: {}", config_clone.pub_key);
+    debug!("Successfully got pubkey from evnode: {}", config_clone.pub_key);
 
     tokio::spawn({
         let block_prover = BlockExecProver::new(AppContext::from_config(config_clone)?)?;
         async move {
             if let Err(e) = block_prover.run().await {
-                eprintln!("Block prover task failed: {e:?}");
+                error!("Block prover task failed: {e:?}");
             }
         }
     });

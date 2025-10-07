@@ -17,6 +17,7 @@ use tempfile::TempDir;
 #[tokio::test]
 async fn test_run_message_prover() {
     dotenvy::dotenv().ok();
+    tracing_subscriber::fmt::init();
     let tmp = TempDir::new().expect("cannot create temp directory");
     let snapshot_storage_path = dirs::home_dir()
         .expect("cannot find home directory")

@@ -46,6 +46,8 @@ tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 tonic = { version = "0.10", features = ["transport"] }
 tonic-reflection = "0.10"
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 [build-dependencies]
 prost-build = "0.12"
