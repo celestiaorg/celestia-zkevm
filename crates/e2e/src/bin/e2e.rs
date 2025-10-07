@@ -92,7 +92,7 @@ async fn main() {
         let msg = MsgProcessMessage::new(
             "0x68797065726c616e650000000000000000000000000000000000000000000000".to_string(),
             "celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q".to_string(),
-            alloy::hex::encode(vec![]),
+            alloy::hex::encode(vec![]), // empty metadata; messages are pre-authorized before submission
             message_hex,
         );
         let response = ism_client.process_hyperlane_message(msg).await.unwrap();
