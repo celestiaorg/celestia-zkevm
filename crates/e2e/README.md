@@ -1,74 +1,60 @@
 # ZKISM E2E on Celestia
 
-## 1. Message Proof Payload
+
+## Running the E2E
+
+First 
+1. Install the binary to local Cargo binary directory `~/.cargo/bin`:
+
+    ```shell
+    cargo install --path ./crates/ev-prover
+    ```
+
+2. Initialise a new `ev-prover` home directory and configuration file with defaults:
+
+    ```shell
+    ev-prover init
+    ```
+
+The newly created config will be used by the e2e binary and includes things like the EV genesis block.
+
 In order to generate a message proof for submission to the ZK ISM, ensure that the docker environment is running:
 ```bash
 make start
 ```
 
-Submit several transactions by running:
+Run `make transfer` to bridge from Celestia to EVM, wait a few seconds and run `make transfer-back` to emit a hyperlane mailbox event on EVM.
 ```bash
 make transfer
-make transfer-back-loop
+make transfer-back
 ```
-Take note of one of the block heights after transaction submission, so that you can update the `target_height` in the config file.
+The output of `make transfer-back` will include the EVM block height at which the event was emitted. This is our `TARGET_HEIGHT` in `e2e/src/config.rs`.
 
-Next update the configuration file in `e2e/config.rs`:
-
-In `e2e/config.rs`:
-```rust
-...
-pub const TARGET_HEIGHT: u64 = 250;
-```
-Make sure that before TARGET_HEIGHT transactions have occurred. The E2E will prove all transactions in range `0` to `TARGET_HEIGHT` in one go.
-
-
-Next, run the prover:
+Find the ZKISM trusted state on Celestia:
 ```bash
-cargo run -p e2e --bin message-prover --release
+docker exec -it celestia-validator /bin/bash
+celestia-appd query zkism isms
 ```
+The output will contain the `trusted height`.
 
-## 2. Block Proof Payload
-In order to generate a block range proof for submission to the ZK ISM,
-make sure that the configuration file in `e2e/src/config.rs` contains the correct checkpoint and target values:
-
-```rust
-pub const MAILBOX_ADDRESS: &str = "0xb1c938f5ba4b3593377f399e12175e8db0c787ff";
-pub const MERKLE_TREE_ADDRESS: &str = "0xfcb1d485ef46344029d9e8a7925925e146b3430e";
-// initial trusted height for block prover
-pub const TRUSTED_HEIGHT: u64 = 0;
-// height at wich to start proving blocks
-pub const START_HEIGHT: u64 = 2;
-// number of blocks to prove for block prover (from TRUSTED_HEIGHT onwards)
-pub const NUM_BLOCKS: u64 = 2;
-// target height for message prover
-pub const TARGET_HEIGHT: u64 = 100;
-pub const TRUSTED_ROOT: &str = "0x2892acb3938e55f74887eb9624668f2c5f0d97fae9151d83dea3b70d5ea850b5";
-pub const EV_RPC: &str = "http://127.0.0.1:8545";
-pub const EV_WS: &str = "ws://127.0.0.1:8546";
-```
-
-## Config Breakdown
-## ZK ISM
-`TRUSTED_HEIGHT`: The EVM trusted height from the ZK ISM.
-`TRUSTED_ROOT`: The trusted EVM root from the ZK ISM
-
-## Block Prover
-`START_HEIGHT`: The Celestia block height of the block after the one that included the last trusted EVM block.
-NUM_BLOCKS: The number of Celestia blocks whose EVM blocks we want to prove, starting at START_HEIGHT.
-
-## Message Prover
-`TARGET_HEIGHT`: The EVM target height for our message prover, should be set to the last EVM height of the Celestia block whose height is START_HEIGHT + NUM_BLOCKS. (the last evm height of the last celestia block that we prove with the block prover).
-
-For our E2E this will tell the message prover to prove all messages from block 0 to the last EVM block in our target Celestia block.
-
-Next, run the prover:
+Use curl to find the corresponding `trusted root`:
 ```bash
-cargo run -p e2e --bin block-prover --release
+curl -s -X POST http://127.0.0.1:8545 \
+  -H "Content-Type: application/json" \
+  --data '{
+    "jsonrpc":"2.0",
+    "method":"eth_getBlockByNumber",
+    "params":["REPLACE_WITH_HEIGHT_AS_HEX", false],
+    "id":1
+  }' | jq -r '.result.stateRoot'
+
 ```
 
+Update `e2e/src/config.rs` TRUSTED_ROOT and TRUSTED_HEIGHT to match the ones in the ZKISM.
 
-## Wiring up the E2E
-The E2E test should call both the `prove_blocks` method from `prover/blocks.rs` and the `prove_messages` method from `prover/message.rs`. They will return a single `groth16` proof each that can then be sent to the ZK ISM on Celestia.
+**The corresponding inclusion heights on Celestia are derived from the TRUSTED and TARGET EVM heights in the config.**
 
-The trusted state must match exactly the trusted state on Celestia and the message proof must be for the new `TRUSTED_ROOT` and `TRUSTED_HEIGHT` that is in the output of the groth16 range block proof.
+Now set your `SP1_PROVER` in the workspace `.env` to `cpu`, `cuda` or `network` and run:
+```bash
+cargo run --bin e2e -p e2e --release
+```

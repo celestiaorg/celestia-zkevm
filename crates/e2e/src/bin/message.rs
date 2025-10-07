@@ -1,6 +1,6 @@
 use alloy_provider::ProviderBuilder;
 use e2e::{
-    config::{EV_RPC, TARGET_HEIGHT},
+    config::{other::EV_RPC, other::TARGET_HEIGHT},
     prover::message::prove_messages,
 };
 use ev_state_queries::MockStateQueryProvider;

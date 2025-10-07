@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use celestia_grpc_client::proto::celestia::zkism::v1::{QueryIsmRequest, QueryIsmsRequest};
-use celestia_grpc_client::{CelestiaIsmClient, ProofSubmitter, StateInclusionProofMsg, StateTransitionProofMsg};
+use celestia_grpc_client::{CelestiaIsmClient, MsgRemoteTransfer, StateInclusionProofMsg, StateTransitionProofMsg};
 use clap::{Parser, Subcommand};
 use tracing::{info, Level};
 
@@ -45,6 +45,23 @@ enum Commands {
         #[arg(long)]
         height: u64,
     },
+    Transfer {
+        /// The sender address (must be the tx signer)
+        #[arg(long)]
+        sender: String,
+        /// The Hyperlane warp token identifier
+        #[arg(long)]
+        token_id: String,
+        /// The destination domain for the transfer (e.g. 1234)
+        #[arg(long)]
+        domain: u32,
+        /// The recipient address on the counterparty
+        #[arg(long)]
+        recipient: String,
+        // The token amount
+        #[arg(long)]
+        amount: String,
+    },
     QueryISM {
         /// ISM identifier
         #[arg(long)]
@@ -83,7 +100,7 @@ async fn main() -> Result<()> {
 
             let proof_msg = StateTransitionProofMsg::new(id.clone(), *height, proof, public_values, signer_address);
 
-            let response = client.submit_state_transition_proof(proof_msg).await?;
+            let response = client.send_tx(proof_msg).await?;
             println!("State transition proof submitted successfully!");
             println!("Transaction hash: {}", response.tx_hash);
             println!("Block height: {}", response.height);
@@ -103,8 +120,31 @@ async fn main() -> Result<()> {
 
             let proof_msg = StateInclusionProofMsg::new(id.clone(), *height, proof, public_values, signer_address);
 
-            let response = client.submit_state_inclusion_proof(proof_msg).await?;
+            let response = client.send_tx(proof_msg).await?;
             println!("State inclusion proof submitted successfully!");
+            println!("Transaction hash: {}", response.tx_hash);
+            println!("Block height: {}", response.height);
+            println!("Gas used: {}", response.gas_used);
+        }
+        Commands::Transfer {
+            sender,
+            token_id,
+            domain,
+            recipient,
+            amount,
+        } => {
+            info!("Submitting warp transfer (MsgRemoteTransfer)...");
+
+            let transfer_msg = MsgRemoteTransfer::new(
+                sender.clone(),
+                token_id.clone(),
+                *domain,
+                recipient.clone(),
+                amount.clone(),
+            );
+
+            let response = client.send_tx(transfer_msg).await?;
+            println!("Warp transfer submitted successfully!");
             println!("Transaction hash: {}", response.tx_hash);
             println!("Block height: {}", response.height);
             println!("Gas used: {}", response.gas_used);

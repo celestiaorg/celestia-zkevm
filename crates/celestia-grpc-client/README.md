@@ -14,21 +14,31 @@ Rust code-gen is produced from the Protobuf defintions via `buf.gen.yaml` plugin
 
 ### Usage
 
-1. Regenerate the `celestia-grpc-client` code by running the following command:
+1. Generate the `celestia-grpc-client` code by running the following command:
 
 ```bash
 cd proto
 buf generate --template buf.gen.yaml
 ```
 
-2. Regenerate the cosmos dependencies by running the following command:
+2. Generate the CosmosSDK dependencies by running the following command:
 
 ```bash
 cd proto
 buf generate --template buf.gen.yaml \
   buf.build/cosmos/cosmos-sdk:aa25660f4ff746388669ce36b3778442 \
   --path cosmos/base/v1beta1/coin.proto \
-  --path cosmos/base/query/v1beta1/pagination.proto
+  --path cosmos/base/query/v1beta1/pagination.proto \
+  buf.build/bcp-innovations/hyperlane-cosmos:v1.0.1 \
+  --path hyperlane/core/v1/tx.proto
+```
+
+3. Generate the Hyperlane dependencies by running the following command:
+
+```bash
+buf generate --template buf.gen.yaml \
+  buf.build/bcp-innovations/hyperlane-cosmos:v1.0.1 \
+  --path hyperlane/core/v1/tx.proto
 ```
 
 3. Update module dependencies:
