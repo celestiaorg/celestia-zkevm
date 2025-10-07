@@ -20,7 +20,7 @@ use sp1_sdk::{EnvProver, SP1ProofWithPublicValues, SP1Stdin};
 use storage::hyperlane::{StoredHyperlaneMessage, message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use tempfile::TempDir;
 
-use crate::config::{MAILBOX_ADDRESS, MERKLE_TREE_ADDRESS};
+use crate::config::other::{MAILBOX_ADDRESS, MERKLE_TREE_ADDRESS};
 
 pub async fn prove_messages(
     target_height: u64,
@@ -36,7 +36,7 @@ pub async fn prove_messages(
 
     let merkle_proof = evm_provider
         .get_proof(
-            Address::from_str(crate::config::MERKLE_TREE_ADDRESS).unwrap(),
+            Address::from_str(MERKLE_TREE_ADDRESS).unwrap(),
             HYPERLANE_MERKLE_TREE_KEYS
                 .iter()
                 .map(|k| FixedBytes::from_hex(k).unwrap())

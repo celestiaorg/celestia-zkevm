@@ -4,11 +4,10 @@ use celestia_grpc_client::{
     MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm, ProofSubmitter, QueryIsmRequest,
     client::CelestiaIsmClient,
 };
-use e2e::prover::block::prove_blocks;
-use e2e::{
-    config::{EV_RPC, TARGET_HEIGHT},
-    prover::message::prove_messages,
-};
+use e2e::config::e2e::ISM_ID;
+use e2e::config::other::EV_RPC;
+use e2e::prover::message::prove_messages;
+use e2e::{config::e2e::TARGET_HEIGHT, prover::block::prove_blocks};
 use ev_state_queries::MockStateQueryProvider;
 use ev_types::v1::{GetMetadataRequest, store_service_client::StoreServiceClient};
 use ev_zkevm_types::hyperlane::encode_hyperlane_message;
@@ -27,9 +26,7 @@ async fn main() {
     let ism_client = CelestiaIsmClient::from_env().await.unwrap();
 
     let ism = ism_client
-        .ism(QueryIsmRequest {
-            id: "0x726f7465725f69736d00000000000000000000000000002a0000000000000001".to_string(),
-        })
+        .ism(QueryIsmRequest { id: ISM_ID.to_string() })
         .await
         .unwrap();
 
@@ -52,7 +49,7 @@ async fn main() {
     .expect("Failed to prove blocks");
 
     let block_proof_msg = MsgUpdateZkExecutionIsm::new(
-        "0x726f757465725f69736d000000000000000000000000002a0000000000000001".to_string(),
+        ISM_ID.to_string(),
         target_inclusion_height,
         block_proof.bytes(),
         block_proof.public_values.as_slice().to_vec(),
@@ -73,7 +70,7 @@ async fn main() {
     .unwrap();
 
     let message_proof_msg = MsgSubmitMessages::new(
-        "0x726f757465725f69736d000000000000000000000000002a0000000000000001".to_string(),
+        ISM_ID.to_string(),
         TARGET_HEIGHT,
         message_proof.0.bytes(),
         message_proof.0.public_values.as_slice().to_vec(),
@@ -102,7 +99,7 @@ async fn main() {
 
 // todo: find a place for this function and remove it from the binaries
 async fn inclusion_height(block_number: u64) -> anyhow::Result<u64> {
-    let mut client = StoreServiceClient::connect(e2e::config::SEQUENCER_URL).await?;
+    let mut client = StoreServiceClient::connect(e2e::config::e2e::SEQUENCER_URL).await?;
     let req = GetMetadataRequest {
         key: format!("rhb/{block_number}/d"),
     };
