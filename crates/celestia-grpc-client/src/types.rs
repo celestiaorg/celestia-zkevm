@@ -38,37 +38,23 @@ impl ClientConfig {
     /// Derive the bech32-encoded signer address from the private key
     pub fn derive_signer_address(private_key_hex: &str) -> Result<String, anyhow::Error> {
         use anyhow::Context;
-        use bech32;
-        use k256::elliptic_curve::consts::U32;
-        use k256::elliptic_curve::generic_array::GenericArray;
-        use k256::elliptic_curve::sec1::ToEncodedPoint;
-        use k256::SecretKey;
+        use bech32::{self, Bech32, Hrp};
+        use k256::ecdsa::SigningKey;
+        use ripemd::Ripemd160;
         use sha2::{Digest, Sha256};
 
-        // Decode private key
-        let private_key_bytes = hex::decode(private_key_hex).context("Failed to decode private key hex")?;
+        let sk_bytes = hex::decode(private_key_hex).context("Failed to decode private key hex")?;
+        let signing_key = SigningKey::from_slice(&sk_bytes).context("Failed to create signing key from bytes")?;
 
-        // Create secret key
-        let private_key_array: GenericArray<u8, U32> = GenericArray::clone_from_slice(&private_key_bytes);
-        let secret_key = SecretKey::from_bytes(&private_key_array).context("Failed to create secret key from bytes")?;
+        let vk = signing_key.verifying_key();
+        let pk_compressed = vk.to_encoded_point(true);
 
-        // Derive public key
-        let public_key = secret_key.public_key();
-        let public_key_bytes = public_key.to_encoded_point(false);
+        let sha = Sha256::digest(pk_compressed.as_bytes());
+        let ripemd = Ripemd160::digest(sha);
+        let hrp = Hrp::parse("celestia")?;
+        let addr = bech32::encode::<Bech32>(hrp, ripemd.as_slice()).context("Failed to encode bech32 address")?;
 
-        // Hash public key (Cosmos SDK standard)
-        let mut hasher = Sha256::new();
-        hasher.update(&public_key_bytes.as_bytes()[1..]); // Skip the 0x04 prefix
-        let hash = hasher.finalize();
-
-        // Take first 20 bytes for the address
-        let address_bytes = &hash[..20];
-
-        // Encode as bech32 with "celestia" prefix
-        let bech32_address = bech32::encode::<bech32::Bech32m>(bech32::Hrp::parse("celestia")?, address_bytes)
-            .context("Failed to create bech32 address")?;
-
-        Ok(bech32_address)
+        Ok(addr)
     }
 }
 
