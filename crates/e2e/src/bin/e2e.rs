@@ -92,7 +92,7 @@ async fn main() {
             alloy::hex::encode(vec![]), // empty metadata; messages are pre-authorized before submission
             message_hex,
         );
-        let response = ism_client.send_tx(msg, "MsgProcessMessage").await.unwrap();
+        let response = ism_client.send_tx(msg).await.unwrap();
         assert!(response.success);
     }
 }
