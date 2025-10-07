@@ -28,7 +28,6 @@ use url::Url;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
-const APP_HOME: &str = ".ev-prover";
 
 /// The arguments for the command.
 #[derive(Parser, Debug)]
@@ -100,16 +99,19 @@ async fn main() {
 async fn write_proof_inputs(stdin: &mut SP1Stdin, args: &Args) -> Result<()> {
     let message_storage_path = dirs::home_dir()
         .expect("cannot find home directory")
-        .join(APP_HOME)
+        .join(".ev-prover")
         .join("data")
         .join("messages.db");
     let message_db = HyperlaneMessageStore::new(message_storage_path).unwrap();
     let mut messages = Vec::new();
     // insert messages into local database
     for height in args.start_height..=args.target_height {
-        messages = message_db.get_by_block(height as u64).unwrap();
+        let block_messages = message_db.get_by_block(height as u64).unwrap();
+        for block_message in block_messages {
+            println!("Height: {}", height);
+            messages.push(block_message);
+        }
     }
-
     // get the merkle proofs from the EVM execution client
     let provider = ProviderBuilder::new().connect_http(Url::from_str(&args.rpc_url).unwrap());
     let proof = provider
