@@ -50,7 +50,7 @@ impl ClientConfig {
         let pk_compressed = vk.to_encoded_point(true);
 
         let sha = Sha256::digest(pk_compressed.as_bytes());
-        let ripemd = Ripemd160::digest(&sha);
+        let ripemd = Ripemd160::digest(sha);
         let hrp = Hrp::parse("celestia")?;
         let addr = bech32::encode::<Bech32>(hrp, ripemd.as_slice()).context("Failed to encode bech32 address")?;
 

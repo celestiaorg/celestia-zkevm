@@ -24,7 +24,6 @@ async fn main() {
 
     // instantiate ISM client for submitting payloads and querying state
     let ism_client = CelestiaIsmClient::from_env().await.unwrap();
-    println!("signer address: {}", ism_client.signer_address());
 
     let resp = ism_client
         .ism(QueryIsmRequest { id: ISM_ID.to_string() })
