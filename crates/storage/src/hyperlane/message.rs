@@ -85,8 +85,9 @@ impl HyperlaneMessageStore {
             .write()
             .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {e}"))?;
         write_lock.drop_cf("messages")?;
-        let opts = Options::default();
-        write_lock.create_cf("messages", &opts)?;
+        let mut cf_opts = Options::default();
+        cf_opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(8));
+        write_lock.create_cf("messages", &cf_opts)?;
         Ok(())
     }
 }
