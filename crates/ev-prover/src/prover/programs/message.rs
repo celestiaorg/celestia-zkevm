@@ -22,6 +22,7 @@ use std::{
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use storage::proofs::ProofStorage;
 use tokio::time::sleep;
+use tracing::{debug, error, info};
 
 const TIMEOUT: u64 = 6; // in seconds
 const DISTANCE_TO_HEAD: u64 = 32; // in blocks
@@ -151,14 +152,14 @@ impl HyperlaneMessageProver {
                 )
                 .block_id(height.into())
                 .await?;
-            println!(
-                "[INFO] state_root: {state_root}, height: {height}, trusted height: {}",
+            info!(
+                "state_root: {state_root}, height: {height}, trusted height: {}",
                 self.app.merkle_tree_state.read().unwrap().height + 1
             );
 
             if self.app.merkle_tree_state.read().unwrap().height >= height {
-                println!(
-                    "[INFO] Waiting for more blocks to occur {}/{}...",
+                info!(
+                    "Waiting for more blocks to occur {}/{}...",
                     height,
                     self.app.merkle_tree_state.read().unwrap().height + DISTANCE_TO_HEAD
                 );
@@ -183,11 +184,11 @@ impl HyperlaneMessageProver {
                 .run_inner(&evm_provider, &mut indexer, height, merkle_proof.clone(), state_root)
                 .await
             {
-                println!(
+                error!(
                     "Failed to generate proof, Stored Value: {}",
                     hex::encode(merkle_proof.storage_proof.last().unwrap().value.to_be_bytes::<32>())
                 );
-                panic!("[ERROR] Failed to generate proof: {e:?}");
+                panic!("Failed to generate proof: {e:?}");
             }
         }
     }
@@ -218,8 +219,8 @@ impl HyperlaneMessageProver {
             .index(self.message_store.clone(), Arc::new(evm_provider.clone()))
             .await
             .expect("Failed to index messages");
-        println!(
-            "[INFO] Indexed messages, new height {}",
+        debug!(
+            "Indexed messages, new height {}",
             self.message_store.current_index().expect("Failed to get current index")
         );
 
@@ -256,8 +257,8 @@ impl HyperlaneMessageProver {
             HyperlaneBranchProofInputs::from(branch_proof),
             snapshot.clone(),
         );
-        println!(
-            "[INFO] Proving messages with ids: {:?}",
+        info!(
+            "Proving messages with ids: {:?}",
             messages.iter().map(|m| m.message.id()).collect::<Vec<String>>()
         );
 

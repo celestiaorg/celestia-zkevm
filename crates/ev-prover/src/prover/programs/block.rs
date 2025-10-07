@@ -29,6 +29,7 @@ use tokio::{
     sync::{mpsc, RwLock, Semaphore},
     task::JoinSet,
 };
+use tracing::{debug, error, info};
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
 use crate::prover::{ProgramProver, ProverConfig};
@@ -287,7 +288,7 @@ impl BlockExecProver {
             async move {
                 let mut tasks = JoinSet::new();
                 while let Some(event) = event_rx.recv().await {
-                    println!("\nNew block event height={}, blobs={}", event.height, event.blobs.len());
+                    debug!("\nNew block event height={}, blobs={}", event.height, event.blobs.len());
                     let client = client.clone();
                     let prover = prover.clone();
 
@@ -300,13 +301,13 @@ impl BlockExecProver {
                             Ok(job) => {
                                 let _ = job_tx.send(job).await;
                             }
-                            Err(e) => eprintln!("failed to retrieve proof inputs: {e:#}"),
+                            Err(e) => error!("failed to retrieve proof inputs: {e:#}"),
                         }
                     });
                 }
 
                 while tasks.join_next().await.is_some() {}
-                eprintln!("prepare stage shutting down");
+                error!("prepare stage shutting down");
             }
         });
 
@@ -365,7 +366,7 @@ impl BlockExecProver {
                     }
                 }
 
-                eprintln!("schedule stage shutting down");
+                error!("schedule stage shutting down");
             }
         });
 
@@ -384,13 +385,13 @@ impl BlockExecProver {
                         let _permit = permit; // limit concurrent proofs
 
                         if let Err(e) = prover.prove_and_store(scheduled).await {
-                            eprintln!("prove failed: {e:#}");
+                            error!("prove failed: {e:#}");
                         }
                     });
                 }
 
                 while tasks.join_next().await.is_some() {}
-                eprintln!("prove stage shutting down");
+                error!("prove stage shutting down");
             }
         });
 
@@ -404,7 +405,7 @@ impl BlockExecProver {
                         .map_err(|_| anyhow::anyhow!("worker queue closed"))?;
                 }
                 Err(e) => {
-                    println!("Subscription error: {e}");
+                    error!("Subscription error: {e}");
                     break;
                 }
             }
@@ -440,7 +441,7 @@ impl BlockExecProver {
             executor_inputs.push(self.eth_client_executor_input(block_number).await?);
         }
 
-        println!("Got {} evm inputs at height {}", executor_inputs.len(), event.height);
+        debug!("Got {} evm inputs at height {}", executor_inputs.len(), event.height);
 
         Ok(ProofJob {
             height: event.height,
@@ -473,14 +474,14 @@ impl BlockExecProver {
             .store_block_proof(scheduled.job.height, &proof, &outputs)
             .await
         {
-            eprintln!(
+            error!(
                 "Failed to store proof for block {}: {} - error: {e:#}",
                 scheduled.job.height, outputs,
             );
             // Note: We continue execution even if storage fails to avoid breaking the proving pipeline
         }
 
-        println!(
+        info!(
             "Successfully created and stored proof for block {}. Outputs: {}",
             scheduled.job.height, outputs,
         );
