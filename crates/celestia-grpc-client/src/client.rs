@@ -209,12 +209,6 @@ impl ProofSubmitter for CelestiaIsmClient {
 
         self.send_tx(proof_msg).await
     }
-
-    async fn process_hyperlane_message(&self, message: HyperlaneMessage) -> Result<TxResponse> {
-        info!("Processing Hyperlane message for ISM id: {}", message.mailbox_id);
-
-        self.send_tx(message).await
-    }
 }
 
 #[cfg(test)]
