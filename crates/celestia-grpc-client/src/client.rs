@@ -22,9 +22,6 @@ pub trait ProofSubmitter {
 
     /// Submit a state inclusion proof to Celestia
     async fn submit_state_inclusion_proof(&self, proof_msg: StateInclusionProofMsg) -> Result<TxResponse>;
-
-    /// Process a Hyperlane message
-    async fn process_hyperlane_message(&self, message: HyperlaneMessage) -> Result<TxResponse>;
 }
 
 /// Celestia gRPC client for proof submission
@@ -132,7 +129,7 @@ impl CelestiaIsmClient {
     }
 
     /// Sign and send a tx to Celestia including the provided message.
-    async fn send_tx<M>(&self, message: M, message_type: &str) -> Result<TxResponse>
+    pub async fn send_tx<M>(&self, message: M, message_type: &str) -> Result<TxResponse>
     where
         M: celestia_grpc::IntoProtobufAny + Send + 'static,
     {
@@ -209,12 +206,6 @@ impl ProofSubmitter for CelestiaIsmClient {
         }
 
         self.send_tx(proof_msg, "MsgSubmitMessages").await
-    }
-
-    async fn process_hyperlane_message(&self, message: HyperlaneMessage) -> Result<TxResponse> {
-        info!("Processing Hyperlane message for ISM id: {}", message.mailbox_id);
-
-        self.send_tx(message, "MsgProcessMessage").await
     }
 }
 

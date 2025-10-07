@@ -53,7 +53,7 @@ async fn main() {
         target_inclusion_height,
         block_proof.bytes(),
         block_proof.public_values.as_slice().to_vec(),
-        "celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q".to_string(),
+        ism_client.signer_address().to_string(),
     );
 
     let response = ism_client.submit_state_transition_proof(block_proof_msg).await.unwrap();
@@ -74,7 +74,7 @@ async fn main() {
         TARGET_HEIGHT,
         message_proof.0.bytes(),
         message_proof.0.public_values.as_slice().to_vec(),
-        "celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q".to_string(),
+        ism_client.signer_address().to_string(),
     );
 
     let response = ism_client
@@ -92,7 +92,7 @@ async fn main() {
             alloy::hex::encode(vec![]), // empty metadata; messages are pre-authorized before submission
             message_hex,
         );
-        let response = ism_client.process_hyperlane_message(msg).await.unwrap();
+        let response = ism_client.send_tx(msg, "MsgProcessMessage").await.unwrap();
         assert!(response.success);
     }
 }
