@@ -25,4 +25,10 @@ pub mod hyperlane {
             include!("hyperlane.core.v1.rs");
         }
     }
+
+    pub mod warp {
+        pub mod v1 {
+            include!("hyperlane.warp.v1.rs");
+        }
+    }
 }

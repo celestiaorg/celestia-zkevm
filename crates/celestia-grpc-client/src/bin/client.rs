@@ -2,7 +2,9 @@
 
 use anyhow::Result;
 use celestia_grpc_client::proto::celestia::zkism::v1::{QueryIsmRequest, QueryIsmsRequest};
-use celestia_grpc_client::{CelestiaIsmClient, ProofSubmitter, StateInclusionProofMsg, StateTransitionProofMsg};
+use celestia_grpc_client::{
+    CelestiaIsmClient, MsgRemoteTransfer, ProofSubmitter, StateInclusionProofMsg, StateTransitionProofMsg,
+};
 use clap::{Parser, Subcommand};
 use tracing::{info, Level};
 
@@ -44,6 +46,22 @@ enum Commands {
         /// Block height for inclusion proof
         #[arg(long)]
         height: u64,
+    },
+    Transfer {
+        /// ISM identifier
+        #[arg(long)]
+        sender: String,
+        /// Proof file path (hex encoded)
+        #[arg(long)]
+        token_id: String,
+        /// Public values file path (hex encoded)
+        #[arg(long)]
+        domain: u32,
+        /// Block height for inclusion proof
+        #[arg(long)]
+        recipient: String,
+        #[arg(long)]
+        amount: String,
     },
     QueryISM {
         /// ISM identifier
@@ -105,6 +123,29 @@ async fn main() -> Result<()> {
 
             let response = client.submit_state_inclusion_proof(proof_msg).await?;
             println!("State inclusion proof submitted successfully!");
+            println!("Transaction hash: {}", response.tx_hash);
+            println!("Block height: {}", response.height);
+            println!("Gas used: {}", response.gas_used);
+        }
+        Commands::Transfer {
+            sender,
+            token_id,
+            domain,
+            recipient,
+            amount,
+        } => {
+            info!("Submitting warp transfer (MsgRemoteTransfer)...");
+
+            let transfer_msg = MsgRemoteTransfer::new(
+                sender.clone(),
+                token_id.clone(),
+                *domain,
+                recipient.clone(),
+                amount.clone(),
+            );
+
+            let response = client.send_tx(transfer_msg).await?;
+            println!("Warp transfer submitted successfully!");
             println!("Transaction hash: {}", response.tx_hash);
             println!("Block height: {}", response.height);
             println!("Gas used: {}", response.gas_used);

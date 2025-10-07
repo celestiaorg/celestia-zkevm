@@ -132,19 +132,20 @@ impl CelestiaIsmClient {
     }
 
     /// Sign and send a tx to Celestia including the provided message.
-    async fn send_tx<M>(&self, message: M, message_type: &str) -> Result<TxResponse>
+    pub async fn send_tx<M>(&self, message: M) -> Result<TxResponse>
     where
-        M: celestia_grpc::IntoProtobufAny + Send + 'static,
+        M: celestia_grpc::IntoProtobufAny + Send + Clone + 'static,
     {
+        let message_type = message.clone().into_any().type_url;
         debug!(
-            "Submitting {} message to Celestia via Lumina (endpoint: {}, chain: {})",
+            "Submitting {} message to Celestia (endpoint: {}, chain: {})",
             message_type, self.config.grpc_endpoint, self.config.chain_id
         );
 
         let tx_config = celestia_grpc::TxConfig {
             gas_limit: Some(self.config.max_gas),
             gas_price: Some(self.config.gas_price as f64),
-            memo: Some(format!("zkISM {message_type} submission")),
+            memo: Some(format!("celestia-zkism-client")),
             ..Default::default()
         };
 
@@ -191,7 +192,7 @@ impl ProofSubmitter for CelestiaIsmClient {
             return Err(IsmClientError::InvalidProof("ISM ID cannot be empty".to_string()));
         }
 
-        self.send_tx(proof_msg, "MsgUpdateZKExecutionISM").await
+        self.send_tx(proof_msg).await
     }
 
     async fn submit_state_inclusion_proof(&self, proof_msg: StateInclusionProofMsg) -> Result<TxResponse> {
@@ -208,13 +209,13 @@ impl ProofSubmitter for CelestiaIsmClient {
             return Err(IsmClientError::InvalidProof("ISM ID cannot be empty".to_string()));
         }
 
-        self.send_tx(proof_msg, "MsgSubmitMessages").await
+        self.send_tx(proof_msg).await
     }
 
     async fn process_hyperlane_message(&self, message: HyperlaneMessage) -> Result<TxResponse> {
         info!("Processing Hyperlane message for ISM id: {}", message.mailbox_id);
 
-        self.send_tx(message, "MsgProcessMessage").await
+        self.send_tx(message).await
     }
 }
 
