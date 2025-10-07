@@ -2,9 +2,7 @@
 
 use anyhow::Result;
 use celestia_grpc_client::proto::celestia::zkism::v1::{QueryIsmRequest, QueryIsmsRequest};
-use celestia_grpc_client::{
-    CelestiaIsmClient, MsgRemoteTransfer, ProofSubmitter, StateInclusionProofMsg, StateTransitionProofMsg,
-};
+use celestia_grpc_client::{CelestiaIsmClient, MsgRemoteTransfer, StateInclusionProofMsg, StateTransitionProofMsg};
 use clap::{Parser, Subcommand};
 use tracing::{info, Level};
 
@@ -102,7 +100,7 @@ async fn main() -> Result<()> {
 
             let proof_msg = StateTransitionProofMsg::new(id.clone(), *height, proof, public_values, signer_address);
 
-            let response = client.submit_state_transition_proof(proof_msg).await?;
+            let response = client.send_tx(proof_msg).await?;
             println!("State transition proof submitted successfully!");
             println!("Transaction hash: {}", response.tx_hash);
             println!("Block height: {}", response.height);
@@ -122,7 +120,7 @@ async fn main() -> Result<()> {
 
             let proof_msg = StateInclusionProofMsg::new(id.clone(), *height, proof, public_values, signer_address);
 
-            let response = client.submit_state_inclusion_proof(proof_msg).await?;
+            let response = client.send_tx(proof_msg).await?;
             println!("State inclusion proof submitted successfully!");
             println!("Transaction hash: {}", response.tx_hash);
             println!("Block height: {}", response.height);

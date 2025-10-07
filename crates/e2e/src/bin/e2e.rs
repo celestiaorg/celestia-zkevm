@@ -1,8 +1,7 @@
 use alloy_primitives::{FixedBytes, hex::FromHex};
 use alloy_provider::ProviderBuilder;
 use celestia_grpc_client::{
-    MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm, ProofSubmitter, QueryIsmRequest,
-    client::CelestiaIsmClient,
+    MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm, QueryIsmRequest, client::CelestiaIsmClient,
 };
 use e2e::config::e2e::ISM_ID;
 use e2e::config::other::EV_RPC;
@@ -56,7 +55,7 @@ async fn main() {
         ism_client.signer_address().to_string(),
     );
 
-    let response = ism_client.submit_state_transition_proof(block_proof_msg).await.unwrap();
+    let response = ism_client.send_tx(block_proof_msg).await.unwrap();
     assert!(response.success);
 
     let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
@@ -77,10 +76,7 @@ async fn main() {
         ism_client.signer_address().to_string(),
     );
 
-    let response = ism_client
-        .submit_state_inclusion_proof(message_proof_msg)
-        .await
-        .unwrap();
+    let response = ism_client.send_tx(message_proof_msg).await.unwrap();
     assert!(response.success);
 
     // submit all now verified messages to hyperlane
