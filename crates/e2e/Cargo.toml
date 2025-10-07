@@ -16,6 +16,7 @@ name = "block-prover"
 path = "src/bin/block.rs"
 
 [dependencies]
+alloy = { workspace = true }
 alloy-genesis = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }

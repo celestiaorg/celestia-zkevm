@@ -20,14 +20,14 @@ use sp1_sdk::{EnvProver, SP1ProofWithPublicValues, SP1Stdin};
 use storage::hyperlane::{StoredHyperlaneMessage, message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use tempfile::TempDir;
 
-use crate::config::{MAILBOX_ADDRESS, MERKLE_TREE_ADDRESS};
+use crate::config::other::{MAILBOX_ADDRESS, MERKLE_TREE_ADDRESS};
 
 pub async fn prove_messages(
     target_height: u64,
     evm_provider: &DefaultProvider,
     state_query_provider: &dyn StateQueryProvider,
     client: Arc<EnvProver>,
-) -> Result<SP1ProofWithPublicValues> {
+) -> Result<(SP1ProofWithPublicValues, Vec<StoredHyperlaneMessage>)> {
     let tmp = TempDir::new().expect("cannot create temp directory");
     let state_root = state_query_provider
         .get_state_root(target_height)
@@ -36,7 +36,7 @@ pub async fn prove_messages(
 
     let merkle_proof = evm_provider
         .get_proof(
-            Address::from_str(crate::config::MERKLE_TREE_ADDRESS).unwrap(),
+            Address::from_str(MERKLE_TREE_ADDRESS).unwrap(),
             HYPERLANE_MERKLE_TREE_KEYS
                 .iter()
                 .map(|k| FixedBytes::from_hex(k).unwrap())
@@ -122,5 +122,5 @@ pub async fn prove_messages(
     // could be removed but this is just a test so doesn't really matter
     // might actually be better to keep this in for sanity
     client.verify(&proof, &vk).expect("failed to verify proof");
-    Ok(proof)
+    Ok((proof, messages))
 }
