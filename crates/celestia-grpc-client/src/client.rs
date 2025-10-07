@@ -1,5 +1,5 @@
 use crate::error::{IsmClientError, Result};
-use crate::message::{HyperlaneMessage, StateInclusionProofMsg, StateTransitionProofMsg};
+use crate::message::{StateInclusionProofMsg, StateTransitionProofMsg};
 use crate::proto::celestia::zkism::v1::{
     query_client::QueryClient, QueryIsmRequest, QueryIsmResponse, QueryIsmsRequest, QueryIsmsResponse,
 };
