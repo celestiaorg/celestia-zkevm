@@ -43,21 +43,16 @@ impl ClientConfig {
         use ripemd::Ripemd160;
         use sha2::{Digest, Sha256};
 
-        let sk_bytes = hex::decode(private_key_hex)
-            .context("Failed to decode private key hex")?;
-
-        let signing_key = SigningKey::from_slice(&sk_bytes)
-            .context("Failed to create signing key from bytes")?;
+        let sk_bytes = hex::decode(private_key_hex).context("Failed to decode private key hex")?;
+        let signing_key = SigningKey::from_slice(&sk_bytes).context("Failed to create signing key from bytes")?;
 
         let vk = signing_key.verifying_key();
         let pk_compressed = vk.to_encoded_point(true);
 
         let sha = Sha256::digest(pk_compressed.as_bytes());
         let ripemd = Ripemd160::digest(&sha);
-
         let hrp = Hrp::parse("celestia")?;
-        let addr = bech32::encode::<Bech32>(hrp, ripemd.as_slice())
-            .context("Failed to encode bech32 address")?;
+        let addr = bech32::encode::<Bech32>(hrp, ripemd.as_slice()).context("Failed to encode bech32 address")?;
 
         Ok(addr)
     }
