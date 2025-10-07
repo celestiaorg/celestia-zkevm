@@ -147,7 +147,7 @@ pub async fn parallel_prover(
 
     // before we generate proofs in parallel mode, we execute all blocks to
     // collect the trusted height and root to then supply them optimistically to the prover
-    for block_number in start_height..(start_height + num_blocks) {
+    for block_number in start_height..=(start_height + num_blocks) {
         println!("\nProcessing block: {block_number}");
         let blobs: Vec<Blob> = celestia_client
             .blob_get_all(block_number, &[namespace])
@@ -218,7 +218,7 @@ pub async fn parallel_prover(
 
     // now we can generate proofs in parallel
     let mut handles: Vec<JoinHandle<()>> = Vec::new();
-    for block_number in start_height..(start_height + num_blocks) {
+    for block_number in start_height..=(start_height + num_blocks) {
         let handle = tokio::spawn({
             let celestia_client = Client::new(config::CELESTIA_RPC_URL, None)
                 .await

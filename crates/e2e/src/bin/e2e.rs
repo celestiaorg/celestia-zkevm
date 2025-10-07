@@ -25,24 +25,24 @@ async fn main() {
     // instantiate ISM client for submitting payloads and querying state
     let ism_client = CelestiaIsmClient::from_env().await.unwrap();
 
-    let ism = ism_client
+    let resp = ism_client
         .ism(QueryIsmRequest { id: ISM_ID.to_string() })
         .await
         .unwrap();
 
-    let ism = ism.ism.expect("ZKISM not found");
-    let ism_trusted_root_hex = alloy::hex::encode(ism.state_root);
-    let ism_trusted_height = ism.height;
+    let ism = resp.ism.expect("ZKISM not found");
+    let trusted_root_hex = alloy::hex::encode(ism.state_root);
+    let trusted_height = ism.height;
 
     let client: Arc<EnvProver> = Arc::new(ProverClient::from_env());
-    let trusted_inclusion_height = inclusion_height(ism_trusted_height).await.unwrap() + 1;
+    let start_height = inclusion_height(trusted_height).await.unwrap() + 1;
     let target_inclusion_height = inclusion_height(TARGET_HEIGHT).await.unwrap();
-    let num_blocks = target_inclusion_height - trusted_inclusion_height + 1;
+    let num_blocks = target_inclusion_height - start_height;
     let block_proof = prove_blocks(
-        trusted_inclusion_height,
-        ism_trusted_height,
+        start_height,
+        trusted_height,
         num_blocks,
-        &mut FixedBytes::from_hex(ism_trusted_root_hex).unwrap(),
+        &mut FixedBytes::from_hex(trusted_root_hex).unwrap(),
         client.clone(),
     )
     .await
