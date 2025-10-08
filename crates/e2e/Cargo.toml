@@ -15,7 +15,12 @@ path = "src/bin/message.rs"
 name = "block-prover"
 path = "src/bin/block.rs"
 
+[[bin]]
+name = "query-stored-proofs"
+path = "src/bin/query_stored_proofs.rs"
+
 [dependencies]
+ev-prover = { path = "../ev-prover" }
 alloy-genesis = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }

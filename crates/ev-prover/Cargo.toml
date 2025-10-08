@@ -3,6 +3,10 @@ name = "ev-prover"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "query_proofs"
+path = "src/bin/query_proofs.rs"
+
 [dependencies]
 alloy = { workspace = true }
 alloy-genesis = { workspace = true }

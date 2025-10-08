@@ -4,43 +4,208 @@ package celestia.prover.v1;
 
 option go_package = "provers/client";
 
+// Prover defines the gRPC prover service for generating and querying
+// zero-knowledge proofs for state transitions and state membership.
 service Prover {
+  // Info returns general information about the prover service including
+  // verification keys for state transition and state membership proofs.
   rpc Info(InfoRequest) returns (InfoResponse);
+
+  // ProveStateTransition generates a zero-knowledge proof for a state
+  // transition of the specified client.
   rpc ProveStateTransition(ProveStateTransitionRequest)
       returns (ProveStateTransitionResponse);
+
+  // ProveStateMembership generates a zero-knowledge proof for state
+  // membership verification of the specified key paths.
   rpc ProveStateMembership(ProveStateMembershipRequest)
       returns (ProveStateMembershipResponse);
+
+  // GetBlockProof retrieves a single block proof by Celestia height.
+  rpc GetBlockProof(GetBlockProofRequest) returns (GetBlockProofResponse);
+
+  // GetBlockProofsInRange retrieves multiple block proofs within a
+  // specified height range.
+  rpc GetBlockProofsInRange(GetBlockProofsInRangeRequest)
+      returns (GetBlockProofsInRangeResponse);
+
+  // GetLatestBlockProof retrieves the most recently generated block proof.
+  rpc GetLatestBlockProof(GetLatestBlockProofRequest)
+      returns (GetLatestBlockProofResponse);
+
+  // GetMembershipProof retrieves a state membership proof for a specific
+  // height.
+  rpc GetMembershipProof(GetMembershipProofRequest)
+      returns (GetMembershipProofResponse);
+
+  // GetLatestMembershipProof retrieves the most recently generated state
+  // membership proof.
+  rpc GetLatestMembershipProof(GetLatestMembershipProofRequest)
+      returns (GetLatestMembershipProofResponse);
+
+  // GetRangeProofs retrieves aggregated range proofs covering a specified
+  // height range.
+  rpc GetRangeProofs(GetRangeProofsRequest)
+      returns (GetRangeProofsResponse);
 }
 
+// InfoRequest is the request type for the Info RPC.
 message InfoRequest {}
 
+// InfoResponse is the response type for the Info RPC.
 message InfoResponse {
-  // TODO: add more info here as is relevant such as the circuit and state
-  // machine types hex-encoded state transition verifier key
+  // state_transition_verifier_key is the hex-encoded verifier key used for
+  // state transition proof verification.
   string state_transition_verifier_key = 1;
-  // hex-encoded state membership verifier key
+  // state_membership_verifier_key is the hex-encoded verifier key used for
+  // state membership proof verification.
   string state_membership_verifier_key = 2;
 }
 
+// ProveStateTransitionRequest is the request type for ProveStateTransition.
 message ProveStateTransitionRequest {
-  // For EVM chains this is the Tendermint light client contract address.
+  // client_id identifies the client for which to generate the state transition
+  // proof. For EVM chains this is the Tendermint light client contract address.
   // For Tendermint chains this is the client ID.
   string client_id = 1;
 }
 
+// ProveStateTransitionResponse is the response type for ProveStateTransition.
 message ProveStateTransitionResponse {
+  // proof contains the zero-knowledge proof bytes.
   bytes proof = 1;
+  // public_values contains the public inputs used for proof verification.
   bytes public_values = 2;
 }
 
+// ProveStateMembershipRequest is the request type for ProveStateMembership.
 message ProveStateMembershipRequest {
-  // For EVM chains this is the Tendermint light client contract address.
+  // client_id identifies the client for which to generate the state membership
+  // proof. For EVM chains this is the Tendermint light client contract address.
   // For Tendermint chains this is the client ID.
   string client_id = 1;
+  // key_paths is the list of storage key paths to prove membership for.
   repeated string key_paths = 2;
 }
 
+// ProveStateMembershipResponse is the response type for ProveStateMembership.
 message ProveStateMembershipResponse {
+  // proof contains the zero-knowledge proof bytes.
   bytes proof = 1;
+  // height is the block height at which the membership proof was generated.
   int64 height = 2;
+}
+
+// BlockProof represents a zero-knowledge proof for a single Celestia block.
+message BlockProof {
+  // celestia_height is the Celestia block height this proof corresponds to.
+  uint64 celestia_height = 1;
+  // proof_data contains the serialized zero-knowledge proof bytes.
+  bytes proof_data = 2;
+  // public_values contains the public inputs used for proof verification.
+  bytes public_values = 3;
+  // created_at is the Unix timestamp (in seconds) when this proof was generated.
+  uint64 created_at = 4;
+}
+
+// RangeProof represents an aggregated zero-knowledge proof covering multiple
+// Celestia blocks within a height range.
+message RangeProof {
+  // start_height is the starting Celestia block height (inclusive).
+  uint64 start_height = 1;
+  // end_height is the ending Celestia block height (inclusive).
+  uint64 end_height = 2;
+  // proof_data contains the serialized aggregated zero-knowledge proof bytes.
+  bytes proof_data = 3;
+  // public_values contains the public inputs used for proof verification.
+  bytes public_values = 4;
+  // created_at is the Unix timestamp (in seconds) when this proof was generated.
+  uint64 created_at = 5;
+}
+
+// MembershipProof represents a zero-knowledge proof for state membership
+// verification.
+message MembershipProof {
+  // proof_data contains the serialized zero-knowledge proof bytes.
+  bytes proof_data = 1;
+  // public_values contains the public inputs used for proof verification.
+  bytes public_values = 2;
+  // created_at is the Unix timestamp (in seconds) when this proof was generated.
+  uint64 created_at = 3;
+}
+
+// GetBlockProofRequest is the request type for GetBlockProof.
+message GetBlockProofRequest {
+  // celestia_height is the Celestia block height for which to retrieve the proof.
+  uint64 celestia_height = 1;
+}
+
+// GetBlockProofResponse is the response type for GetBlockProof.
+message GetBlockProofResponse {
+  // proof is the block proof for the requested height.
+  BlockProof proof = 1;
+}
+
+// GetBlockProofsInRangeRequest is the request type for GetBlockProofsInRange.
+message GetBlockProofsInRangeRequest {
+  // start_height is the starting Celestia block height (inclusive).
+  uint64 start_height = 1;
+  // end_height is the ending Celestia block height (inclusive).
+  uint64 end_height = 2;
+}
+
+// GetBlockProofsInRangeResponse is the response type for GetBlockProofsInRange.
+message GetBlockProofsInRangeResponse {
+  // proofs is the list of block proofs within the requested range.
+  repeated BlockProof proofs = 1;
+}
+
+// GetLatestBlockProofRequest is the request type for GetLatestBlockProof.
+message GetLatestBlockProofRequest {}
+
+// GetLatestBlockProofResponse is the response type for GetLatestBlockProof.
+message GetLatestBlockProofResponse {
+  // proof is the most recently generated block proof.
+  BlockProof proof = 1;
+  // has_proof indicates whether a proof exists.
+  bool has_proof = 2;
+}
+
+// GetMembershipProofRequest is the request type for GetMembershipProof.
+message GetMembershipProofRequest {
+  // height is the block height for which to retrieve the membership proof.
+  uint64 height = 1;
+}
+
+// GetMembershipProofResponse is the response type for GetMembershipProof.
+message GetMembershipProofResponse {
+  // proof is the membership proof for the requested height.
+  MembershipProof proof = 1;
+}
+
+// GetLatestMembershipProofRequest is the request type for
+// GetLatestMembershipProof.
+message GetLatestMembershipProofRequest {}
+
+// GetLatestMembershipProofResponse is the response type for
+// GetLatestMembershipProof.
+message GetLatestMembershipProofResponse {
+  // proof is the most recently generated membership proof.
+  MembershipProof proof = 1;
+  // has_proof indicates whether a proof exists.
+  bool has_proof = 2;
+}
+
+// GetRangeProofsRequest is the request type for GetRangeProofs.
+message GetRangeProofsRequest {
+  // start_height is the starting Celestia block height (inclusive).
+  uint64 start_height = 1;
+  // end_height is the ending Celestia block height (inclusive).
+  uint64 end_height = 2;
+}
+
+// GetRangeProofsResponse is the response type for GetRangeProofs.
+message GetRangeProofsResponse {
+  // proofs is the list of aggregated range proofs covering the requested range.
+  repeated RangeProof proofs = 1;
 }

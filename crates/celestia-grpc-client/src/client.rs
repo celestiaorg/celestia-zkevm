@@ -6,26 +6,12 @@ use crate::proto::celestia::zkism::v1::{
 use crate::types::{ClientConfig, ProofSubmissionResponse};
 
 use anyhow::Context;
-use async_trait::async_trait;
 use celestia_grpc::GrpcClient;
 use tonic::{
     transport::{Channel, Endpoint},
     Request,
 };
 use tracing::{debug, info, warn};
-
-/// Trait for proof submission operations
-#[async_trait]
-pub trait ProofSubmitter {
-    /// Submit a state transition proof to Celestia
-    async fn submit_state_transition_proof(
-        &self,
-        proof_msg: StateTransitionProofMsg,
-    ) -> Result<ProofSubmissionResponse>;
-
-    /// Submit a state inclusion proof to Celestia
-    async fn submit_state_inclusion_proof(&self, proof_msg: StateInclusionProofMsg) -> Result<ProofSubmissionResponse>;
-}
 
 /// Celestia gRPC client for proof submission
 pub struct CelestiaIsmClient {
@@ -173,11 +159,9 @@ impl CelestiaIsmClient {
             }
         }
     }
-}
 
-#[async_trait]
-impl ProofSubmitter for CelestiaIsmClient {
-    async fn submit_state_transition_proof(
+    /// Submit a state transition proof to Celestia
+    pub async fn submit_state_transition_proof(
         &self,
         proof_msg: StateTransitionProofMsg,
     ) -> Result<ProofSubmissionResponse> {
@@ -199,7 +183,11 @@ impl ProofSubmitter for CelestiaIsmClient {
         self.submit_zkism_message(proof_msg, "MsgUpdateZKExecutionISM").await
     }
 
-    async fn submit_state_inclusion_proof(&self, proof_msg: StateInclusionProofMsg) -> Result<ProofSubmissionResponse> {
+    /// Submit a state inclusion proof to Celestia
+    pub async fn submit_state_inclusion_proof(
+        &self,
+        proof_msg: StateInclusionProofMsg,
+    ) -> Result<ProofSubmissionResponse> {
         info!(
             "Submitting state inclusion proof for ISM id: {}, height: {}",
             proof_msg.id, proof_msg.height

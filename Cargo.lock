@@ -3038,6 +3038,7 @@ dependencies = [
  "chrono",
  "dirs",
  "dotenvy",
+ "ev-prover",
  "ev-state-queries",
  "ev-types",
  "ev-zkevm-types",
