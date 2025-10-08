@@ -79,7 +79,7 @@ impl HyperlaneMessageStore {
     }
 
     /// Prune all Hyperlane messages from the database
-    pub fn prune_all(&self) -> Result<()> {
+    pub fn reset_db(&self) -> Result<()> {
         let mut write_lock = self
             .db
             .write()

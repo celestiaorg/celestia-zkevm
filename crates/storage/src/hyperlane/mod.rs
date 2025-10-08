@@ -40,7 +40,7 @@ mod tests {
         store.insert_message(current_index, message.clone()).unwrap();
         let retrieved_message = store.get_by_block(current_index).unwrap();
         assert_eq!(retrieved_message.first().unwrap().message, message.message);
-        store.prune_all().unwrap();
+        store.reset_db().unwrap();
     }
 
     #[test]
@@ -60,7 +60,7 @@ mod tests {
         let retrieved_messages = store.get_by_block(100).unwrap();
         assert_eq!(retrieved_messages.len(), 1);
         assert_eq!(retrieved_messages[0].message, message.message);
-        store.prune_all().unwrap();
+        store.reset_db().unwrap();
     }
 
     #[test]
@@ -77,6 +77,6 @@ mod tests {
         store.insert_snapshot(current_index, snapshot.clone()).unwrap();
         let retrieved_snapshot = store.get_snapshot(current_index).unwrap();
         assert_eq!(retrieved_snapshot, snapshot);
-        store.prune_all().unwrap();
+        store.reset_db().unwrap();
     }
 }

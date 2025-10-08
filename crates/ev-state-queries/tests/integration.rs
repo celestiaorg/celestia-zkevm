@@ -25,7 +25,7 @@ async fn test_run_indexer() {
         .join("messages.db");
     let indexer = HyperlaneIndexer::default();
     let message_store = Arc::new(HyperlaneMessageStore::new(message_storage_path).unwrap());
-    message_store.prune_all().unwrap();
+    message_store.reset_db().unwrap();
     let provider = Arc::new(ProviderBuilder::new().connect_ws(indexer.socket.clone()).await.unwrap());
     indexer.index(message_store, provider).await.unwrap();
 }
