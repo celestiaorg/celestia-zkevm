@@ -379,6 +379,9 @@ impl BlockExecProver {
             async move {
                 let mut tasks = JoinSet::new();
                 while let Some(scheduled) = sched_rx.recv().await {
+                    if scheduled.job.blobs.is_empty() {
+                        continue;
+                    }
                     let prover = prover.clone();
                     let permit = prove_sem.clone().acquire_owned().await.unwrap();
                     tasks.spawn(async move {
