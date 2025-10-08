@@ -89,7 +89,7 @@ impl HyperlaneSnapshotStore {
         }
     }
 
-    pub fn prune_all(&self) -> Result<()> {
+    pub fn reset_db(&self) -> Result<()> {
         let mut write_lock = self
             .db
             .write()

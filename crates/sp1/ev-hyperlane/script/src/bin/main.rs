@@ -28,7 +28,6 @@ use url::Url;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
-const APP_HOME: &str = ".ev-prover";
 
 /// The arguments for the command.
 #[derive(Parser, Debug)]
@@ -77,7 +76,10 @@ async fn main() {
         .expect("failed to write proof inputs");
 
     if args.execute {
-        client.execute(EV_HYPERLANE_ELF, &stdin).run().unwrap();
+        client
+            .execute(EV_HYPERLANE_ELF, &stdin)
+            .run()
+            .expect("failed to execute program");
         println!("Program executed successfully!");
     } else {
         // Setup the program for proving.
@@ -92,7 +94,8 @@ async fn main() {
         client.verify(&proof, &vk).expect("failed to verify proof");
         println!("Successfully verified proof!");
 
-        let proof_outputs: HyperlaneMessageOutputs = bincode::deserialize(proof.public_values.as_slice()).unwrap();
+        let proof_outputs: HyperlaneMessageOutputs =
+            bincode::deserialize(proof.public_values.as_slice()).expect("Failed to deserialize proof outputs");
         println!("Proof outputs: {proof_outputs:?}");
     }
 }
@@ -100,31 +103,34 @@ async fn main() {
 async fn write_proof_inputs(stdin: &mut SP1Stdin, args: &Args) -> Result<()> {
     let message_storage_path = dirs::home_dir()
         .expect("cannot find home directory")
-        .join(APP_HOME)
+        .join(".ev-prover")
         .join("data")
         .join("messages.db");
-    let message_db = HyperlaneMessageStore::new(message_storage_path).unwrap();
+    let message_db = HyperlaneMessageStore::new(message_storage_path).expect("Failed to create message database");
     let mut messages = Vec::new();
     // insert messages into local database
     for height in args.start_height..=args.target_height {
-        messages = message_db.get_by_block(height as u64).unwrap();
+        let block_messages = message_db.get_by_block(height as u64).expect("Failed to get messages");
+        for block_message in block_messages {
+            messages.push(block_message);
+        }
     }
-
     // get the merkle proofs from the EVM execution client
-    let provider = ProviderBuilder::new().connect_http(Url::from_str(&args.rpc_url).unwrap());
+    let provider =
+        ProviderBuilder::new().connect_http(Url::from_str(&args.rpc_url).expect("Failed to create provider"));
     let proof = provider
         .get_proof(
-            Address::from_str(&args.contract).unwrap(),
+            Address::from_str(&args.contract).expect("Failed to create contract address"),
             HYPERLANE_MERKLE_TREE_KEYS
                 .iter()
-                .map(|k| FixedBytes::from_hex(k).unwrap())
+                .map(|k| FixedBytes::from_hex(k).expect("Failed to create fixed bytes"))
                 .collect(),
         )
         .block_id(alloy_eips::BlockId::Number(alloy_eips::BlockNumberOrTag::Number(
             args.target_height.into(),
         )))
         .await
-        .unwrap();
+        .expect("Failed to get proof");
 
     let block = provider
         .get_block(alloy_eips::BlockId::Number(alloy_eips::BlockNumberOrTag::Number(

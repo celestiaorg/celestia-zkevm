@@ -54,7 +54,7 @@ pub async fn prove_messages(
         .join("messages.db");
     let hyperlane_message_store = Arc::new(HyperlaneMessageStore::new(message_storage_path).unwrap());
     // prune in case non-empty
-    hyperlane_message_store.prune_all().unwrap();
+    hyperlane_message_store.reset_db().unwrap();
 
     let filter = Filter::new()
         .address(Address::from_str(MAILBOX_ADDRESS).unwrap())
@@ -97,7 +97,7 @@ pub async fn prove_messages(
         .join("data")
         .join("snapshots.db");
     let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
-    hyperlane_snapshot_store.prune_all().unwrap();
+    hyperlane_snapshot_store.reset_db().unwrap();
     let snapshot = hyperlane_snapshot_store.get_snapshot(0).unwrap();
 
     // Construct program inputs from values

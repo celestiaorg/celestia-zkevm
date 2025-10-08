@@ -2,7 +2,7 @@
 /// It is used to store and retrieve Hyperlane messages.
 /// The messages are stored in a column family called "messages".
 use anyhow::{Context, Result};
-use rocksdb::{ColumnFamilyDescriptor, DB, IteratorMode, Options};
+use rocksdb::{ColumnFamilyDescriptor, DB, IteratorMode, Options, SliceTransform};
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
@@ -14,25 +14,25 @@ pub struct HyperlaneMessageStore {
 
 impl HyperlaneMessageStore {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let opts = Self::get_opts()?;
+        let db_opts = Self::get_opts()?;
         let cfs = Self::get_cfs()?;
-        let db = DB::open_cf_descriptors(&opts, path, cfs)?;
+        let db = DB::open_cf_descriptors(&db_opts, path, cfs)?;
         Ok(Self {
             db: Arc::new(RwLock::new(db)),
         })
     }
 
-    pub fn get_opts() -> Result<Options> {
+    fn get_opts() -> Result<Options> {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
         Ok(opts)
     }
 
-    pub fn get_cfs() -> Result<Vec<ColumnFamilyDescriptor>> {
-        Ok(vec![
-            ColumnFamilyDescriptor::new("messages", Options::default()), // index → payload
-        ])
+    fn get_cfs() -> Result<Vec<ColumnFamilyDescriptor>> {
+        let mut cf_opts = Options::default();
+        cf_opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(8));
+        Ok(vec![ColumnFamilyDescriptor::new("messages", cf_opts)])
     }
 
     /// Insert a serialized hyperlane message into the database
@@ -43,7 +43,7 @@ impl HyperlaneMessageStore {
         if let Some(block) = message.block_number {
             let cf_blk = write_lock.cf_handle("messages").expect("Missing messages CF");
             let mut key = block.to_be_bytes().to_vec();
-            key.extend_from_slice(&index.to_be_bytes()); // 16-byte key
+            key.extend_from_slice(&index.to_be_bytes());
             write_lock.put_cf(cf_blk, key, &serialized)?;
         }
 
@@ -73,7 +73,6 @@ impl HyperlaneMessageStore {
             if k.len() != 16 {
                 anyhow::bail!("messages CF key length != 16 (got {})", k.len());
             }
-            // key = block(8) || index(8)
             let mut buf = [0u8; 8];
             buf.copy_from_slice(&k[8..16]);
             return Ok(u64::from_be_bytes(buf) + 1);
@@ -82,14 +81,15 @@ impl HyperlaneMessageStore {
     }
 
     /// Prune all Hyperlane messages from the database
-    pub fn prune_all(&self) -> Result<()> {
+    pub fn reset_db(&self) -> Result<()> {
         let mut write_lock = self
             .db
             .write()
             .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {e}"))?;
         write_lock.drop_cf("messages")?;
-        let opts = Options::default();
-        write_lock.create_cf("messages", &opts)?;
+        let mut cf_opts = Options::default();
+        cf_opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(8));
+        write_lock.create_cf("messages", &cf_opts)?;
         Ok(())
     }
 }
