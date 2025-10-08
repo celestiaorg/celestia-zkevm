@@ -22,14 +22,8 @@ pub struct CelestiaIsmClient {
 
 impl CelestiaIsmClient {
     /// Create a new Celestia proof client
-    pub async fn new(mut config: ClientConfig) -> Result<Self> {
+    pub async fn new(config: ClientConfig) -> Result<Self> {
         debug!("Creating Celestia proof client with endpoint: {}", config.grpc_endpoint);
-
-        // Derive and cache the signer address if not already set
-        if config.signer_address.is_empty() {
-            config.signer_address = ClientConfig::derive_signer_address(&config.private_key_hex)?;
-            debug!("Derived signer address: {}", config.signer_address);
-        }
 
         // optional: set timeouts, concurrency limits, TLS, etc.
         let endpoint = Endpoint::from_shared(config.grpc_endpoint.clone())?

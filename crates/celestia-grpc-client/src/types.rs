@@ -1,5 +1,6 @@
 use crate::error::{IsmClientError, Result};
 use serde::{Deserialize, Serialize};
+use std::env;
 
 /// Response from proof submission
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,23 +60,25 @@ impl ClientConfig {
     }
 
     pub fn from_env() -> Result<Self> {
+        let private_key_hex = env::var("CELESTIA_PRIVATE_KEY").map_err(|_| {
+            IsmClientError::Configuration("CELESTIA_PRIVATE_KEY environment variable not set".to_string())
+        })?;
+        let signer_address = Self::derive_signer_address(&private_key_hex)?;
+
         let config = ClientConfig {
-            grpc_endpoint: std::env::var("CELESTIA_GRPC_ENDPOINT")
-                .unwrap_or_else(|_| "http://localhost:9090".to_string()),
-            private_key_hex: std::env::var("CELESTIA_PRIVATE_KEY").map_err(|_| {
-                IsmClientError::Configuration("CELESTIA_PRIVATE_KEY environment variable not set".to_string())
-            })?,
-            signer_address: String::new(), // Will be derived in new()
-            chain_id: std::env::var("CELESTIA_CHAIN_ID").unwrap_or_else(|_| "celestia-zkevm-testnet".to_string()),
-            gas_price: std::env::var("CELESTIA_GAS_PRICE")
+            grpc_endpoint: env::var("CELESTIA_GRPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:9090".to_string()),
+            private_key_hex,
+            signer_address,
+            chain_id: env::var("CELESTIA_CHAIN_ID").unwrap_or_else(|_| "celestia-zkevm-testnet".to_string()),
+            gas_price: env::var("CELESTIA_GAS_PRICE")
                 .unwrap_or_else(|_| "1000".to_string())
                 .parse()
                 .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_GAS_PRICE".to_string()))?,
-            max_gas: std::env::var("CELESTIA_MAX_GAS")
+            max_gas: env::var("CELESTIA_MAX_GAS")
                 .unwrap_or_else(|_| "200000".to_string())
                 .parse()
                 .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_MAX_GAS".to_string()))?,
-            confirmation_timeout: std::env::var("CELESTIA_CONFIRMATION_TIMEOUT")
+            confirmation_timeout: env::var("CELESTIA_CONFIRMATION_TIMEOUT")
                 .unwrap_or_else(|_| "60".to_string())
                 .parse()
                 .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_CONFIRMATION_TIMEOUT".to_string()))?,
