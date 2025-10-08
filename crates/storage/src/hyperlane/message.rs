@@ -14,11 +14,7 @@ pub struct HyperlaneMessageStore {
 
 impl HyperlaneMessageStore {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let mut db_opts = Options::default();
-        db_opts.create_if_missing(true);
-        db_opts.create_missing_column_families(true);
-        db_opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(8)); // apply globally too
-
+        let db_opts = Self::get_opts()?;
         let cfs = Self::get_cfs()?;
         let db = DB::open_cf_descriptors(&db_opts, path, cfs)?;
         Ok(Self {
@@ -26,7 +22,15 @@ impl HyperlaneMessageStore {
         })
     }
 
-    pub fn get_cfs() -> Result<Vec<ColumnFamilyDescriptor>> {
+    fn get_opts() -> Result<Options> {
+        let mut opts = Options::default();
+        opts.create_if_missing(true);
+        opts.create_missing_column_families(true);
+        opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(8));
+        Ok(opts)
+    }
+
+    fn get_cfs() -> Result<Vec<ColumnFamilyDescriptor>> {
         let mut cf_opts = Options::default();
         cf_opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(8));
         Ok(vec![ColumnFamilyDescriptor::new("messages", cf_opts)])
@@ -40,7 +44,7 @@ impl HyperlaneMessageStore {
         if let Some(block) = message.block_number {
             let cf_blk = write_lock.cf_handle("messages").expect("Missing messages CF");
             let mut key = block.to_be_bytes().to_vec();
-            key.extend_from_slice(&index.to_be_bytes()); // 16-byte key
+            key.extend_from_slice(&index.to_be_bytes());
             write_lock.put_cf(cf_blk, key, &serialized)?;
         }
 
@@ -70,7 +74,6 @@ impl HyperlaneMessageStore {
             if k.len() != 16 {
                 anyhow::bail!("messages CF key length != 16 (got {})", k.len());
             }
-            // key = block(8) || index(8)
             let mut buf = [0u8; 8];
             buf.copy_from_slice(&k[8..16]);
             return Ok(u64::from_be_bytes(buf) + 1);
