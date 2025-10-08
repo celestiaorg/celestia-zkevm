@@ -26,7 +26,6 @@ impl HyperlaneMessageStore {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
-        opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(8));
         Ok(opts)
     }
 
