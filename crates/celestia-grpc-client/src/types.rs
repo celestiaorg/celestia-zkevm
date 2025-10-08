@@ -1,3 +1,4 @@
+use crate::error::{IsmClientError, Result};
 use serde::{Deserialize, Serialize};
 
 /// Response from proof submission
@@ -36,7 +37,7 @@ pub struct ClientConfig {
 
 impl ClientConfig {
     /// Derive the bech32-encoded signer address from the private key
-    pub fn derive_signer_address(private_key_hex: &str) -> Result<String, anyhow::Error> {
+    pub fn derive_signer_address(private_key_hex: &str) -> anyhow::Result<String> {
         use anyhow::Context;
         use bech32::{self, Bech32, Hrp};
         use k256::ecdsa::SigningKey;
@@ -55,6 +56,32 @@ impl ClientConfig {
         let addr = bech32::encode::<Bech32>(hrp, ripemd.as_slice()).context("Failed to encode bech32 address")?;
 
         Ok(addr)
+    }
+
+    pub fn from_env() -> Result<Self> {
+        let config = ClientConfig {
+            grpc_endpoint: std::env::var("CELESTIA_GRPC_ENDPOINT")
+                .unwrap_or_else(|_| "http://localhost:9090".to_string()),
+            private_key_hex: std::env::var("CELESTIA_PRIVATE_KEY").map_err(|_| {
+                IsmClientError::Configuration("CELESTIA_PRIVATE_KEY environment variable not set".to_string())
+            })?,
+            signer_address: String::new(), // Will be derived in new()
+            chain_id: std::env::var("CELESTIA_CHAIN_ID").unwrap_or_else(|_| "celestia-zkevm-testnet".to_string()),
+            gas_price: std::env::var("CELESTIA_GAS_PRICE")
+                .unwrap_or_else(|_| "1000".to_string())
+                .parse()
+                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_GAS_PRICE".to_string()))?,
+            max_gas: std::env::var("CELESTIA_MAX_GAS")
+                .unwrap_or_else(|_| "200000".to_string())
+                .parse()
+                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_MAX_GAS".to_string()))?,
+            confirmation_timeout: std::env::var("CELESTIA_CONFIRMATION_TIMEOUT")
+                .unwrap_or_else(|_| "60".to_string())
+                .parse()
+                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_CONFIRMATION_TIMEOUT".to_string()))?,
+        };
+
+        Ok(config)
     }
 }
 

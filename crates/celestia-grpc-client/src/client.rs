@@ -53,33 +53,6 @@ impl CelestiaIsmClient {
         })
     }
 
-    /// Create a client from environment variables
-    pub async fn from_env() -> Result<Self> {
-        let config = ClientConfig {
-            grpc_endpoint: std::env::var("CELESTIA_GRPC_ENDPOINT")
-                .unwrap_or_else(|_| "http://localhost:9090".to_string()),
-            private_key_hex: std::env::var("CELESTIA_PRIVATE_KEY").map_err(|_| {
-                IsmClientError::Configuration("CELESTIA_PRIVATE_KEY environment variable not set".to_string())
-            })?,
-            signer_address: String::new(), // Will be derived in new()
-            chain_id: std::env::var("CELESTIA_CHAIN_ID").unwrap_or_else(|_| "celestia-zkevm-testnet".to_string()),
-            gas_price: std::env::var("CELESTIA_GAS_PRICE")
-                .unwrap_or_else(|_| "1000".to_string())
-                .parse()
-                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_GAS_PRICE".to_string()))?,
-            max_gas: std::env::var("CELESTIA_MAX_GAS")
-                .unwrap_or_else(|_| "200000".to_string())
-                .parse()
-                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_MAX_GAS".to_string()))?,
-            confirmation_timeout: std::env::var("CELESTIA_CONFIRMATION_TIMEOUT")
-                .unwrap_or_else(|_| "60".to_string())
-                .parse()
-                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_CONFIRMATION_TIMEOUT".to_string()))?,
-        };
-
-        Self::new(config).await
-    }
-
     /// Get the gRPC tx client reference for direct access to Lumina functionality
     pub fn tx_client(&self) -> &GrpcClient {
         &self.tx_client
@@ -154,7 +127,7 @@ impl CelestiaIsmClient {
             }
             Err(e) => {
                 warn!("Failed to submit {} message: {}", message_type, e);
-                Err(IsmClientError::SubmissionFailed(format!(
+                Err(IsmClientError::TxFailed(format!(
                     "Failed to submit {message_type}: {e}"
                 )))
             }
