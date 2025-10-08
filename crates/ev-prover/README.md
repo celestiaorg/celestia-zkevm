@@ -22,7 +22,7 @@ Run the following commands from the root of the repository.
 3. Start the `ev-prover` application binary using:
 
     ```shell
-    RUST_LOG="ev-prover=debug" ev-prover start
+    RUST_LOG="ev_prover=debug" ev-prover start
     ```
 
 4. Verify the service is up and running using `grpcurl`:
