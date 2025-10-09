@@ -40,22 +40,30 @@ async fn main() {
 
     loop {
         // get trustd state from ISM
-        let (trusted_root_hex, trusted_height) = query_ism(&ism_client).await.unwrap();
+        let (trusted_root, trusted_height) = query_ism(&ism_client).await.unwrap();
         let target_inclusion_height = celestia_height("http://localhost:26657").unwrap();
         if target_inclusion_height < inclusion_height(trusted_height).await.unwrap() + PROVER_INTERVAL {
             continue;
         }
         let start_height = inclusion_height(trusted_height).await.unwrap() + 1;
-        let num_blocks = target_inclusion_height - start_height;
+        // prove at most PROVER_INTERVAL blocks at a time
+        let num_blocks = (target_inclusion_height - start_height).min(PROVER_INTERVAL);
         let block_proof = prove_blocks(
             start_height,
             trusted_height,
             num_blocks,
-            &mut FixedBytes::from_hex(trusted_root_hex).unwrap(),
+            &mut trusted_root.into(),
             client.clone(),
         )
         .await
         .expect("Failed to prove blocks");
+
+        println!(
+            "ISM at height {} Proving block {} up to {}",
+            trusted_height,
+            start_height,
+            start_height + num_blocks
+        );
 
         let block_proof_msg = MsgUpdateZkExecutionIsm::new(
             ISM_ID.to_string(),
@@ -153,7 +161,7 @@ async fn query_ism(ism_client: &CelestiaIsmClient) -> anyhow::Result<(FixedBytes
         .unwrap();
 
     let ism = resp.ism.expect("ZKISM not found");
-    let trusted_root_hex = alloy::hex::encode(ism.state_root);
+    let trusted_root = alloy::hex::encode(ism.state_root);
     let trusted_height = ism.height;
-    Ok((FixedBytes::from_hex(trusted_root_hex).unwrap(), trusted_height))
+    Ok((FixedBytes::from_hex(trusted_root).unwrap(), trusted_height))
 }
