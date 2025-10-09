@@ -38,6 +38,10 @@ async fn main() {
     let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
     hyperlane_snapshot_store.reset_db().unwrap();
 
+    // This variable is a trick to account for empty blocks that were proven,
+    // by not relying on the fixed trusted_height in the ZKISM but instead remembering which height we are actually at.
+    let mut prover_height: Option<u64> = None;
+
     loop {
         // get trustd state from ISM
         let (trusted_root_hex, trusted_height) = query_ism(&ism_client).await.unwrap();
@@ -45,7 +49,18 @@ async fn main() {
         if latest_celestia_height < inclusion_height(trusted_height).await.unwrap() + PROVER_INTERVAL {
             continue;
         }
-        let celestia_start_height = inclusion_height(trusted_height).await.unwrap() + 1;
+
+        // workaround to ensure we don't prove empty blocks again
+        // we should be able to set the start height to the last block that has
+        // the same state root as the ism
+        let celestia_start_height = {
+            if let Some(prover_height) = prover_height {
+                prover_height
+            } else {
+                inclusion_height(trusted_height).await.unwrap() + 1
+            }
+        };
+
         // prove at most PROVER_INTERVAL blocks at a time
         let num_blocks = (latest_celestia_height - celestia_start_height).min(PROVER_INTERVAL);
 
@@ -79,10 +94,7 @@ async fn main() {
 
         let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
 
-        // don't prove if no messages occurred
-        if message_proof.1.is_empty() {
-            continue;
-        }
+        prover_height = Some(celestia_start_height + num_blocks);
 
         let mut snapshot = hyperlane_snapshot_store.get_snapshot(snapshot_index).unwrap();
         let message_proof = prove_messages(
@@ -106,6 +118,11 @@ async fn main() {
 
         let response = ism_client.send_tx(message_proof_msg).await.unwrap();
         assert!(response.success);
+
+        // don't prove if no messages occurred
+        if message_proof.1.is_empty() {
+            continue;
+        }
 
         // submit all now verified messages to hyperlane
         for message in message_proof.1.clone() {
