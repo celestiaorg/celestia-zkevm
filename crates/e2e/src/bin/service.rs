@@ -16,7 +16,7 @@ use storage::hyperlane::snapshot::HyperlaneSnapshotStore;
 use url::Url;
 
 // prove once every 10 blocks
-const PROVER_INTERVAL: u64 = 10;
+const PROVER_INTERVAL: u64 = 2;
 
 #[tokio::main]
 async fn main() {
@@ -40,27 +40,27 @@ async fn main() {
 
     loop {
         // get trustd state from ISM
-        let (trusted_root, trusted_height) = query_ism(&ism_client).await.unwrap();
-        let target_inclusion_height = celestia_height("http://localhost:26657").unwrap();
-        if target_inclusion_height < inclusion_height(trusted_height).await.unwrap() + PROVER_INTERVAL {
+        let (trusted_root_hex, trusted_height) = query_ism(&ism_client).await.unwrap();
+        let latest_celestia_height = celestia_height("http://localhost:26657").unwrap();
+        if latest_celestia_height < inclusion_height(trusted_height).await.unwrap() + PROVER_INTERVAL {
             continue;
         }
-        let start_height = inclusion_height(trusted_height).await.unwrap() + 1;
+        let celestia_start_height = inclusion_height(trusted_height).await.unwrap() + 1;
         // prove at most PROVER_INTERVAL blocks at a time
-        let num_blocks = (target_inclusion_height - start_height).min(PROVER_INTERVAL);
+        let num_blocks = (latest_celestia_height - celestia_start_height).min(PROVER_INTERVAL);
 
         println!(
             "ISM at height {} Proving block {} up to {}",
             trusted_height,
-            start_height,
-            start_height + num_blocks
+            celestia_start_height,
+            celestia_start_height + num_blocks
         );
 
         let block_proof = prove_blocks(
-            start_height,
+            celestia_start_height,
             trusted_height,
             num_blocks,
-            &mut trusted_root.into(),
+            &mut FixedBytes::from_hex(alloy::hex::encode(trusted_root_hex)).unwrap(),
             client.clone(),
         )
         .await
@@ -68,7 +68,7 @@ async fn main() {
 
         let block_proof_msg = MsgUpdateZkExecutionIsm::new(
             ISM_ID.to_string(),
-            target_inclusion_height,
+            celestia_start_height + num_blocks,
             block_proof.bytes(),
             block_proof.public_values.as_slice().to_vec(),
             ism_client.signer_address().to_string(),
@@ -78,6 +78,11 @@ async fn main() {
         assert!(response.success);
 
         let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
+
+        // don't prove if no messages occurred
+        if message_proof.1.is_empty() {
+            continue;
+        }
 
         let mut snapshot = hyperlane_snapshot_store.get_snapshot(snapshot_index).unwrap();
         let message_proof = prove_messages(
@@ -101,11 +106,6 @@ async fn main() {
 
         let response = ism_client.send_tx(message_proof_msg).await.unwrap();
         assert!(response.success);
-
-        // don't prove if no messages occurred
-        if message_proof.1.is_empty() {
-            continue;
-        }
 
         // submit all now verified messages to hyperlane
         for message in message_proof.1.clone() {
@@ -160,14 +160,14 @@ fn celestia_height(base_url: &str) -> anyhow::Result<u64> {
     Ok(h.parse::<u64>()?)
 }
 
-async fn query_ism(ism_client: &CelestiaIsmClient) -> anyhow::Result<(FixedBytes<32>, u64)> {
+async fn query_ism(ism_client: &CelestiaIsmClient) -> anyhow::Result<(Vec<u8>, u64)> {
     let resp = ism_client
         .ism(QueryIsmRequest { id: ISM_ID.to_string() })
         .await
         .unwrap();
 
     let ism = resp.ism.expect("ZKISM not found");
-    let trusted_root = alloy::hex::encode(ism.state_root);
+    let trusted_root = ism.state_root;
     let trusted_height = ism.height;
-    Ok((FixedBytes::from_hex(trusted_root).unwrap(), trusted_height))
+    Ok((trusted_root, trusted_height))
 }
