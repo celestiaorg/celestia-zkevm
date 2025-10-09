@@ -20,13 +20,13 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Get a single block proof by height
-    GetBlockProof {
+    BlockProof {
         /// Celestia block height
         #[arg(long)]
         height: u64,
     },
     /// Get block proofs in a range
-    GetBlockProofsInRange {
+    BlockProofsInRange {
         /// Start height (inclusive)
         #[arg(long)]
         start: u64,
@@ -35,17 +35,17 @@ enum Commands {
         end: u64,
     },
     /// Get the latest block proof
-    GetLatestBlockProof,
+    LatestBlockProof,
     /// Get a membership proof by height
-    GetMembershipProof {
+    MembershipProof {
         /// Block height
         #[arg(long)]
         height: u64,
     },
     /// Get the latest membership proof
-    GetLatestMembershipProof,
+    LatestMembershipProof,
     /// Get range proofs
-    GetRangeProofs {
+    RangeProofs {
         /// Start height
         #[arg(long)]
         start: u64,
@@ -62,8 +62,8 @@ async fn main() -> Result<()> {
     let mut client = ProverClient::connect(cli.server.clone()).await?;
 
     match cli.command {
-        Commands::GetBlockProof { height } => {
-            println!("Querying block proof for height {}...", height);
+        Commands::BlockProof { height } => {
+            println!("Querying block proof for height {height}...");
             let request = GetBlockProofRequest {
                 celestia_height: height,
             };
@@ -85,8 +85,8 @@ async fn main() -> Result<()> {
                 println!("✗ No proof found");
             }
         }
-        Commands::GetBlockProofsInRange { start, end } => {
-            println!("Querying block proofs in range [{}, {}]...", start, end);
+        Commands::BlockProofsInRange { start, end } => {
+            println!("Querying block proofs in range [{start}, {end}]...");
             let request = GetBlockProofsInRangeRequest {
                 start_height: start,
                 end_height: end,
@@ -104,7 +104,7 @@ async fn main() -> Result<()> {
                 );
             }
         }
-        Commands::GetLatestBlockProof => {
+        Commands::LatestBlockProof => {
             println!("Querying latest block proof...");
             let request = GetLatestBlockProofRequest {};
             let response = client.get_latest_block_proof(request).await?;
@@ -124,8 +124,8 @@ async fn main() -> Result<()> {
                 println!("✗ No proofs in storage");
             }
         }
-        Commands::GetMembershipProof { height } => {
-            println!("Querying membership proof for height {}...", height);
+        Commands::MembershipProof { height } => {
+            println!("Querying membership proof for height {height}...");
             let request = GetMembershipProofRequest { height };
             let response = client.get_membership_proof(request).await?;
             let proof = response.into_inner().proof;
@@ -144,7 +144,7 @@ async fn main() -> Result<()> {
                 println!("✗ No proof found");
             }
         }
-        Commands::GetLatestMembershipProof => {
+        Commands::LatestMembershipProof => {
             println!("Querying latest membership proof...");
             let request = GetLatestMembershipProofRequest {};
             let response = client.get_latest_membership_proof(request).await?;
@@ -163,8 +163,8 @@ async fn main() -> Result<()> {
                 println!("✗ No proofs in storage");
             }
         }
-        Commands::GetRangeProofs { start, end } => {
-            println!("Querying range proofs in range [{}, {}]...", start, end);
+        Commands::RangeProofs { start, end } => {
+            println!("Querying range proofs in range [{start}, {end}]...");
             let request = GetRangeProofsRequest {
                 start_height: start,
                 end_height: end,

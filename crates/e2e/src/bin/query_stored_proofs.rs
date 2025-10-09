@@ -13,7 +13,7 @@ async fn main() -> Result<()> {
     println!("=== E2E Test: Query Stored Proofs ===\n");
 
     let server_addr = "http://127.0.0.1:50051";
-    println!("Connecting to gRPC server at {}...", server_addr);
+    println!("Connecting to gRPC server at {server_addr}...");
 
     let mut client = ProverClient::connect(server_addr).await?;
     println!("✓ Connected to gRPC server\n");
@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
                     let latest_height = proof.celestia_height;
 
                     // Test 2: Get specific block proof by height
-                    println!("\nTest 2: Get block proof by height ({})", latest_height);
+                    println!("\nTest 2: Get block proof by height ({latest_height})");
                     println!("---");
                     match client
                         .get_block_proof(GetBlockProofRequest {
@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
                             }
                         }
                         Err(e) => {
-                            println!("✗ Failed to get block proof: {}", e);
+                            println!("✗ Failed to get block proof: {e}");
                         }
                     }
 
@@ -64,7 +64,7 @@ async fn main() -> Result<()> {
                         let start_height = if latest_height >= 5 { latest_height - 4 } else { 1 };
                         let end_height = latest_height;
 
-                        println!("\nTest 3: Get block proofs in range [{}, {}]", start_height, end_height);
+                        println!("\nTest 3: Get block proofs in range [{start_height}, {end_height}]");
                         println!("---");
                         match client
                             .get_block_proofs_in_range(GetBlockProofsInRangeRequest {
@@ -96,7 +96,7 @@ async fn main() -> Result<()> {
                                 }
                             }
                             Err(e) => {
-                                println!("✗ Failed to get block proofs in range: {}", e);
+                                println!("✗ Failed to get block proofs in range: {e}");
                             }
                         }
                     }
@@ -109,7 +109,7 @@ async fn main() -> Result<()> {
             }
         }
         Err(e) => {
-            println!("✗ Failed to connect or query: {}", e);
+            println!("✗ Failed to connect or query: {e}");
             println!("  Make sure the ev-prover gRPC server is running");
             return Err(e.into());
         }
