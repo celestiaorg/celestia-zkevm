@@ -94,7 +94,7 @@ async fn main() {
 
         let range_out: BlockRangeExecOutput = bincode::deserialize(block_proof.public_values.as_slice()).unwrap();
         let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
-        prover_height = Some(celestia_start_height + num_blocks);
+        prover_height = Some(celestia_start_height + num_blocks + 1);
 
         // don't prove messages if no progress was made
         if range_out.new_height <= trusted_height + 1 {
@@ -187,4 +187,10 @@ async fn query_ism(ism_client: &CelestiaIsmClient) -> anyhow::Result<(Vec<u8>, u
     let trusted_root = ism.state_root;
     let trusted_height = ism.height;
     Ok((trusted_root, trusted_height))
+}
+
+#[tokio::test]
+async fn test() {
+    let height = inclusion_height(264).await.unwrap();
+    println!("Height: {height}");
 }
