@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 use celestia_types::ExtendedHeader;
 use std::collections::BTreeMap;
-use std::fs;
 use std::result::Result::{Err, Ok};
 use std::sync::Arc;
+use std::{env, fs};
 
 use alloy_genesis::Genesis as AlloyGenesis;
 use alloy_primitives::FixedBytes;
@@ -270,15 +270,20 @@ impl BlockExecProver {
     /// proofs are generated concurrently while ensuring the trusted state is updated
     /// monotonically in block-height order.
     pub async fn run(self: Arc<Self>) -> Result<()> {
+        let prover_mode = env::var("SP1_PROVER")?;
+        let mut concurrency = CONCURRENCY;
+        // spawn at most one prover task for cpu and cuda
+        if prover_mode == "cpu" || prover_mode == "cuda" {
+            concurrency = 1;
+        }
         let (client, mut subscription) = self.connect_and_subscribe().await?;
-
         // Queues for the 3-stage pipeline
         let (event_tx, mut event_rx) = mpsc::channel::<BlockEvent>(QUEUE_CAP);
         let (job_tx, mut job_rx) = mpsc::channel::<ProofJob>(QUEUE_CAP);
         let (sched_tx, mut sched_rx) = mpsc::channel::<ScheduledProofJob>(QUEUE_CAP);
 
         // Stage 1: Prepare proof inputs (parallel, IO-bound)
-        let sem = Arc::new(Semaphore::new(CONCURRENCY));
+        let sem = Arc::new(Semaphore::new(concurrency));
         tokio::spawn({
             let client = client.clone();
             let prover = self.clone();
@@ -371,7 +376,7 @@ impl BlockExecProver {
         });
 
         // Stage 3: Prove (parallel, CPU/IO-bound for remote prover network)
-        let prove_sem = Arc::new(Semaphore::new(CONCURRENCY));
+        let prove_sem = Arc::new(Semaphore::new(concurrency));
         tokio::spawn({
             let prover = self.clone();
             let prove_sem = prove_sem.clone();
