@@ -9,7 +9,7 @@ use e2e::prover::block::prove_blocks;
 use e2e::prover::message::prove_messages;
 use ev_state_queries::MockStateQueryProvider;
 use ev_types::v1::{GetMetadataRequest, store_service_client::StoreServiceClient};
-use ev_zkevm_types::hyperlane::encode_hyperlane_message;
+use ev_zkevm_types::{hyperlane::encode_hyperlane_message, programs::block::BlockRangeExecOutput};
 use sp1_sdk::{EnvProver, ProverClient};
 use std::{str::FromStr, sync::Arc};
 use storage::hyperlane::snapshot::HyperlaneSnapshotStore;
@@ -92,14 +92,14 @@ async fn main() {
         let response = ism_client.send_tx(block_proof_msg).await.unwrap();
         assert!(response.success);
 
+        let range_out: BlockRangeExecOutput = bincode::deserialize(block_proof.public_values.as_slice()).unwrap();
         let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
-
         prover_height = Some(celestia_start_height + num_blocks);
 
         let mut snapshot = hyperlane_snapshot_store.get_snapshot(snapshot_index).unwrap();
         let message_proof = prove_messages(
             trusted_height + 1,
-            inclusion_height(celestia_start_height + num_blocks).await.unwrap(),
+            range_out.new_height,
             &evm_provider.clone(),
             &MockStateQueryProvider::new(evm_provider),
             client.clone(),
