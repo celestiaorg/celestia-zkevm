@@ -6,6 +6,8 @@ use e2e::{
 use ev_state_queries::MockStateQueryProvider;
 use sp1_sdk::{EnvProver, ProverClient};
 use std::{str::FromStr, sync::Arc};
+use storage::hyperlane::snapshot::HyperlaneSnapshotStore;
+use tempfile::TempDir;
 use url::Url;
 
 #[tokio::main]
@@ -13,11 +15,21 @@ async fn main() {
     dotenvy::dotenv().ok();
     let client: Arc<EnvProver> = Arc::new(ProverClient::from_env());
     let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
+    let tmp = TempDir::new().expect("cannot create temp directory");
+    let snapshot_storage_path = dirs::home_dir()
+        .expect("cannot find home directory")
+        .join(&tmp)
+        .join("data")
+        .join("snapshots.db");
+    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
+    hyperlane_snapshot_store.reset_db().unwrap();
     let _proof = prove_messages(
+        0,
         TARGET_HEIGHT,
         &evm_provider.clone(),
         &MockStateQueryProvider::new(evm_provider),
         client,
+        hyperlane_snapshot_store.get_snapshot(0).unwrap(),
     )
     .await
     .unwrap();

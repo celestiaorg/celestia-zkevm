@@ -15,6 +15,10 @@ path = "src/bin/message.rs"
 name = "block-prover"
 path = "src/bin/block.rs"
 
+[[bin]]
+name = "service"
+path = "src/bin/service.rs"
+
 [dependencies]
 alloy = { workspace = true }
 alloy-genesis = { workspace = true }
@@ -53,3 +57,4 @@ tempfile = { workspace = true }
 tendermint-proto = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+reqwest = { workspace = true, features = ["blocking"] }
