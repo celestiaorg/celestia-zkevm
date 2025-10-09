@@ -59,10 +59,10 @@ impl ClientConfig {
         Ok(addr)
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn from_env() -> Result<Self> {
-        let private_key_hex = env::var("CELESTIA_PRIVATE_KEY").map_err(|_| {
-            IsmClientError::Configuration("CELESTIA_PRIVATE_KEY environment variable not set".to_string())
-        })?;
+        let private_key_hex = env::var("CELESTIA_PRIVATE_KEY")
+            .map_err(|_| IsmClientError::Configuration("CELESTIA_PRIVATE_KEY not set".to_string()))?;
         let signer_address = Self::derive_signer_address(&private_key_hex)?;
 
         let config = ClientConfig {
@@ -73,15 +73,15 @@ impl ClientConfig {
             gas_price: env::var("CELESTIA_GAS_PRICE")
                 .unwrap_or_else(|_| "1000".to_string())
                 .parse()
-                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_GAS_PRICE".to_string()))?,
+                .unwrap(),
             max_gas: env::var("CELESTIA_MAX_GAS")
                 .unwrap_or_else(|_| "200000".to_string())
                 .parse()
-                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_MAX_GAS".to_string()))?,
+                .unwrap(),
             confirmation_timeout: env::var("CELESTIA_CONFIRMATION_TIMEOUT")
                 .unwrap_or_else(|_| "60".to_string())
                 .parse()
-                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_CONFIRMATION_TIMEOUT".to_string()))?,
+                .unwrap(),
         };
 
         Ok(config)
