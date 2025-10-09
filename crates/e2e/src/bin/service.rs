@@ -96,6 +96,11 @@ async fn main() {
         let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
         prover_height = Some(celestia_start_height + num_blocks);
 
+        // don't prove messages if no progress was made
+        if range_out.new_height <= trusted_height + 1 {
+            continue;
+        }
+
         let mut snapshot = hyperlane_snapshot_store.get_snapshot(snapshot_index).unwrap();
         let message_proof = prove_messages(
             trusted_height + 1,
@@ -118,11 +123,6 @@ async fn main() {
 
         let response = ism_client.send_tx(message_proof_msg).await.unwrap();
         assert!(response.success);
-
-        // don't prove if no messages occurred
-        if message_proof.1.is_empty() {
-            continue;
-        }
 
         // submit all now verified messages to hyperlane
         for message in message_proof.1.clone() {
