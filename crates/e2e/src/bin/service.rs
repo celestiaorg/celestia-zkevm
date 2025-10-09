@@ -71,6 +71,11 @@ async fn main() {
             celestia_start_height + num_blocks
         );
 
+        println!(
+            "Lagging behind by {} blocks",
+            latest_celestia_height - celestia_start_height
+        );
+
         let block_proof = prove_blocks(
             celestia_start_height,
             trusted_height,
