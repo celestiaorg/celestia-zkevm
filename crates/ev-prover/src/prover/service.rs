@@ -92,7 +92,7 @@ impl Prover for ProverService {
             .proof_storage
             .get_block_proof(celestia_height)
             .await
-            .map_err(|e| Status::not_found(format!("Block proof not found: {}", e)))?;
+            .map_err(|e| Status::not_found(format!("Block proof not found: {e}")))?;
 
         let proof = BlockProof {
             celestia_height: stored_proof.celestia_height,
@@ -116,7 +116,7 @@ impl Prover for ProverService {
             .proof_storage
             .get_block_proofs_in_range(start_height, end_height)
             .await
-            .map_err(|e| Status::internal(format!("Failed to get block proofs: {}", e)))?;
+            .map_err(|e| Status::internal(format!("Failed to get block proofs: {e}")))?;
 
         let proofs: Vec<BlockProof> = stored_proofs
             .into_iter()
@@ -139,7 +139,7 @@ impl Prover for ProverService {
             .proof_storage
             .get_latest_block_proof()
             .await
-            .map_err(|e| Status::internal(format!("Failed to get latest block proof: {}", e)))?;
+            .map_err(|e| Status::internal(format!("Failed to get latest block proof: {e}")))?;
 
         match stored_proof_opt {
             Some(stored_proof) => {
@@ -172,7 +172,7 @@ impl Prover for ProverService {
             .proof_storage
             .get_membership_proof(height)
             .await
-            .map_err(|e| Status::not_found(format!("Membership proof not found: {}", e)))?;
+            .map_err(|e| Status::not_found(format!("Membership proof not found: {e}")))?;
 
         let proof = MembershipProof {
             proof_data: stored_proof.proof_data,
@@ -191,7 +191,7 @@ impl Prover for ProverService {
             .proof_storage
             .get_latest_membership_proof()
             .await
-            .map_err(|e| Status::internal(format!("Failed to get latest membership proof: {}", e)))?;
+            .map_err(|e| Status::internal(format!("Failed to get latest membership proof: {e}")))?;
 
         match stored_proof_opt {
             Some(stored_proof) => {
@@ -224,7 +224,7 @@ impl Prover for ProverService {
             .proof_storage
             .get_range_proofs(start_height, end_height)
             .await
-            .map_err(|e| Status::internal(format!("Failed to get range proofs: {}", e)))?;
+            .map_err(|e| Status::internal(format!("Failed to get range proofs: {e}")))?;
 
         let proofs: Vec<RangeProof> = stored_proofs
             .into_iter()
