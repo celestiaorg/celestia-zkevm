@@ -5,8 +5,8 @@ use celestia_grpc_client::{
 };
 use e2e::config::e2e::ISM_ID;
 use e2e::config::other::EV_RPC;
+use e2e::prover::block::prove_blocks;
 use e2e::prover::message::prove_messages;
-use e2e::{config::e2e::TARGET_HEIGHT, prover::block::prove_blocks};
 use ev_state_queries::MockStateQueryProvider;
 use ev_types::v1::{GetMetadataRequest, store_service_client::StoreServiceClient};
 use ev_zkevm_types::hyperlane::encode_hyperlane_message;
@@ -99,7 +99,7 @@ async fn main() {
         let mut snapshot = hyperlane_snapshot_store.get_snapshot(snapshot_index).unwrap();
         let message_proof = prove_messages(
             trusted_height + 1,
-            TARGET_HEIGHT,
+            inclusion_height(celestia_start_height + num_blocks).await.unwrap(),
             &evm_provider.clone(),
             &MockStateQueryProvider::new(evm_provider),
             client.clone(),
@@ -110,7 +110,7 @@ async fn main() {
 
         let message_proof_msg = MsgSubmitMessages::new(
             ISM_ID.to_string(),
-            TARGET_HEIGHT,
+            inclusion_height(celestia_start_height + num_blocks).await.unwrap(),
             message_proof.0.bytes(),
             message_proof.0.public_values.as_slice().to_vec(),
             ism_client.signer_address().to_string(),
