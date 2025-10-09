@@ -54,3 +54,8 @@ pub trait ProgramProver {
     /// Parse or convert program outputs.
     fn post_process(&self, proof: SP1ProofWithPublicValues) -> Result<Self::Output>;
 }
+
+#[derive(Debug, Clone)]
+pub struct ProofCommitted {
+    pub height: u64,
+}

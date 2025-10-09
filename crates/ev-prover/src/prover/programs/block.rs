@@ -26,14 +26,14 @@ use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
 use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 use tokio::{
-    sync::{mpsc, RwLock, Semaphore},
+    sync::{mpsc, mpsc::Sender, RwLock, Semaphore},
     task::JoinSet,
 };
 use tracing::{debug, error, info};
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
-use crate::prover::{ProgramProver, ProverConfig};
-use storage::proofs::{ProofStorage, RocksDbProofStorage};
+use crate::prover::{ProgramProver, ProofCommitted, ProverConfig};
+use storage::proofs::ProofStorage;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_EXEC_ELF: &[u8] = include_elf!("ev-exec-program");
@@ -116,6 +116,7 @@ pub struct BlockExecProver {
     pub app: AppContext,
     pub config: ProverConfig,
     pub prover: EnvProver,
+    pub tx: Sender<ProofCommitted>,
     pub storage: Arc<dyn ProofStorage>,
 }
 
@@ -189,38 +190,17 @@ struct ScheduledProofJob {
 impl BlockExecProver {
     /// Creates a new instance of [`BlockExecProver`] for the provided [`AppContext`] using default configuration
     /// and prover environment settings.
-    pub fn new(app: AppContext) -> Result<Arc<Self>> {
+    pub fn new(app: AppContext, tx: Sender<ProofCommitted>, storage: Arc<dyn ProofStorage>) -> Result<Arc<Self>> {
         let config = BlockExecProver::default_config();
         let prover = ProverClient::from_env();
-
-        // Initialize RocksDB storage in the default data directory
-        let storage_path = dirs::home_dir()
-            .expect("cannot find home directory")
-            .join(APP_HOME)
-            .join("data")
-            .join("proofs.db");
-
-        let storage = Arc::new(RocksDbProofStorage::new(storage_path)?);
 
         Ok(Arc::new(Self {
             app,
             config,
             prover,
+            tx,
             storage,
         }))
-    }
-
-    /// Creates a new instance with custom storage (useful for testing)
-    pub fn with_storage(app: AppContext, storage: Arc<dyn ProofStorage>) -> Arc<Self> {
-        let config = BlockExecProver::default_config();
-        let prover = ProverClient::from_env();
-
-        Arc::new(Self {
-            app,
-            config,
-            prover,
-            storage,
-        })
     }
 
     /// Returns the default prover configuration for the block execution program.
@@ -485,6 +465,12 @@ impl BlockExecProver {
             "Successfully created and stored proof for block {}. Outputs: {}",
             scheduled.job.height, outputs,
         );
+
+        self.tx
+            .send(ProofCommitted {
+                height: scheduled.job.height,
+            })
+            .await?;
 
         Ok(())
     }

@@ -1,14 +1,17 @@
 #![allow(dead_code)]
-use std::result::Result::{Err, Ok};
+use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Ok, Result};
 use async_trait::async_trait;
 use ev_zkevm_types::programs::block::{BlockRangeExecInput, BlockRangeExecOutput};
 use sp1_sdk::{
     include_elf, EnvProver, ProverClient, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
 };
+use storage::proofs::ProofStorage;
+use tokio::sync::mpsc::Receiver;
+use tracing::info;
 
-use crate::prover::{ProgramProver, ProverConfig};
+use crate::prover::{ProgramProver, ProofCommitted, ProverConfig};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_RANGE_EXEC_ELF: &[u8] = include_elf!("ev-range-exec-program");
@@ -26,12 +29,20 @@ pub const EV_RANGE_EXEC_ELF: &[u8] = include_elf!("ev-range-exec-program");
 pub struct BlockRangeExecProver {
     config: ProverConfig,
     prover: EnvProver,
+    rx: Receiver<ProofCommitted>,
+    storage: Arc<dyn ProofStorage>,
 }
 
 /// ProofInput is a convenience type used for proof aggregation inputs within the BlockRangeExecProver program.
 pub struct ProofInput {
     proof: SP1Proof,
     vkey: SP1VerifyingKey,
+}
+
+impl ProofInput {
+    pub fn new(proof: SP1Proof, vkey: SP1VerifyingKey) -> Self {
+        Self { proof, vkey }
+    }
 }
 
 #[async_trait]
@@ -97,6 +108,18 @@ impl ProgramProver for BlockRangeExecProver {
 }
 
 impl BlockRangeExecProver {
+    pub fn new(rx: Receiver<ProofCommitted>, storage: Arc<dyn ProofStorage>) -> Result<Self> {
+        let config = BlockRangeExecProver::default_config();
+        let prover = ProverClient::from_env();
+
+        Ok(Self {
+            config,
+            prover,
+            rx,
+            storage,
+        })
+    }
+
     /// Returns the default prover configuration for the block execution program.
     pub fn default_config() -> ProverConfig {
         ProverConfig {
@@ -104,14 +127,14 @@ impl BlockRangeExecProver {
             proof_mode: SP1ProofMode::Groth16,
         }
     }
-}
 
-impl Default for BlockRangeExecProver {
-    /// Creates a new instance of [`BlockRangeExecProver`] using default configuration
-    /// and prover environment settings.
-    fn default() -> Self {
-        let config = BlockRangeExecProver::default_config();
-        let prover = ProverClient::from_env();
-        Self { config, prover }
+    pub async fn run(mut self) -> Result<()> {
+        while let Some(event) = self.rx.recv().await {
+            // collect proof committed events and check for contiguous range complete
+            // on insertion.
+            info!("rx: ProofCommitted for height: {}", event.height);
+        }
+
+        Ok(())
     }
 }

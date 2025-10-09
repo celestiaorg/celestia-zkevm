@@ -1,16 +1,21 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use ev_types::v1::get_block_request::Identifier;
 use ev_types::v1::store_service_client::StoreServiceClient;
 use ev_types::v1::GetBlockRequest;
+use storage::proofs::RocksDbProofStorage;
 use tokio::net::TcpListener;
+use tokio::sync::mpsc;
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server;
 use tonic_reflection::server::Builder as ReflectionBuilder;
 use tracing::{debug, error};
 
-use crate::config::config::Config;
+use crate::config::config::{Config, APP_HOME};
 use crate::proto::celestia::prover::v1::prover_server::ProverServer;
 use crate::prover::programs::block::{AppContext, BlockExecProver};
+use crate::prover::programs::range::BlockRangeExecProver;
 use crate::prover::service::ProverService;
 
 pub async fn start_server(config: Config) -> Result<()> {
@@ -28,10 +33,29 @@ pub async fn start_server(config: Config) -> Result<()> {
     config_clone.pub_key = public_key().await?;
     debug!("Successfully got pubkey from evnode: {}", config_clone.pub_key);
 
+    // Initialize RocksDB storage in the default data directory
+    let storage_path = dirs::home_dir()
+        .expect("cannot find home directory")
+        .join(APP_HOME)
+        .join("data")
+        .join("proofs.db");
+
+    let storage = Arc::new(RocksDbProofStorage::new(storage_path)?);
+    let (proof_tx, proof_rx) = mpsc::channel(256);
+
     tokio::spawn({
-        let block_prover = BlockExecProver::new(AppContext::from_config(config_clone)?)?;
+        let block_prover = BlockExecProver::new(AppContext::from_config(config_clone)?, proof_tx, storage.clone())?;
         async move {
             if let Err(e) = block_prover.run().await {
+                error!("Block prover task failed: {e:?}");
+            }
+        }
+    });
+
+    tokio::spawn({
+        let range_prover = BlockRangeExecProver::new(proof_rx, storage.clone())?;
+        async move {
+            if let Err(e) = range_prover.run().await {
                 error!("Block prover task failed: {e:?}");
             }
         }
