@@ -48,6 +48,14 @@ async fn main() {
         let start_height = inclusion_height(trusted_height).await.unwrap() + 1;
         // prove at most PROVER_INTERVAL blocks at a time
         let num_blocks = (target_inclusion_height - start_height).min(PROVER_INTERVAL);
+
+        println!(
+            "ISM at height {} Proving block {} up to {}",
+            trusted_height,
+            start_height,
+            start_height + num_blocks
+        );
+
         let block_proof = prove_blocks(
             start_height,
             trusted_height,
@@ -57,13 +65,6 @@ async fn main() {
         )
         .await
         .expect("Failed to prove blocks");
-
-        println!(
-            "ISM at height {} Proving block {} up to {}",
-            trusted_height,
-            start_height,
-            start_height + num_blocks
-        );
 
         let block_proof_msg = MsgUpdateZkExecutionIsm::new(
             ISM_ID.to_string(),
@@ -100,6 +101,11 @@ async fn main() {
 
         let response = ism_client.send_tx(message_proof_msg).await.unwrap();
         assert!(response.success);
+
+        // don't prove if no messages occurred
+        if message_proof.1.is_empty() {
+            continue;
+        }
 
         // submit all now verified messages to hyperlane
         for message in message_proof.1.clone() {
