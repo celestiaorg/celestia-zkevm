@@ -1,12 +1,12 @@
 use crate::error::{IsmClientError, Result};
-use crate::message::{StateInclusionProofMsg, StateTransitionProofMsg};
 use crate::proto::celestia::zkism::v1::{
     query_client::QueryClient, QueryIsmRequest, QueryIsmResponse, QueryIsmsRequest, QueryIsmsResponse,
 };
-use crate::types::{ClientConfig, ProofSubmissionResponse};
+use crate::types::{ClientConfig, TxResponse};
 
 use anyhow::Context;
-use celestia_grpc::GrpcClient;
+use celestia_grpc::{GrpcClient, IntoProtobufAny};
+use prost::Message;
 use tonic::{
     transport::{Channel, Endpoint},
     Request,
@@ -117,20 +117,21 @@ impl CelestiaIsmClient {
         Ok(resp.into_inner())
     }
 
-    /// Submit a zkISM proof message via Lumina
-    async fn submit_zkism_message<M>(&self, message: M, message_type: &str) -> Result<ProofSubmissionResponse>
+    /// Sign and send a tx to Celestia including the provided message.
+    pub async fn send_tx<M>(&self, message: M) -> Result<TxResponse>
     where
-        M: celestia_grpc::IntoProtobufAny + Send + 'static,
+        M: Message + IntoProtobufAny + Send + Clone + 'static,
     {
+        let message_type = message.clone().into_any().type_url;
         debug!(
-            "Submitting {} message to Celestia via Lumina (endpoint: {}, chain: {})",
+            "Submitting {} message to Celestia (endpoint: {}, chain: {})",
             message_type, self.config.grpc_endpoint, self.config.chain_id
         );
 
         let tx_config = celestia_grpc::TxConfig {
             gas_limit: Some(self.config.max_gas),
             gas_price: Some(self.config.gas_price as f64),
-            memo: Some(format!("zkISM {message_type} submission")),
+            memo: Some("celestia-zkism-client".to_string()),
             ..Default::default()
         };
 
@@ -143,7 +144,7 @@ impl CelestiaIsmClient {
                     tx_info.height.value()
                 );
 
-                Ok(ProofSubmissionResponse {
+                Ok(TxResponse {
                     tx_hash: tx_info.hash.to_string(),
                     height: tx_info.height.value(),
                     gas_used: 0, // TxInfo doesn't provide gas_used, use estimation
@@ -159,56 +160,10 @@ impl CelestiaIsmClient {
             }
         }
     }
-
-    /// Submit a state transition proof to Celestia
-    pub async fn submit_state_transition_proof(
-        &self,
-        proof_msg: StateTransitionProofMsg,
-    ) -> Result<ProofSubmissionResponse> {
-        info!(
-            "Submitting state transition proof for ISM id: {}, height: {}",
-            proof_msg.id, proof_msg.height
-        );
-
-        // Validate proof message
-        if proof_msg.proof.is_empty() {
-            return Err(IsmClientError::InvalidProof("Proof data cannot be empty".to_string()));
-        }
-
-        if proof_msg.id.is_empty() {
-            return Err(IsmClientError::InvalidProof("ISM ID cannot be empty".to_string()));
-        }
-
-        // Submit via Lumina
-        self.submit_zkism_message(proof_msg, "MsgUpdateZKExecutionISM").await
-    }
-
-    /// Submit a state inclusion proof to Celestia
-    pub async fn submit_state_inclusion_proof(
-        &self,
-        proof_msg: StateInclusionProofMsg,
-    ) -> Result<ProofSubmissionResponse> {
-        info!(
-            "Submitting state inclusion proof for ISM id: {}, height: {}",
-            proof_msg.id, proof_msg.height
-        );
-
-        // Validate proof message
-        if proof_msg.proof.is_empty() {
-            return Err(IsmClientError::InvalidProof("Proof data cannot be empty".to_string()));
-        }
-
-        if proof_msg.id.is_empty() {
-            return Err(IsmClientError::InvalidProof("ISM ID cannot be empty".to_string()));
-        }
-
-        // Submit via Lumina
-        self.submit_zkism_message(proof_msg, "MsgSubmitMessages").await
-    }
 }
-
 #[cfg(test)]
 mod tests {
+    use crate::message::{StateInclusionProofMsg, StateTransitionProofMsg};
     use prost::Message;
 
     use super::*;

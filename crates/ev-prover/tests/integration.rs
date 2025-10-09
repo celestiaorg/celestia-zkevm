@@ -41,8 +41,8 @@ async fn test_run_message_prover() {
     let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
     let proof_store = Arc::new(RocksDbProofStorage::new(proof_storage_path).unwrap());
 
-    hyperlane_message_store.prune_all().unwrap();
-    hyperlane_snapshot_store.prune_all().unwrap();
+    hyperlane_message_store.reset_db().unwrap();
+    hyperlane_snapshot_store.reset_db().unwrap();
 
     let app = AppContext {
         evm_rpc: "http://127.0.0.1:8545".to_string(),
