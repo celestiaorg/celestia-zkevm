@@ -159,7 +159,7 @@ impl ProgramProver for BlockExecProver {
 
 // TODO: Add these as fields to the BlockExecProver to make configurable?
 const QUEUE_CAP: usize = 256;
-const CONCURRENCY: usize = 16;
+const CONCURRENCY: usize = 1;
 
 struct BlockEvent {
     height: u64,
@@ -388,6 +388,8 @@ impl BlockExecProver {
                             error!("prove failed: {e:#}");
                         }
                     });
+                    info!("prove generated a proof");
+                    break;
                 }
 
                 while tasks.join_next().await.is_some() {}
