@@ -21,6 +21,9 @@ use tracing::info;
 use tracing_subscriber::EnvFilter;
 use url::Url;
 
+// todo: find a better way to wait for the balance to be updated
+// ideally deterministically check if the hyperlane transfer was finalized on the destination
+// and wait until the ev block to be included in a Celestia block when going back
 const BALANCE_UPDATE_DELAY: u64 = 30;
 
 #[tokio::main]
