@@ -8,7 +8,7 @@ use celestia_grpc_client::{
 use e2e::config::e2e::ISM_ID;
 use e2e::config::other::EV_RPC;
 use e2e::prover::block::prove_blocks;
-use e2e::prover::evm::transfer_back;
+use e2e::prover::helpers::transfer_back;
 use e2e::prover::message::prove_messages;
 use ev_state_queries::MockStateQueryProvider;
 use ev_types::v1::{GetMetadataRequest, store_service_client::StoreServiceClient};
@@ -18,6 +18,8 @@ use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
 use tokio::time::sleep;
 use url::Url;
+
+const BALANCE_UPDATE_DELAY: u64 = 15;
 
 #[tokio::main]
 #[allow(clippy::field_reassign_with_default)]
@@ -52,22 +54,27 @@ async fn main() {
         "1000".to_string(),
     );
 
+    println!("Bridging Tia from Celestia to Evolve...");
     let response = ism_client.send_tx(transfer_msg).await.unwrap();
     assert!(response.success);
 
+    println!("Waiting for Evolve balance to be updated...");
+    // wait for the EVM balance to be updated
+    sleep(Duration::from_secs(BALANCE_UPDATE_DELAY)).await;
+
     // reinstantiate ISM client from env for other messages
     let ism_client = CelestiaIsmClient::from_env().await.unwrap();
-    // wait for the EVM block to be included in a Celestia block
-    sleep(Duration::from_secs(15)).await;
-
     // next trigger make transfer-back
+    println!("Submitting Hyperlane deposit message on Evolve...");
     let target_height = transfer_back().await.unwrap();
-    println!("transfer-back inclusion block height: {target_height}");
+    println!("[Done] submitting transfer Messages");
 
     let client: Arc<EnvProver> = Arc::new(ProverClient::from_env());
     let target_inclusion_height = inclusion_height(target_height).await.unwrap();
     let start_height = inclusion_height(trusted_height).await.unwrap() + 1;
     let num_blocks = target_inclusion_height - start_height;
+
+    println!("Proving Evolve blocks...");
     let block_proof = prove_blocks(
         start_height,
         trusted_height,
@@ -77,6 +84,7 @@ async fn main() {
     )
     .await
     .expect("Failed to prove blocks");
+    println!("[Done] proving blocks");
 
     let block_proof_msg = MsgUpdateZkExecutionIsm::new(
         ISM_ID.to_string(),
@@ -86,10 +94,13 @@ async fn main() {
         ism_client.signer_address().to_string(),
     );
 
+    println!("Updating ZKISM on Celestia...");
     let response = ism_client.send_tx(block_proof_msg).await.unwrap();
     assert!(response.success);
+    println!("[Done] ZKISM was updated successfully");
 
     let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
+    println!("Proving Evolve Hyperlane deposit events...");
     let message_proof = prove_messages(
         target_height,
         &evm_provider.clone(),
@@ -106,10 +117,14 @@ async fn main() {
         message_proof.0.public_values.as_slice().to_vec(),
         ism_client.signer_address().to_string(),
     );
+    println!("[Done] ZKISM was updated successfully");
 
+    println!("Submitting Hyperlane tree proof to ZKISM...");
     let response = ism_client.send_tx(message_proof_msg).await.unwrap();
     assert!(response.success);
+    println!("[Done] ZKISM was updated successfully");
 
+    println!("Relaying verified Hyperlane messages to Celestia...");
     // submit all now verified messages to hyperlane
     for message in message_proof.1 {
         let message_hex = alloy::hex::encode(encode_hyperlane_message(&message.message).unwrap());
@@ -122,6 +137,7 @@ async fn main() {
         let response = ism_client.send_tx(msg).await.unwrap();
         assert!(response.success);
     }
+    println!("[Done] Tia was bridged back to Celestia");
 }
 
 // todo: find a place for this function and remove it from the binaries
