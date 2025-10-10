@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 
 use anyhow::{anyhow, Ok, Result};
 use async_trait::async_trait;
@@ -29,6 +29,7 @@ pub const EV_RANGE_EXEC_ELF: &[u8] = include_elf!("ev-range-exec-program");
 pub struct BlockRangeExecProver {
     config: ProverConfig,
     prover: EnvProver,
+    pending: BTreeSet<ProofCommitted>,
     rx: Receiver<ProofCommitted>,
     storage: Arc<dyn ProofStorage>,
 }
@@ -111,10 +112,12 @@ impl BlockRangeExecProver {
     pub fn new(rx: Receiver<ProofCommitted>, storage: Arc<dyn ProofStorage>) -> Result<Self> {
         let config = BlockRangeExecProver::default_config();
         let prover = ProverClient::from_env();
+        let pending = BTreeSet::new();
 
         Ok(Self {
             config,
             prover,
+            pending,
             rx,
             storage,
         })
@@ -132,7 +135,11 @@ impl BlockRangeExecProver {
         while let Some(event) = self.rx.recv().await {
             // collect proof committed events and check for contiguous range complete
             // on insertion.
-            info!("rx: ProofCommitted for height: {}", event.height);
+            info!("rx: ProofCommitted for height: {}", event);
+
+            self.pending.insert(event);
+
+            info!("size pending: {}", self.pending.len());
         }
 
         Ok(())

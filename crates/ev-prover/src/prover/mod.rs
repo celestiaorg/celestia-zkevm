@@ -1,4 +1,4 @@
-use std::result::Result::Ok;
+use std::{fmt::Display, result::Result::Ok};
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -55,7 +55,11 @@ pub trait ProgramProver {
     fn post_process(&self, proof: SP1ProofWithPublicValues) -> Result<Self::Output>;
 }
 
-#[derive(Debug, Clone)]
-pub struct ProofCommitted {
-    pub height: u64,
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ProofCommitted(pub u64);
+
+impl Display for ProofCommitted {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }

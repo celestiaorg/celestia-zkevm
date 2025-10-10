@@ -466,11 +466,7 @@ impl BlockExecProver {
             scheduled.job.height, outputs,
         );
 
-        self.tx
-            .send(ProofCommitted {
-                height: scheduled.job.height,
-            })
-            .await?;
+        self.tx.send(ProofCommitted(scheduled.job.height)).await?;
 
         Ok(())
     }
