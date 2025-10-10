@@ -27,5 +27,11 @@ Wait for all containers to initialize fully.
 
 Then set your `SP1_PROVER` in the workspace `.env` to `cpu`, `cuda` or `network` and run:
 ```bash
-make e2e
+RUST_LOG="e2e=info" make e2e
+```
+
+If you want to see all the details about block proving and other background processes, run:
+
+```bash
+RUST_LOG="e2e=debug" make e2e
 ```
