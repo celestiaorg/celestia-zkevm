@@ -21,7 +21,7 @@ use tracing::info;
 use tracing_subscriber::EnvFilter;
 use url::Url;
 
-const BALANCE_UPDATE_DELAY: u64 = 6;
+const BALANCE_UPDATE_DELAY: u64 = 30;
 
 #[tokio::main]
 #[allow(clippy::field_reassign_with_default)]
