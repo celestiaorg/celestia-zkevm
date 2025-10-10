@@ -20,6 +20,7 @@ use tokio::time::sleep;
 use url::Url;
 
 #[tokio::main]
+#[allow(clippy::field_reassign_with_default)]
 async fn main() {
     rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
