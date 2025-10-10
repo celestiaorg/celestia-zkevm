@@ -19,7 +19,7 @@ use std::{str::FromStr, sync::Arc};
 use tokio::time::sleep;
 use url::Url;
 
-const BALANCE_UPDATE_DELAY: u64 = 15;
+const BALANCE_UPDATE_DELAY: u64 = 6;
 
 #[tokio::main]
 #[allow(clippy::field_reassign_with_default)]
@@ -68,6 +68,9 @@ async fn main() {
     println!("Submitting Hyperlane deposit message on Evolve...");
     let target_height = transfer_back().await.unwrap();
     println!("[Done] submitting transfer Messages");
+
+    // wait for the EVM height to be included in a Celestia block
+    sleep(Duration::from_secs(BALANCE_UPDATE_DELAY)).await;
 
     let client: Arc<EnvProver> = Arc::new(ProverClient::from_env());
     let target_inclusion_height = inclusion_height(target_height).await.unwrap();
