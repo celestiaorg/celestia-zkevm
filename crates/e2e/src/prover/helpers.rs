@@ -44,7 +44,6 @@ pub async fn transfer_back() -> Result<u64> {
 
     let pending = provider.send_transaction(tx).await?;
     let receipt = pending.get_receipt().await?;
-    println!("tx hash: {:?}", receipt.transaction_hash);
     // transaction must be successful
     assert!(receipt.status(), "Transfer back failed");
     Ok(receipt.block_number.unwrap())

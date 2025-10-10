@@ -19,6 +19,7 @@ use ev_zkevm_types::{
 use sp1_sdk::{EnvProver, SP1ProofWithPublicValues, SP1Stdin};
 use storage::hyperlane::{StoredHyperlaneMessage, message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use tempfile::TempDir;
+use tracing::{debug, error};
 
 use crate::config::other::{MAILBOX_ADDRESS, MERKLE_TREE_ADDRESS};
 
@@ -75,10 +76,10 @@ pub async fn prove_messages(
                 hyperlane_message_store
                     .insert_message(current_index, stored_message)
                     .unwrap();
-                println!("Inserted Hyperlane Message at index: {current_index}");
+                debug!("Inserted Hyperlane Message at index: {current_index}");
             }
             Err(e) => {
-                eprintln!("Failed to decode Dispatch Event: {e:?}");
+                error!("Failed to decode Dispatch Event: {e:?}");
             }
         }
     }

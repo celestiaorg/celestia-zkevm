@@ -3060,6 +3060,8 @@ dependencies = [
  "tempfile",
  "tendermint-proto",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
  "url",
 ]
 

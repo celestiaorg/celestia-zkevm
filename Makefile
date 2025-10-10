@@ -94,5 +94,5 @@ spamoor:
 .PHONY: spamoor
 
 e2e:
-	cargo run --bin e2e -p e2e --release
+	RUST_LOG="e2e=info" cargo run --bin e2e -p e2e --release
 .PHONY: e2e
