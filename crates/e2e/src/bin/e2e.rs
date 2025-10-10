@@ -1,6 +1,7 @@
 use alloy_primitives::{FixedBytes, hex::FromHex};
 use alloy_provider::ProviderBuilder;
 use celestia_grpc_client::MsgRemoteTransfer;
+use celestia_grpc_client::types::ClientConfig;
 use celestia_grpc_client::{
     MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm, QueryIsmRequest, client::CelestiaIsmClient,
 };
@@ -27,7 +28,6 @@ async fn main() {
 
     // instantiate ISM client for submitting payloads and querying state
     let ism_client = CelestiaIsmClient::from_env().await.unwrap();
-
     let resp = ism_client
         .ism(QueryIsmRequest { id: ISM_ID.to_string() })
         .await
@@ -37,30 +37,31 @@ async fn main() {
     let trusted_root_hex = alloy::hex::encode(ism.state_root);
     let trusted_height = ism.height;
 
-    /*
-    THE CODE BELOW SEEMS BROKEN. THROWS THE FOLLOWING ERROR:
-    called `Result::unwrap()` on an `Err` value:
-    SubmissionFailed("Failed to submit /hyperlane.warp.v1.MsgRemoteTransfer:
-    Broadcasting transaction ABAB0E4CEC0C29B946E8D6B44A83B90EF07A9C57A1EED2C20A9A8919003B313A 
-    failed; code: Unauthorized, error: 
-    wrong number of signers; expected 2, got 1: unauthorized")
-    */
-    /*let transfer_msg = MsgRemoteTransfer::new(
-        "celestia1d2qfkdk27r2x4y67ua5r2pj7ck5t8n4890x9wy".to_string(),
+    // manually override the signer address and private key for the transfer
+    let mut celestia_client_config = ClientConfig::default();
+    celestia_client_config.private_key_hex =
+        "f7ec3cfaa1ae36c9c907d5ed5397503fc6e9f26cb69bfd83dbe45c5b2a717021".to_string();
+    celestia_client_config.signer_address = "celestia1d2qfkdk27r2x4y67ua5r2pj7ck5t8n4890x9wy".to_string();
+    let ism_client = CelestiaIsmClient::new(celestia_client_config).await.unwrap();
+    let transfer_msg = MsgRemoteTransfer::new(
+        ism_client.signer_address().to_string(),
         "0x726f757465725f61707000000000000000000000000000010000000000000000".to_string(),
         1234,
         "0x000000000000000000000000aF9053bB6c4346381C77C2FeD279B17ABAfCDf4d".to_string(),
-        "10000000".to_string(),
+        "1000".to_string(),
     );
 
     let response = ism_client.send_tx(transfer_msg).await.unwrap();
-    assert!(response.success);*/
+    assert!(response.success);
+
+    // reinstantiate ISM client from env for other messages
+    let ism_client = CelestiaIsmClient::from_env().await.unwrap();
+    // wait for the EVM block to be included in a Celestia block
+    sleep(Duration::from_secs(15)).await;
 
     // next trigger make transfer-back
     let target_height = transfer_back().await.unwrap();
     println!("transfer-back inclusion block height: {target_height}");
-    // wait for the EVM block to be included in a Celestia block
-    sleep(Duration::from_secs(15)).await;
 
     let client: Arc<EnvProver> = Arc::new(ProverClient::from_env());
     let target_inclusion_height = inclusion_height(target_height).await.unwrap();

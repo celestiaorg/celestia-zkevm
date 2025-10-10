@@ -15,7 +15,7 @@ use tracing::{debug, info, warn};
 
 /// Celestia gRPC client for proof submission
 pub struct CelestiaIsmClient {
-    config: ClientConfig,
+    pub config: ClientConfig,
     channel: Channel,
     tx_client: GrpcClient,
 }
