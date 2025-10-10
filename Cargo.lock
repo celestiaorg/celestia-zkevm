@@ -3030,6 +3030,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-provider",
  "alloy-rpc-types",
+ "alloy-signer-local",
  "alloy-sol-types",
  "anyhow",
  "bincode",

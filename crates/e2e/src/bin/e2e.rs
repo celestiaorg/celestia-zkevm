@@ -1,17 +1,21 @@
 use alloy_primitives::{FixedBytes, hex::FromHex};
 use alloy_provider::ProviderBuilder;
+use celestia_grpc_client::MsgRemoteTransfer;
 use celestia_grpc_client::{
     MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm, QueryIsmRequest, client::CelestiaIsmClient,
 };
 use e2e::config::e2e::ISM_ID;
 use e2e::config::other::EV_RPC;
+use e2e::prover::block::prove_blocks;
+use e2e::prover::evm::transfer_back;
 use e2e::prover::message::prove_messages;
-use e2e::{config::e2e::TARGET_HEIGHT, prover::block::prove_blocks};
 use ev_state_queries::MockStateQueryProvider;
 use ev_types::v1::{GetMetadataRequest, store_service_client::StoreServiceClient};
 use ev_zkevm_types::hyperlane::encode_hyperlane_message;
 use sp1_sdk::{EnvProver, ProverClient};
+use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
+use tokio::time::sleep;
 use url::Url;
 
 #[tokio::main]
@@ -33,8 +37,33 @@ async fn main() {
     let trusted_root_hex = alloy::hex::encode(ism.state_root);
     let trusted_height = ism.height;
 
+    /*
+    THE CODE BELOW SEEMS BROKEN. THROWS THE FOLLOWING ERROR:
+    called `Result::unwrap()` on an `Err` value:
+    SubmissionFailed("Failed to submit /hyperlane.warp.v1.MsgRemoteTransfer:
+    Broadcasting transaction ABAB0E4CEC0C29B946E8D6B44A83B90EF07A9C57A1EED2C20A9A8919003B313A 
+    failed; code: Unauthorized, error: 
+    wrong number of signers; expected 2, got 1: unauthorized")
+    */
+    /*let transfer_msg = MsgRemoteTransfer::new(
+        "celestia1d2qfkdk27r2x4y67ua5r2pj7ck5t8n4890x9wy".to_string(),
+        "0x726f757465725f61707000000000000000000000000000010000000000000000".to_string(),
+        1234,
+        "0x000000000000000000000000aF9053bB6c4346381C77C2FeD279B17ABAfCDf4d".to_string(),
+        "10000000".to_string(),
+    );
+
+    let response = ism_client.send_tx(transfer_msg).await.unwrap();
+    assert!(response.success);*/
+
+    // next trigger make transfer-back
+    let target_height = transfer_back().await.unwrap();
+    println!("transfer-back inclusion block height: {target_height}");
+    // wait for the EVM block to be included in a Celestia block
+    sleep(Duration::from_secs(15)).await;
+
     let client: Arc<EnvProver> = Arc::new(ProverClient::from_env());
-    let target_inclusion_height = inclusion_height(TARGET_HEIGHT).await.unwrap();
+    let target_inclusion_height = inclusion_height(target_height).await.unwrap();
     let start_height = inclusion_height(trusted_height).await.unwrap() + 1;
     let num_blocks = target_inclusion_height - start_height;
     let block_proof = prove_blocks(
@@ -60,7 +89,7 @@ async fn main() {
 
     let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
     let message_proof = prove_messages(
-        TARGET_HEIGHT,
+        target_height,
         &evm_provider.clone(),
         &MockStateQueryProvider::new(evm_provider),
         client.clone(),
@@ -70,7 +99,7 @@ async fn main() {
 
     let message_proof_msg = MsgSubmitMessages::new(
         ISM_ID.to_string(),
-        TARGET_HEIGHT,
+        target_height,
         message_proof.0.bytes(),
         message_proof.0.public_values.as_slice().to_vec(),
         ism_client.signer_address().to_string(),
