@@ -5,8 +5,8 @@ use celestia_grpc_client::types::ClientConfig;
 use celestia_grpc_client::{
     MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm, QueryIsmRequest, client::CelestiaIsmClient,
 };
-use e2e::config::e2e::ISM_ID;
-use e2e::config::other::EV_RPC;
+use e2e::config::debug::EV_RPC;
+use e2e::config::e2e::{CELESTIA_MAILBOX_ID, CELESTIA_TOKEN_ID, EV_RECIPIENT_ADDRESS, ISM_ID};
 use e2e::prover::block::prove_blocks;
 use e2e::prover::helpers::transfer_back;
 use e2e::prover::message::prove_messages;
@@ -50,17 +50,11 @@ async fn main() {
     let trusted_root_hex = alloy::hex::encode(ism.state_root);
     let trusted_height = ism.height;
 
-    // manually override the signer address and private key for the transfer
-    let mut celestia_client_config = ClientConfig::default();
-    celestia_client_config.private_key_hex =
-        "f7ec3cfaa1ae36c9c907d5ed5397503fc6e9f26cb69bfd83dbe45c5b2a717021".to_string();
-    celestia_client_config.signer_address = "celestia1d2qfkdk27r2x4y67ua5r2pj7ck5t8n4890x9wy".to_string();
-    let ism_client = CelestiaIsmClient::new(celestia_client_config).await.unwrap();
     let transfer_msg = MsgRemoteTransfer::new(
         ism_client.signer_address().to_string(),
-        "0x726f757465725f61707000000000000000000000000000010000000000000000".to_string(),
+        CELESTIA_TOKEN_ID.to_string(),
         1234,
-        "0x000000000000000000000000aF9053bB6c4346381C77C2FeD279B17ABAfCDf4d".to_string(),
+        EV_RECIPIENT_ADDRESS.to_string(),
         "1000".to_string(),
     );
 
@@ -167,7 +161,7 @@ async fn main() {
     for message in message_proof.1 {
         let message_hex = alloy::hex::encode(encode_hyperlane_message(&message.message).unwrap());
         let msg = MsgProcessMessage::new(
-            "0x68797065726c616e650000000000000000000000000000000000000000000000".to_string(),
+            CELESTIA_MAILBOX_ID.to_string(),
             ism_client.signer_address().to_string(),
             alloy::hex::encode(vec![]), // empty metadata; messages are pre-authorized before submission
             message_hex,

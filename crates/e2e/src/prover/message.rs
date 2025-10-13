@@ -21,7 +21,7 @@ use storage::hyperlane::{StoredHyperlaneMessage, message::HyperlaneMessageStore,
 use tempfile::TempDir;
 use tracing::{debug, error};
 
-use crate::config::other::{MAILBOX_ADDRESS, MERKLE_TREE_ADDRESS};
+use crate::config::debug::{MAILBOX_ADDRESS, MERKLE_TREE_ADDRESS};
 
 pub async fn prove_messages(
     target_height: u64,
