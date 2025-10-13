@@ -167,6 +167,8 @@ services:
       dockerfile: crates/ev-prover/Dockerfile
     platform: linux/amd64
     container_name: ev-prover
+    profiles:
+      - prover
     ports:
       - "50051:50051"
     environment:
