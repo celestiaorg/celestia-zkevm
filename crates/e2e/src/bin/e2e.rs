@@ -1,7 +1,6 @@
 use alloy_primitives::{FixedBytes, hex::FromHex};
 use alloy_provider::ProviderBuilder;
 use celestia_grpc_client::MsgRemoteTransfer;
-use celestia_grpc_client::types::ClientConfig;
 use celestia_grpc_client::{
     MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm, QueryIsmRequest, client::CelestiaIsmClient,
 };
@@ -61,6 +60,9 @@ async fn main() {
     info!("Bridging Tia from Celestia to Evolve...");
     let response = ism_client.send_tx(transfer_msg).await.unwrap();
     assert!(response.success);
+    // we can choose this as our start heihgt, because the state root has not changed in between the hyperlane deployments
+    // and this transfer.
+    let celestia_start_height = response.height - 1;
 
     info!("Waiting for Evolve balance to be updated...");
 
@@ -73,7 +75,7 @@ async fn main() {
                 Ok(height) => height,
                 Err(_) => {
                     if retries > MAX_RETRIES {
-                        panic!("Failed to get target height after {} retries", MAX_RETRIES);
+                        panic!("Failed to get target height after {MAX_RETRIES} retries");
                     }
                     sleep(Duration::from_secs(RETRY_DELAY)).await;
                     retries += 1;
@@ -93,7 +95,7 @@ async fn main() {
                 Ok(height) => height,
                 Err(_) => {
                     if retries > MAX_RETRIES {
-                        panic!("Failed to get target inclusion height after {} retries", MAX_RETRIES);
+                        panic!("Failed to get target inclusion height after {MAX_RETRIES} retries");
                     }
                     sleep(Duration::from_secs(RETRY_DELAY)).await;
                     retries += 1;
@@ -103,12 +105,11 @@ async fn main() {
             break target_inclusion_height;
         }
     };
-    let start_height = inclusion_height(trusted_height).await.unwrap() + 1;
-    let num_blocks = target_inclusion_height - start_height;
+    let num_blocks = target_inclusion_height - celestia_start_height;
 
     info!("Proving Evolve blocks...");
     let block_proof = prove_blocks(
-        start_height,
+        celestia_start_height,
         trusted_height,
         num_blocks,
         &mut FixedBytes::from_hex(trusted_root_hex).unwrap(),
