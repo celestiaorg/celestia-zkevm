@@ -18,8 +18,8 @@ pub enum IsmClientError {
     #[error("Client configuration error: {0}")]
     Configuration(String),
 
-    #[error("Proof submission failed: {0}")]
-    SubmissionFailed(String),
+    #[error("Tx submission failed: {0}")]
+    TxFailed(String),
 
     #[error("Lumina gRPC error: {0}")]
     LuminaGrpc(#[from] anyhow::Error),
