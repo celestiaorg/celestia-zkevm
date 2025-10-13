@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	submissionTimeout            = 600 * time.Second
+	submissionTimeout            = 2400 * time.Second
 	noGasPrice                   = -1
 	initialBackoff               = 100 * time.Millisecond
 	defaultGasPrice              = 0.0

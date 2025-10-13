@@ -96,8 +96,3 @@ spamoor:
 e2e:
 	cargo run --bin e2e -p e2e --release
 .PHONY: e2e
-
-build-local:
-	./devnet/forks/celestia-app/build-local.sh
-	./devnet/forks/ev-node/build-local.sh
-.PHONY: build-local
