@@ -29,7 +29,9 @@ pub async fn start_server(config: Config) -> Result<()> {
     debug!("Successfully got pubkey from evnode: {}", config_clone.pub_key);
 
     tokio::spawn({
-        let block_prover = BlockExecProver::new(AppContext::from_config(config_clone)?)?;
+        let queue_capacity = config_clone.queue_capacity;
+        let concurrency = config_clone.concurrency;
+        let block_prover = BlockExecProver::new(AppContext::from_config(config_clone)?, queue_capacity, concurrency)?;
         async move {
             if let Err(e) = block_prover.run().await {
                 error!("Block prover task failed: {e:?}");
