@@ -92,3 +92,7 @@ spamoor:
 	@chmod +x scripts/run-spamoor.sh
 	@scripts/run-spamoor.sh $(ARGS)
 .PHONY: spamoor
+
+e2e:
+	cargo run --bin e2e -p e2e --release
+.PHONY: e2e
