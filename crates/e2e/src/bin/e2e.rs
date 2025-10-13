@@ -21,9 +21,6 @@ use tracing::info;
 use tracing_subscriber::EnvFilter;
 use url::Url;
 
-// todo: find a better way to wait for the balance to be updated
-// ideally deterministically check if the hyperlane transfer was finalized on the destination
-// and wait until the ev block was included in a Celestia block when going back
 const MAX_RETRIES: u64 = 10;
 const RETRY_DELAY: u64 = 2;
 
