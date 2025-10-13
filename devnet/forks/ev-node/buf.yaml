@@ -1,0 +1,16 @@
+version: v2
+
+modules:
+  - path: proto
+lint:
+  use:
+    - COMMENTS
+    - FILE_LOWER_SNAKE_CASE
+  except:
+    - COMMENT_FIELD
+    - SERVICE_SUFFIX
+  ignore:
+    - tendermint
+breaking:
+  use:
+    - FILE

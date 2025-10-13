@@ -1,0 +1,17 @@
+# Check if the generated protobuf code matches the committed code
+name: Protobuf
+on:
+  workflow_call:
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  buf-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: bufbuild/buf-action@v1
+        with:
+          format: false

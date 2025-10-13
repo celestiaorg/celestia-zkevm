@@ -1,0 +1,334 @@
+package evm
+
+import (
+	"context"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"math/big"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/ethereum/go-ethereum/beacon/engine"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/rs/zerolog"
+
+	"github.com/evstack/ev-node/core/execution"
+)
+
+var (
+	// ErrInvalidPayloadStatus indicates that EVM returned status != VALID
+	ErrInvalidPayloadStatus = errors.New("invalid payload status")
+)
+
+// Ensure EngineAPIExecutionClient implements the execution.Execute interface
+var _ execution.Executor = (*EngineClient)(nil)
+
+// EngineClient represents a client that interacts with an Ethereum execution engine
+// through the Engine API. It manages connections to both the engine and standard Ethereum
+// APIs, and maintains state related to block processing.
+type EngineClient struct {
+	engineClient  *rpc.Client       // Client for Engine API calls
+	ethClient     *ethclient.Client // Client for standard Ethereum API calls
+	genesisHash   common.Hash       // Hash of the genesis block
+	initialHeight uint64
+	feeRecipient  common.Address // Address to receive transaction fees
+
+	mu                        sync.Mutex  // Mutex to protect concurrent access to block hashes
+	currentHeadBlockHash      common.Hash // Store last non-finalized HeadBlockHash
+	currentSafeBlockHash      common.Hash // Store last non-finalized SafeBlockHash
+	currentFinalizedBlockHash common.Hash // Store last finalized block hash
+
+	logger zerolog.Logger
+}
+
+// NewEngineExecutionClient creates a new instance of EngineAPIExecutionClient
+func NewEngineExecutionClient(
+	ethURL,
+	engineURL string,
+	jwtSecret string,
+	genesisHash common.Hash,
+	feeRecipient common.Address,
+) (*EngineClient, error) {
+	ethClient, err := ethclient.Dial(ethURL)
+	if err != nil {
+		return nil, err
+	}
+
+	secret, err := decodeSecret(jwtSecret)
+	if err != nil {
+		return nil, err
+	}
+
+	engineClient, err := rpc.DialOptions(context.Background(), engineURL,
+		rpc.WithHTTPAuth(func(h http.Header) error {
+			authToken, err := getAuthToken(secret)
+			if err != nil {
+				return err
+			}
+
+			if authToken != "" {
+				h.Set("Authorization", "Bearer "+authToken)
+			}
+			return nil
+		}))
+	if err != nil {
+		return nil, err
+	}
+
+	return &EngineClient{
+		engineClient:              engineClient,
+		ethClient:                 ethClient,
+		genesisHash:               genesisHash,
+		feeRecipient:              feeRecipient,
+		currentHeadBlockHash:      genesisHash,
+		currentSafeBlockHash:      genesisHash,
+		currentFinalizedBlockHash: genesisHash,
+		logger:                    zerolog.Nop(),
+	}, nil
+}
+
+// SetLogger allows callers to attach a structured logger.
+func (c *EngineClient) SetLogger(l zerolog.Logger) {
+	c.logger = l
+}
+
+// InitChain initializes the blockchain with the given genesis parameters
+func (c *EngineClient) InitChain(ctx context.Context, genesisTime time.Time, initialHeight uint64, chainID string) ([]byte, uint64, error) {
+	if initialHeight != 1 {
+		return nil, 0, fmt.Errorf("initialHeight must be 1, got %d", initialHeight)
+	}
+
+	// Acknowledge the genesis block
+	var forkchoiceResult engine.ForkChoiceResponse
+	err := c.engineClient.CallContext(ctx, &forkchoiceResult, "engine_forkchoiceUpdatedV3",
+		engine.ForkchoiceStateV1{
+			HeadBlockHash:      c.genesisHash,
+			SafeBlockHash:      c.genesisHash,
+			FinalizedBlockHash: c.genesisHash,
+		},
+		nil,
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("engine_forkchoiceUpdatedV3 failed: %w", err)
+	}
+
+	_, stateRoot, gasLimit, _, err := c.getBlockInfo(ctx, 0)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get block info: %w", err)
+	}
+
+	c.initialHeight = initialHeight
+
+	return stateRoot[:], gasLimit, nil
+}
+
+// GetTxs retrieves transactions from the current execution payload
+func (c *EngineClient) GetTxs(ctx context.Context) ([][]byte, error) {
+	var result []string
+	err := c.ethClient.Client().CallContext(ctx, &result, "txpoolExt_getTxs")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tx pool content: %w", err)
+	}
+
+	txs := make([][]byte, 0, len(result))
+	for _, rlpHex := range result {
+		if !strings.HasPrefix(rlpHex, "0x") || len(rlpHex) < 3 {
+			return nil, fmt.Errorf("invalid hex format for transaction: %s", rlpHex)
+		}
+		txBytes := common.FromHex(rlpHex)
+		if len(txBytes) == 0 && len(rlpHex) > 2 {
+			return nil, fmt.Errorf("failed to decode hex transaction: %s", rlpHex)
+		}
+		txs = append(txs, txBytes)
+	}
+
+	return txs, nil
+}
+
+// ExecuteTxs executes the given transactions at the specified block height and timestamp
+func (c *EngineClient) ExecuteTxs(ctx context.Context, txs [][]byte, blockHeight uint64, timestamp time.Time, prevStateRoot []byte) (updatedStateRoot []byte, maxBytes uint64, err error) {
+	// convert evolve tx to hex strings for ev-reth
+	txsPayload := make([]string, len(txs))
+	for i, tx := range txs {
+		// Use the raw transaction bytes directly instead of re-encoding
+		txsPayload[i] = "0x" + hex.EncodeToString(tx)
+	}
+
+	prevBlockHash, _, prevGasLimit, _, err := c.getBlockInfo(ctx, blockHeight-1)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get block info: %w", err)
+	}
+
+	args := engine.ForkchoiceStateV1{
+		HeadBlockHash:      prevBlockHash,
+		SafeBlockHash:      prevBlockHash,
+		FinalizedBlockHash: prevBlockHash,
+	}
+
+	// update forkchoice to get the next payload id
+	// Create evolve-compatible payloadtimestamp.Unix()
+	evPayloadAttrs := map[string]interface{}{
+		// Standard Ethereum payload attributes (flattened) - using camelCase as expected by JSON
+		"timestamp":             timestamp.Unix(),
+		"prevRandao":            c.derivePrevRandao(blockHeight),
+		"suggestedFeeRecipient": c.feeRecipient,
+		"withdrawals":           []*types.Withdrawal{},
+		// V3 requires parentBeaconBlockRoot
+		"parentBeaconBlockRoot": common.Hash{}.Hex(), // Use zero hash for evolve
+		// evolve-specific fields
+		"transactions": txsPayload,
+		"gasLimit":     prevGasLimit, // Use camelCase to match JSON conventions
+	}
+
+	c.logger.Debug().
+		Uint64("height", blockHeight).
+		Int("tx_count", len(txs)).
+		Msg("engine_forkchoiceUpdatedV3")
+
+	var forkchoiceResult engine.ForkChoiceResponse
+	err = c.engineClient.CallContext(ctx, &forkchoiceResult, "engine_forkchoiceUpdatedV3", args, evPayloadAttrs)
+	if err != nil {
+		return nil, 0, fmt.Errorf("forkchoice update failed: %w", err)
+	}
+	if forkchoiceResult.PayloadID == nil {
+		c.logger.Error().
+			Str("status", string(forkchoiceResult.PayloadStatus.Status)).
+			Str("latestValidHash", forkchoiceResult.PayloadStatus.LatestValidHash.Hex()).
+			Interface("validationError", forkchoiceResult.PayloadStatus.ValidationError).
+			Interface("forkchoiceState", args).
+			Interface("payloadAttributes", evPayloadAttrs).
+			Uint64("blockHeight", blockHeight).
+			Msg("returned nil PayloadID")
+
+		return nil, 0, fmt.Errorf("returned nil PayloadID - (status: %s, latestValidHash: %s)",
+			forkchoiceResult.PayloadStatus.Status,
+			forkchoiceResult.PayloadStatus.LatestValidHash.Hex())
+	}
+
+	// get payload
+	var payloadResult engine.ExecutionPayloadEnvelope
+	err = c.engineClient.CallContext(ctx, &payloadResult, "engine_getPayloadV4", *forkchoiceResult.PayloadID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("get payload failed: %w", err)
+	}
+
+	// submit payload
+	var newPayloadResult engine.PayloadStatusV1
+	err = c.engineClient.CallContext(ctx, &newPayloadResult, "engine_newPayloadV4",
+		payloadResult.ExecutionPayload,
+		[]string{},          // No blob hashes
+		common.Hash{}.Hex(), // Use zero hash for parentBeaconBlockRoot (same as in payload attributes)
+		[][]byte{},          // No execution requests
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("new payload submission failed: %w", err)
+	}
+
+	if newPayloadResult.Status != engine.VALID {
+		c.logger.Warn().
+			Str("status", string(newPayloadResult.Status)).
+			Str("latestValidHash", newPayloadResult.LatestValidHash.Hex()).
+			Interface("validationError", newPayloadResult.ValidationError).
+			Msg("engine_newPayloadV4 returned non-VALID status")
+		return nil, 0, ErrInvalidPayloadStatus
+	}
+
+	// forkchoice update
+	blockHash := payloadResult.ExecutionPayload.BlockHash
+	err = c.setFinal(ctx, blockHash, false)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return payloadResult.ExecutionPayload.StateRoot.Bytes(), payloadResult.ExecutionPayload.GasUsed, nil
+}
+
+func (c *EngineClient) setFinal(ctx context.Context, blockHash common.Hash, isFinal bool) error {
+	c.mu.Lock()
+	// Update block hashes based on finalization status
+	if isFinal {
+		c.currentFinalizedBlockHash = blockHash
+	} else {
+		c.currentHeadBlockHash = blockHash
+		c.currentSafeBlockHash = blockHash
+	}
+
+	// Construct forkchoice state
+	args := engine.ForkchoiceStateV1{
+		HeadBlockHash:      c.currentHeadBlockHash,
+		SafeBlockHash:      c.currentSafeBlockHash,
+		FinalizedBlockHash: c.currentFinalizedBlockHash,
+	}
+	c.mu.Unlock()
+
+	var forkchoiceResult engine.ForkChoiceResponse
+	err := c.engineClient.CallContext(ctx, &forkchoiceResult, "engine_forkchoiceUpdatedV3", args, nil)
+	if err != nil {
+		return fmt.Errorf("forkchoice update failed with error: %w", err)
+	}
+
+	if forkchoiceResult.PayloadStatus.Status != engine.VALID {
+		c.logger.Warn().
+			Str("status", string(forkchoiceResult.PayloadStatus.Status)).
+			Str("latestValidHash", forkchoiceResult.PayloadStatus.LatestValidHash.Hex()).
+			Interface("validationError", forkchoiceResult.PayloadStatus.ValidationError).
+			Msg("forkchoiceUpdatedV3 returned non-VALID status")
+		return ErrInvalidPayloadStatus
+	}
+
+	return nil
+}
+
+// SetFinal marks the block at the given height as finalized
+func (c *EngineClient) SetFinal(ctx context.Context, blockHeight uint64) error {
+	blockHash, _, _, _, err := c.getBlockInfo(ctx, blockHeight)
+	if err != nil {
+		return fmt.Errorf("failed to get block info: %w", err)
+	}
+	return c.setFinal(ctx, blockHash, true)
+}
+
+func (c *EngineClient) derivePrevRandao(blockHeight uint64) common.Hash {
+	return common.BigToHash(new(big.Int).SetUint64(blockHeight))
+}
+
+func (c *EngineClient) getBlockInfo(ctx context.Context, height uint64) (common.Hash, common.Hash, uint64, uint64, error) {
+	header, err := c.ethClient.HeaderByNumber(ctx, new(big.Int).SetUint64(height))
+
+	if err != nil {
+		return common.Hash{}, common.Hash{}, 0, 0, fmt.Errorf("failed to get block at height %d: %w", height, err)
+	}
+
+	return header.Hash(), header.Root, header.GasLimit, header.Time, nil
+}
+
+// decodeSecret decodes a hex-encoded JWT secret string into a byte slice.
+func decodeSecret(jwtSecret string) ([]byte, error) {
+	secret, err := hex.DecodeString(strings.TrimPrefix(jwtSecret, "0x"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode JWT secret: %w", err)
+	}
+	return secret, nil
+}
+
+// getAuthToken creates a JWT token signed with the provided secret, valid for 1 hour.
+func getAuthToken(jwtSecret []byte) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"exp": time.Now().Add(time.Hour * 1).Unix(), // Expires in 1 hour
+		"iat": time.Now().Unix(),
+	})
+
+	// Sign the token with the decoded secret
+	authToken, err := token.SignedString(jwtSecret)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign JWT token: %w", err)
+	}
+	return authToken, nil
+}

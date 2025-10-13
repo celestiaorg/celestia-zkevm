@@ -1,0 +1,14 @@
+reviewers:
+  defaults:
+    - ev-node
+  groups:
+    ev-node:
+      - team:core
+files:
+  ".github/**":
+    - ev-node
+options:
+  ignore_draft: true
+  ignored_keywords:
+    - WIP
+  number_of_reviewers: 3
