@@ -24,7 +24,8 @@ use url::Url;
 // todo: find a better way to wait for the balance to be updated
 // ideally deterministically check if the hyperlane transfer was finalized on the destination
 // and wait until the ev block was included in a Celestia block when going back
-const BALANCE_UPDATE_DELAY: u64 = 30;
+const MAX_RETRIES: u64 = 10;
+const RETRY_DELAY: u64 = 2;
 
 #[tokio::main]
 #[allow(clippy::field_reassign_with_default)]
@@ -71,21 +72,46 @@ async fn main() {
     assert!(response.success);
 
     info!("Waiting for Evolve balance to be updated...");
-    // wait for the EVM balance to be updated
-    sleep(Duration::from_secs(BALANCE_UPDATE_DELAY)).await;
 
-    // reinstantiate ISM client from env for other messages
-    let ism_client = CelestiaIsmClient::from_env().await.unwrap();
     // next trigger make transfer-back
     info!("Submitting Hyperlane deposit message on Evolve...");
-    let target_height = transfer_back().await.unwrap();
+    let mut retries = 0;
+    let target_height = {
+        loop {
+            let target_height = match transfer_back().await {
+                Ok(height) => height,
+                Err(_) => {
+                    if retries > MAX_RETRIES {
+                        panic!("Failed to get target height after {} retries", MAX_RETRIES);
+                    }
+                    sleep(Duration::from_secs(RETRY_DELAY)).await;
+                    retries += 1;
+                    continue;
+                }
+            };
+            break target_height;
+        }
+    };
     info!("[Done] submitting transfer Messages");
-
-    // wait for the EVM height to be included in a Celestia block
-    sleep(Duration::from_secs(BALANCE_UPDATE_DELAY)).await;
-
     let client: Arc<EnvProver> = Arc::new(ProverClient::from_env());
-    let target_inclusion_height = inclusion_height(target_height).await.unwrap();
+
+    let mut retries = 0;
+    let target_inclusion_height = {
+        loop {
+            let target_inclusion_height = match inclusion_height(target_height).await {
+                Ok(height) => height,
+                Err(_) => {
+                    if retries > MAX_RETRIES {
+                        panic!("Failed to get target inclusion height after {} retries", MAX_RETRIES);
+                    }
+                    sleep(Duration::from_secs(RETRY_DELAY)).await;
+                    retries += 1;
+                    continue;
+                }
+            };
+            break target_inclusion_height;
+        }
+    };
     let start_height = inclusion_height(trusted_height).await.unwrap() + 1;
     let num_blocks = target_inclusion_height - start_height;
 
@@ -164,6 +190,5 @@ async fn inclusion_height(block_number: u64) -> anyhow::Result<u64> {
 
     let resp = client.get_metadata(req).await?;
     let height = u64::from_le_bytes(resp.into_inner().value[..8].try_into()?);
-
     Ok(height)
 }
