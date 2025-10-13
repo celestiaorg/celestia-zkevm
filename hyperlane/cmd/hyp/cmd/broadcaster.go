@@ -120,10 +120,10 @@ func (b *Broadcaster) BroadcastTx(ctx context.Context, msgs ...sdk.Msg) *sdk.TxR
 }
 
 func (b *Broadcaster) waitForTxResponse(ctx context.Context, hash string) (*sdk.TxResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2400*time.Second)
 	defer cancel()
 
-	ticker := time.NewTicker(6 * time.Second)
+	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -144,3 +144,13 @@ func (b *Broadcaster) waitForTxResponse(ctx context.Context, hash string) (*sdk.
 	}
 
 }
+
+/*
+
+Configuring remote router for warp route on cosmosnative...
+successfully registered remote router on Hyperlane cosmosnative:
+2025/10/13 21:46:57 successfully enrolled remote router: token_id:"0x726f757465725f61707000000000000000000000000000010000000000000000" owner:"celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q" receiver_domain:1234 receiver_contract:"0x000000000000000000000000345a583028762De4d733852c9D4f419077093A48" gas:"0"
+0x000000000000000000000000345a583028762De4d733852c9D4f419077093A48successfully got block 48 from ev-reth
+successfully got pubkey from ev-node 1441f74bb787f31820660243f87c9fcf8a8f6f89d21f14b54727027dec7f23df
+2025/10/13 21:51:57 failed to parse typed event: illegal base64 data at input byte 64
+*/
