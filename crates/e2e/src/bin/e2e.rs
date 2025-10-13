@@ -15,6 +15,7 @@ use ev_zkevm_types::hyperlane::encode_hyperlane_message;
 use sp1_sdk::{EnvProver, ProverClient};
 use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
+use storage::hyperlane::snapshot::HyperlaneSnapshotStore;
 use tokio::time::sleep;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -134,11 +135,23 @@ async fn main() {
 
     let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
     info!("Proving Evolve Hyperlane deposit events...");
+
+    let snapshot_storage_path = dirs::home_dir()
+        .expect("cannot find home directory")
+        .join(".ev-prover")
+        .join("data")
+        .join("snapshots.db");
+    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
+    hyperlane_snapshot_store.reset_db().unwrap();
+    let snapshot = hyperlane_snapshot_store.get_snapshot(0).unwrap();
+
     let message_proof = prove_messages(
+        0,
         target_height,
         &evm_provider.clone(),
         &MockStateQueryProvider::new(evm_provider),
         client.clone(),
+        snapshot,
     )
     .await
     .unwrap();

@@ -3,8 +3,8 @@ use alloy_provider::ProviderBuilder;
 use celestia_grpc_client::{
     MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm, QueryIsmRequest, client::CelestiaIsmClient,
 };
+use e2e::config::debug::EV_RPC;
 use e2e::config::e2e::ISM_ID;
-use e2e::config::other::EV_RPC;
 use e2e::prover::block::prove_blocks;
 use e2e::prover::message::prove_messages;
 use ev_state_queries::MockStateQueryProvider;
