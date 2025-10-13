@@ -1,0 +1,51 @@
+name: docker-build-publish
+
+# Trigger on all push events, new semantic version tags, and all PRs
+on:
+  push:
+    branches:
+      - "main"
+      - "v*"
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "The checkout reference (ie tag, branch, sha)"
+        required: true
+        type: string
+
+jobs:
+  docker-standalone-build:
+    permissions:
+      contents: write
+      packages: write
+    uses: celestiaorg/.github/.github/workflows/reusable_dockerfile_pipeline.yml@98f519843a1bade938e5604202df600aa0717aa8 #v0.6.3
+    with:
+      dockerfile: docker/standalone.Dockerfile
+      checkout_ref: ${{ github.event.inputs.ref }}
+      packageName: celestia-app-standalone
+    secrets: inherit
+
+  docker-multiplexer-build:
+    permissions:
+      contents: write
+      packages: write
+    uses: celestiaorg/.github/.github/workflows/reusable_dockerfile_pipeline.yml@98f519843a1bade938e5604202df600aa0717aa8 #v0.6.3
+    with:
+      dockerfile: docker/multiplexer.Dockerfile
+      checkout_ref: ${{ github.event.inputs.ref }}
+      packageName: celestia-app
+    secrets: inherit
+
+  docker-txsim-build:
+    permissions:
+      contents: write
+      packages: write
+    uses: celestiaorg/.github/.github/workflows/reusable_dockerfile_pipeline.yml@98f519843a1bade938e5604202df600aa0717aa8 #v0.6.3
+    with:
+      dockerfile: docker/txsim/Dockerfile
+      packageName: txsim
+      checkout_ref: ${{ github.event.inputs.ref }}
+    secrets: inherit

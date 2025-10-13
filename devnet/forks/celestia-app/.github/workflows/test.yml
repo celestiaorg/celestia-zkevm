@@ -1,0 +1,168 @@
+name: test
+on:
+  workflow_call:
+
+jobs:
+  test-short:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 #v5.0.0
+
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 #v5.5.0
+        with:
+          go-version-file: "go.mod"
+
+      - name: Run tests in short mode
+        run: make test-short
+        timeout-minutes: 10
+
+  go-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # sentinel value to run all other tests.
+          - package: "unit"
+          # split the heaviest ones
+          - package: "github.com/celestiaorg/celestia-app/v6/app/test"
+            pattern: "TestIntegration.*"
+          - package: "github.com/celestiaorg/celestia-app/v6/app/test"
+            pattern: "TestBigBlob.*|TestStandardSDK.*"
+          - package: "github.com/celestiaorg/celestia-app/v6/app/test"
+            pattern: "TestSquareSize.*|TestPriority.*"
+          - package: "github.com/celestiaorg/celestia-app/v6/test/txsim"
+          - package: "github.com/celestiaorg/celestia-app/v6/pkg/user"
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 #v5.0.0
+
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 #v5.5.0
+        with:
+          go-version-file: "go.mod"
+
+      - name: Run tests
+        run: |
+          if [ "${{ matrix.package }}" = "unit" ]; then
+            # run all packages except the heavy ones
+            make test PACKAGES="$(go list ./... | grep -v 'app/test$' | grep -v 'test/txsim$' | grep -v 'pkg/user$' | tr '\n' ' ')"
+          elif [ -n "${{ matrix.pattern }}" ]; then
+            # run specific test patterns
+            go test -timeout 30m -run "${{ matrix.pattern }}" ${{ matrix.package }}
+          else
+            # run specific package
+            make test PACKAGES="${{ matrix.package }}"
+          fi
+
+  test:
+    runs-on: ubuntu-latest
+    needs: go-test
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.go-test.result }}" != "success" ]; then
+            echo "One or more test jobs failed"
+            exit 1
+          fi
+          echo "All tests passed"
+
+  test-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 #v5.0.0
+
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 #v5.5.0
+        with:
+          go-version-file: "go.mod"
+
+      - name: Generate coverage.txt
+        run: make test-coverage
+
+      - name: Upload coverage.txt
+        uses: codecov/codecov-action@fdcc8476540edceab3de004e990f80d881c6cc00 #v5.5.0
+        with:
+          files: ./coverage.txt
+
+  test-race:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 #v5.0.0
+
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 #v5.5.0
+        with:
+          go-version-file: "go.mod"
+
+      - name: Run tests in race mode
+        run: make test-race
+
+  test-fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 #v5.0.0
+
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 #v5.5.0
+        with:
+          go-version-file: "go.mod"
+
+      - name: Run fuzz tests
+        run: make test-fuzz
+
+  test-multiplexer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 #v5.0.0
+
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 #v5.5.0
+        with:
+          go-version-file: "go.mod"
+
+      - name: Run multiplexer tests
+        run: make test-multiplexer
+
+  test-docker-e2e:
+    runs-on: ubuntu-latest
+    # if one test fails, continue running the rest.
+    continue-on-error: true
+    strategy:
+      matrix:
+        include:
+          - testcase: TestE2ESimple
+          - testcase: TestStateSync
+          - testcase: TestBlockSync
+          - testcase: TestE2EFullStackPFB
+          - testcase: TestCelestiaAppUpgrade
+          - testcase: TestIBC
+            entrypoint: TestIBCTestSuite
+          - testcase: TestICA
+            entrypoint: TestIBCTestSuite
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+
+      - name: Generate image tag
+        id: tag
+        run: echo "value=$(echo $GITHUB_SHA | cut -c1-8)" >> $GITHUB_OUTPUT
+
+      - name: Build Docker image locally
+        # explicitly not pushing to ghcr as other workflows build and push there.
+        # ideally we don't need to build an image on each runner and can use a single
+        # more powerful self hosted runner to speed things up.
+        run: docker build -t "ghcr.io/celestiaorg/celestia-app:${{ steps.tag.outputs.value }}" . -f docker/multiplexer.Dockerfile
+
+      - name: Run E2E test
+        env:
+          # use the locally built image
+          CELESTIA_IMAGE: ghcr.io/celestiaorg/celestia-app
+          CELESTIA_TAG: ${{ steps.tag.outputs.value }}
+        run: |
+          if [ -n "${{ matrix.entrypoint }}" ]; then
+            make test-docker-e2e test=${{ matrix.testcase }} entrypoint=${{ matrix.entrypoint }}
+          else
+            make test-docker-e2e test=${{ matrix.testcase }}
+          fi
