@@ -1,6 +1,6 @@
 services:
   celestia-init:
-    image: ghcr.io/celestiaorg/celestia-app-standalone:feature-zk-execution-ism
+    image: ghcr.io/celestiaorg/celestia-app-standalone:local
     container_name: celestia-init
     entrypoint: /scripts/init.sh
     volumes:
@@ -9,7 +9,7 @@ services:
     restart: "no"
 
   celestia-validator:
-    image: ghcr.io/celestiaorg/celestia-app-standalone:feature-zk-execution-ism
+    image: ghcr.io/celestiaorg/celestia-app-standalone:local
     container_name: celestia-validator
     ports:
       - "26656:26656"
@@ -21,8 +21,8 @@ services:
         "CMD-SHELL",
         "bh=$(curl -sf http://localhost:26657/status | jq -r '.result.sync_info.latest_block_height'); if [ \"$$bh\" -gt 1 ]; then exit 0; else exit 1; fi"
       ]
-      interval: 30s
-      timeout: 5s
+      interval: 320s
+      timeout: 1s
       start_period: 10s
     volumes:
       - celestia-app:/home/celestia/.celestia-app
@@ -59,7 +59,7 @@ services:
       - celestia-zkevm-net
 
   ev-node-evm-single:
-    image: ghcr.io/evstack/ev-node-evm-single@sha256:8e19df666dafc072a36924b46511f0016ef189e119f9f0d85c182e5c8dd67559
+    image: ghcr.io/evstack/ev-node-evm-single:local
     container_name: ev-node-evm-single
     entrypoint: /scripts/entrypoint.sh
     ports:
@@ -73,7 +73,7 @@ services:
       - EVM_ETH_URL=http://reth:8545
       - EVM_JWT_SECRET=f747494bb0fb338a0d71f5f9fe5b5034c17cc988c229b59fd71e005ee692e9bf
       - EVM_GENESIS_HASH=0x72fe82115f994fbc350021230af421d67c39c9d2ff19ba494f5651af7363ff03
-      - EVM_BLOCK_TIME=1s
+      - EVM_BLOCK_TIME=60s
       - EVM_SIGNER_PATH=/config/signer.json
       - EVM_SIGNER_PASSPHRASE=secret
       - DA_ADDRESS=http://celestia-bridge:26658

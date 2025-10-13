@@ -11,8 +11,9 @@ use ev_state_queries::MockStateQueryProvider;
 use ev_types::v1::{GetMetadataRequest, store_service_client::StoreServiceClient};
 use ev_zkevm_types::{hyperlane::encode_hyperlane_message, programs::block::BlockRangeExecOutput};
 use sp1_sdk::{EnvProver, ProverClient};
-use std::{str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc, time::Duration};
 use storage::hyperlane::snapshot::HyperlaneSnapshotStore;
+use tokio::time::sleep;
 use url::Url;
 
 // prove once every 10 blocks
@@ -41,6 +42,20 @@ async fn main() {
     // This variable is a trick to account for empty blocks that were proven,
     // by not relying on the fixed trusted_height in the ZKISM but instead remembering which height we are actually at.
     let mut prover_height: Option<u64> = None;
+
+    // wait until all hyperlane deployments are done
+    loop {
+        match query_ism(&ism_client).await {
+            Ok(_) => {
+                break;
+            }
+            Err(_) => {
+                println!("ISM not yet deployed, waiting for 10 seconds");
+                sleep(Duration::from_secs(10)).await;
+                continue;
+            }
+        }
+    }
 
     loop {
         // get trustd state from ISM
@@ -183,10 +198,7 @@ fn celestia_height(base_url: &str) -> anyhow::Result<u64> {
 }
 
 async fn query_ism(ism_client: &CelestiaIsmClient) -> anyhow::Result<(Vec<u8>, u64)> {
-    let resp = ism_client
-        .ism(QueryIsmRequest { id: ISM_ID.to_string() })
-        .await
-        .unwrap();
+    let resp = ism_client.ism(QueryIsmRequest { id: ISM_ID.to_string() }).await?;
 
     let ism = resp.ism.expect("ZKISM not found");
     let trusted_root = ism.state_root;
