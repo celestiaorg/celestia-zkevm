@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use celestia_grpc_client::proto::celestia::zkism::v1::{QueryIsmRequest, QueryIsmsRequest};
+use celestia_grpc_client::types::ClientConfig;
 use celestia_grpc_client::{CelestiaIsmClient, MsgRemoteTransfer, StateInclusionProofMsg, StateTransitionProofMsg};
 use clap::{Parser, Subcommand};
 use tracing::{info, Level};
@@ -82,8 +83,8 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    // Create client from environment variables
-    let client = CelestiaIsmClient::from_env().await?;
+    let config = ClientConfig::from_env()?;
+    let client = CelestiaIsmClient::new(config).await?;
 
     match &cli.command {
         Commands::StateTransition {

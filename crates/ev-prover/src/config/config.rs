@@ -19,6 +19,18 @@ pub struct Config {
     pub namespace_hex: String,
     pub pub_key: String,
     pub proof_storage_path: Option<String>,
+    #[serde(default = "default_queue_capacity")]
+    pub queue_capacity: usize,
+    #[serde(default = "default_concurrency")]
+    pub concurrency: usize,
+}
+
+fn default_queue_capacity() -> usize {
+    256
+}
+
+fn default_concurrency() -> usize {
+    16
 }
 
 impl Default for Config {
@@ -30,6 +42,8 @@ impl Default for Config {
             namespace_hex: DEFAULT_NAMESPACE.to_string(),
             pub_key: DEFAULT_PUB_KEY_HEX.to_string(),
             proof_storage_path: None,
+            queue_capacity: default_queue_capacity(),
+            concurrency: default_concurrency(),
         }
     }
 }

@@ -44,7 +44,9 @@ pub async fn start_server(config: Config) -> Result<()> {
 
     tokio::spawn({
         let storage = shared_storage.clone();
-        let block_prover = BlockExecProver::with_storage(AppContext::from_config(config_clone)?, storage);
+        let queue_capacity = config_clone.queue_capacity;
+        let concurrency = config_clone.concurrency;
+        let block_prover = BlockExecProver::with_storage(AppContext::from_config(config_clone)?, storage, queue_capacity, concurrency);
         async move {
             if let Err(e) = block_prover.run().await {
                 error!("Block prover task failed: {e:?}");
