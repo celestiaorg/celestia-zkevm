@@ -1,0 +1,55 @@
+[package]
+name = "e2e"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "e2e"
+path = "src/bin/e2e.rs"
+
+[[bin]]
+name = "message-prover"
+path = "src/bin/message.rs"
+
+[[bin]]
+name = "block-prover"
+path = "src/bin/block.rs"
+
+[dependencies]
+alloy = { workspace = true }
+alloy-genesis = { workspace = true }
+alloy-primitives = { workspace = true }
+alloy-provider = { workspace = true }
+alloy-rpc-types = { workspace = true }
+alloy-sol-types = { workspace = true }
+anyhow = { workspace = true }
+bincode = { workspace = true }
+celestia-grpc = { workspace = true }
+celestia-grpc-client = { path = "../celestia-grpc-client" }
+celestia-rpc = { workspace = true }
+celestia-types = { workspace = true }
+chrono = { workspace = true }
+dirs = { workspace = true }
+dotenvy = { workspace = true }
+ev-state-queries = { workspace = true }
+ev-types = { workspace = true, features = ["grpc"] }
+ev-zkevm-types = { workspace = true }
+eyre = { workspace = true }
+prost = { workspace = true }
+reth-chainspec = { workspace = true }
+rsp-client-executor = { workspace = true }
+rsp-host-executor = { workspace = true }
+rsp-primitives = { workspace = true }
+rsp-rpc-db = { workspace = true }
+rustls = "0.23.31"
+serde = { workspace = true }
+serde_cbor = { workspace = true }
+serde_json = { workspace = true, default-features = false, features = [
+    "alloc",
+] }
+sp1-sdk = { workspace = true }
+storage = { workspace = true }
+tempfile = { workspace = true }
+tendermint-proto = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }

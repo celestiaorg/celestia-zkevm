@@ -14,6 +14,7 @@ services:
     ports:
       - "26656:26656"
       - "26657:26657"
+      - "1317:1317"
       - "9090:9090"
     healthcheck:
       test: [
@@ -34,7 +35,7 @@ services:
       - celestia-zkevm-net
 
   celestia-bridge:
-    image: ghcr.io/celestiaorg/celestia-node:v0.27.0-arabica
+    image: ghcr.io/celestiaorg/celestia-node:v0.26.0-arabica
     container_name: celestia-bridge
     volumes:
       - ./testnet/celestia-node/init.sh:/scripts/init.sh:ro
@@ -89,7 +90,7 @@ services:
   
   reth:
     container_name: reth
-    image: ghcr.io/evstack/ev-reth:latest
+    image: ghcr.io/evstack/ev-reth:latest@sha256:3f06830fbc218ffad1bcbd620536242e722cda563c0a39d62ee52fc36f7a7a49
     ports:
       - "9001:9001" # metrics
       - "30303:30303" # eth/66 peering
@@ -134,6 +135,7 @@ services:
     container_name: hyperlane-init
     volumes:
       - hyperlane:/home/hyperlane/
+      - ./testdata/vkeys:/home/hyperlane/testdata/vkeys:ro
     entrypoint: "scripts/docker-entrypoint.sh"
     depends_on:
       celestia-validator:

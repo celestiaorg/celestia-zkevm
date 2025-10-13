@@ -29,10 +29,11 @@ use tokio::{
     sync::{mpsc, RwLock, Semaphore},
     task::JoinSet,
 };
+use tracing::{debug, error, info};
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
 use crate::prover::{ProgramProver, ProverConfig};
-use crate::storage::{ProofStorage, RocksDbProofStorage};
+use storage::proofs::{ProofStorage, RocksDbProofStorage};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_EXEC_ELF: &[u8] = include_elf!("ev-exec-program");
@@ -116,6 +117,8 @@ pub struct BlockExecProver {
     pub config: ProverConfig,
     pub prover: EnvProver,
     pub storage: Arc<dyn ProofStorage>,
+    pub queue_capacity: usize,
+    pub concurrency: usize,
 }
 
 #[async_trait]
@@ -156,10 +159,6 @@ impl ProgramProver for BlockExecProver {
     }
 }
 
-// TODO: Add these as fields to the BlockExecProver to make configurable?
-const QUEUE_CAP: usize = 256;
-const CONCURRENCY: usize = 16;
-
 struct BlockEvent {
     height: u64,
     blobs: Vec<Blob>,
@@ -188,7 +187,7 @@ struct ScheduledProofJob {
 impl BlockExecProver {
     /// Creates a new instance of [`BlockExecProver`] for the provided [`AppContext`] using default configuration
     /// and prover environment settings.
-    pub fn new(app: AppContext) -> Result<Arc<Self>> {
+    pub fn new(app: AppContext, queue_capacity: usize, concurrency: usize) -> Result<Arc<Self>> {
         let config = BlockExecProver::default_config();
         let prover = ProverClient::from_env();
 
@@ -206,11 +205,18 @@ impl BlockExecProver {
             config,
             prover,
             storage,
+            queue_capacity,
+            concurrency,
         }))
     }
 
     /// Creates a new instance with custom storage (useful for testing)
-    pub fn with_storage(app: AppContext, storage: Arc<dyn ProofStorage>) -> Arc<Self> {
+    pub fn with_storage(
+        app: AppContext,
+        storage: Arc<dyn ProofStorage>,
+        queue_capacity: usize,
+        concurrency: usize,
+    ) -> Arc<Self> {
         let config = BlockExecProver::default_config();
         let prover = ProverClient::from_env();
 
@@ -219,6 +225,8 @@ impl BlockExecProver {
             config,
             prover,
             storage,
+            queue_capacity,
+            concurrency,
         })
     }
 
@@ -272,12 +280,12 @@ impl BlockExecProver {
         let (client, mut subscription) = self.connect_and_subscribe().await?;
 
         // Queues for the 3-stage pipeline
-        let (event_tx, mut event_rx) = mpsc::channel::<BlockEvent>(QUEUE_CAP);
-        let (job_tx, mut job_rx) = mpsc::channel::<ProofJob>(QUEUE_CAP);
-        let (sched_tx, mut sched_rx) = mpsc::channel::<ScheduledProofJob>(QUEUE_CAP);
+        let (event_tx, mut event_rx) = mpsc::channel::<BlockEvent>(self.queue_capacity);
+        let (job_tx, mut job_rx) = mpsc::channel::<ProofJob>(self.queue_capacity);
+        let (sched_tx, mut sched_rx) = mpsc::channel::<ScheduledProofJob>(self.queue_capacity);
 
         // Stage 1: Prepare proof inputs (parallel, IO-bound)
-        let sem = Arc::new(Semaphore::new(CONCURRENCY));
+        let sem = Arc::new(Semaphore::new(self.concurrency));
         tokio::spawn({
             let client = client.clone();
             let prover = self.clone();
@@ -287,7 +295,7 @@ impl BlockExecProver {
             async move {
                 let mut tasks = JoinSet::new();
                 while let Some(event) = event_rx.recv().await {
-                    println!("\nNew block event height={}, blobs={}", event.height, event.blobs.len());
+                    debug!("\nNew block event height={}, blobs={}", event.height, event.blobs.len());
                     let client = client.clone();
                     let prover = prover.clone();
 
@@ -300,13 +308,13 @@ impl BlockExecProver {
                             Ok(job) => {
                                 let _ = job_tx.send(job).await;
                             }
-                            Err(e) => eprintln!("failed to retrieve proof inputs: {e:#}"),
+                            Err(e) => error!("failed to retrieve proof inputs: {e:#}"),
                         }
                     });
                 }
 
                 while tasks.join_next().await.is_some() {}
-                eprintln!("prepare stage shutting down");
+                error!("prepare stage shutting down");
             }
         });
 
@@ -365,12 +373,12 @@ impl BlockExecProver {
                     }
                 }
 
-                eprintln!("schedule stage shutting down");
+                error!("schedule stage shutting down");
             }
         });
 
         // Stage 3: Prove (parallel, CPU/IO-bound for remote prover network)
-        let prove_sem = Arc::new(Semaphore::new(CONCURRENCY));
+        let prove_sem = Arc::new(Semaphore::new(self.concurrency));
         tokio::spawn({
             let prover = self.clone();
             let prove_sem = prove_sem.clone();
@@ -384,13 +392,13 @@ impl BlockExecProver {
                         let _permit = permit; // limit concurrent proofs
 
                         if let Err(e) = prover.prove_and_store(scheduled).await {
-                            eprintln!("prove failed: {e:#}");
+                            error!("prove failed: {e:#}");
                         }
                     });
                 }
 
                 while tasks.join_next().await.is_some() {}
-                eprintln!("prove stage shutting down");
+                error!("prove stage shutting down");
             }
         });
 
@@ -404,7 +412,7 @@ impl BlockExecProver {
                         .map_err(|_| anyhow::anyhow!("worker queue closed"))?;
                 }
                 Err(e) => {
-                    println!("Subscription error: {e}");
+                    error!("Subscription error: {e}");
                     break;
                 }
             }
@@ -420,12 +428,7 @@ impl BlockExecProver {
             .share_get_namespace_data(&extended_header, self.app.namespace)
             .await?;
 
-        let proofs: Vec<NamespaceProof> = namespace_data
-            .rows
-            .iter()
-            .filter(|row| row.proof.is_of_presence())
-            .map(|row| row.proof.clone())
-            .collect();
+        let proofs: Vec<NamespaceProof> = namespace_data.rows.iter().map(|row| row.proof.clone()).collect();
 
         let signed_data: Vec<SignedData> = event
             .blobs
@@ -445,7 +448,7 @@ impl BlockExecProver {
             executor_inputs.push(self.eth_client_executor_input(block_number).await?);
         }
 
-        println!("Got {} evm inputs at height {}", executor_inputs.len(), event.height);
+        debug!("Got {} evm inputs at height {}", executor_inputs.len(), event.height);
 
         Ok(ProofJob {
             height: event.height,
@@ -478,14 +481,14 @@ impl BlockExecProver {
             .store_block_proof(scheduled.job.height, &proof, &outputs)
             .await
         {
-            eprintln!(
+            error!(
                 "Failed to store proof for block {}: {} - error: {e:#}",
                 scheduled.job.height, outputs,
             );
             // Note: We continue execution even if storage fails to avoid breaking the proving pipeline
         }
 
-        println!(
+        info!(
             "Successfully created and stored proof for block {}. Outputs: {}",
             scheduled.job.height, outputs,
         );

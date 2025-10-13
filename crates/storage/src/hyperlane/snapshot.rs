@@ -5,8 +5,7 @@
 use anyhow::{Context, Result};
 use ev_zkevm_types::programs::hyperlane::tree::{MerkleTree, ZERO_BYTES};
 use rocksdb::{ColumnFamilyDescriptor, DB, IteratorMode, Options};
-use std::env;
-use std::path::PathBuf;
+use std::path::Path;
 use std::sync::{Arc, RwLock};
 
 pub type HyperlaneSnapshot = MerkleTree;
@@ -16,14 +15,7 @@ pub struct HyperlaneSnapshotStore {
 }
 
 impl HyperlaneSnapshotStore {
-    pub fn from_path_relative(crate_depth: usize) -> Result<Self> {
-        dotenvy::dotenv().ok();
-        let mut workspace_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-        for _ in 0..crate_depth {
-            workspace_path = workspace_path.parent().unwrap().to_path_buf();
-        }
-        let relative = env::var("HYPERLANE_SNAPSHOT_STORE").expect("HYPERLANE_SNAPSHOT_STORE must be set");
-        let path = workspace_path.join(relative);
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         let opts = Self::get_opts()?;
         let cfs = Self::get_cfs()?;
         let db = DB::open_cf_descriptors(&opts, path, cfs)?;
@@ -50,7 +42,7 @@ impl HyperlaneSnapshotStore {
         let write_lock = self
             .db
             .write()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {e}"))?;
         let cf = write_lock
             .cf_handle("snapshots")
             .context("Missing snapshots column family")?;
@@ -85,7 +77,7 @@ impl HyperlaneSnapshotStore {
         let read_lock = self
             .db
             .read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {e}"))?;
         let cf = read_lock.cf_handle("snapshots").context("Missing CF")?;
         let mut iter = read_lock.iterator_cf(cf, IteratorMode::End);
         if let Some(Ok((k, _))) = iter.next() {
@@ -97,11 +89,11 @@ impl HyperlaneSnapshotStore {
         }
     }
 
-    pub fn prune_all(&self) -> Result<()> {
+    pub fn reset_db(&self) -> Result<()> {
         let mut write_lock = self
             .db
             .write()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {e}"))?;
         write_lock.drop_cf("snapshots")?;
         let opts = Options::default();
         write_lock.create_cf("snapshots", &opts)?;

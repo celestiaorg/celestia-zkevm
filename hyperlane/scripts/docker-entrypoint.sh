@@ -1,7 +1,15 @@
 #!/bin/bash
 
+# The following docker-entrypoint script performs deployment of Hyperlane infrastructure 
+# on both ev-reth and celestia.
+# To minimise proving time in the docker env in this repository we first deploy
+# a noop ism stack on celestia and finally overwrite this with a new zk ism deployment.
+# This ensures that the initial trusted root used in the zk ism is the same as the 
+# latest block's state root in ev-reth.
+
 set -euo pipefail
 
+# HYP_KEY is the priv key of the EVM account used for Hyperlane contract deployment
 export HYP_KEY=0x82bfcfadbf1712f6550d8d2c00a39f05b33ec78939d0167be2a737d691f33a6a
 
 CONFIG_FILE="hyperlane-cosmosnative.json"
@@ -16,8 +24,8 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
   echo "Deploying Hyperlane warp synthetic token EVM contracts..."
   hyperlane warp deploy --config ./configs/warp-config.yaml --registry ./registry --yes
 
-  echo "Deploying Hyperlane on cosmosnative..."
-  hyp deploy celestia-validator:9090
+  echo "Deploying Hyperlane NoopISM stack on cosmosnative..."
+  hyp deploy-noopism celestia-validator:9090
 
   echo "Configuring remote router for warp route on EVM..."
   cast send 0x345a583028762De4d733852c9D4f419077093A48 \
@@ -34,6 +42,8 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 
   echo "Configuring remote router for warp route on cosmosnative..."
   hyp enroll-remote-router celestia-validator:9090 0x726f757465725f61707000000000000000000000000000010000000000000000 1234 0x000000000000000000000000345a583028762De4d733852c9D4f419077093A48
+
+  hyp setup-zkism celestia-validator:9090 reth:8545 ev-node-evm-single:7331
 else
   echo "Skipping deployment: $CONFIG_FILE already exists."
 fi

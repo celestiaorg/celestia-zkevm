@@ -114,18 +114,15 @@ impl HyperlaneBranchProof {
         }
         let storage_root = self.get_state_root()?;
         for (key, proof) in keys.iter().zip(self.proof.storage_proof.iter()) {
-            // Skip empty branch nodes as those don't have storage proofs
+            let key_bytes = alloy_primitives::hex::decode(key)?;
+            let key_nibbles = Nibbles::unpack(digest_keccak(&key_bytes));
+            // Verify exclusion proof for empty branch nodes
             if proof.value == Uint::from(0) {
-                continue;
-            }
-            if verify_proof(
-                storage_root,
-                Nibbles::unpack(digest_keccak(&alloy_primitives::hex::decode(key)?)),
-                Some(encode(proof.value)),
-                &proof.proof,
-            )
-            .is_err()
-            {
+                if verify_proof(storage_root, key_nibbles, None, &proof.proof).is_err() {
+                    println!("Failed to verify exclusion (zero) proof for key: {key}");
+                    return Ok(false);
+                }
+            } else if verify_proof(storage_root, key_nibbles, Some(encode(proof.value)), &proof.proof).is_err() {
                 println!("Failed to verify proof for key: {key}");
                 return Ok(false);
             }

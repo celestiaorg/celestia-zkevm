@@ -8,16 +8,41 @@ use alloy_provider::ProviderBuilder;
 use ev_prover::prover::programs::message::{AppContext, HyperlaneMessageProver, MerkleTreeState};
 use ev_state_queries::{DefaultProvider, MockStateQueryProvider};
 use reqwest::Url;
-use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
+use storage::{
+    hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore},
+    proofs::RocksDbProofStorage,
+};
+use tempfile::TempDir;
+use tracing_subscriber::EnvFilter;
 
 #[tokio::test]
 async fn test_run_message_prover() {
-    #[allow(unused_imports)]
-    let hyperlane_message_store =
-        Arc::new(HyperlaneMessageStore::from_path_relative(2, storage::hyperlane::message::IndexMode::Block).unwrap());
-    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::from_path_relative(2).unwrap());
-    hyperlane_message_store.prune_all().unwrap();
-    hyperlane_snapshot_store.prune_all().unwrap();
+    dotenvy::dotenv().ok();
+    // Configure logging for ev-prover
+    let filter = EnvFilter::new("ev-prover=debug,sp1_core=warn,sp1_runtime=warn,sp1_sdk=warn,sp1_vm=warn");
+    tracing_subscriber::fmt().with_env_filter(filter).init();
+    let tmp = TempDir::new().expect("cannot create temp directory");
+    let snapshot_storage_path = dirs::home_dir()
+        .expect("cannot find home directory")
+        .join(&tmp)
+        .join("data")
+        .join("snapshots.db");
+    let message_storage_path = dirs::home_dir()
+        .expect("cannot find home directory")
+        .join(&tmp)
+        .join("data")
+        .join("messages.db");
+    let proof_storage_path = dirs::home_dir()
+        .expect("cannot find home directory")
+        .join(&tmp)
+        .join("data")
+        .join("proofs.db");
+    let hyperlane_message_store = Arc::new(HyperlaneMessageStore::new(message_storage_path).unwrap());
+    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
+    let proof_store = Arc::new(RocksDbProofStorage::new(proof_storage_path).unwrap());
+
+    hyperlane_message_store.reset_db().unwrap();
+    hyperlane_snapshot_store.reset_db().unwrap();
 
     let app = AppContext {
         evm_rpc: "http://127.0.0.1:8545".to_string(),
@@ -34,6 +59,7 @@ async fn test_run_message_prover() {
         app,
         hyperlane_message_store,
         hyperlane_snapshot_store,
+        proof_store,
         Arc::new(MockStateQueryProvider::new(evm_provider)),
     )
     .unwrap();

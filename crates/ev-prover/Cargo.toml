@@ -16,7 +16,8 @@ bytes = { workspace = true }
 celestia-rpc = { workspace = true }
 celestia-types = { workspace = true }
 clap = { version = "4", features = ["derive"] }
-dirs = "5"
+dirs = { workspace = true }
+dotenvy = { workspace = true }
 ev-state-queries = { workspace = true }
 ev-types = { workspace = true, features = ["grpc"] }
 ev-zkevm-types = { workspace = true }
@@ -45,6 +46,9 @@ tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 tonic = { version = "0.10", features = ["transport"] }
 tonic-reflection = "0.10"
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
 [build-dependencies]
 prost-build = "0.12"
 sp1-build = { workspace = true }
@@ -52,4 +56,4 @@ tonic-build = "0.10"
 walkdir = "2.5.0"
 
 [dev-dependencies]
-tempfile = "3.8"
+tempfile = { workspace = true }
