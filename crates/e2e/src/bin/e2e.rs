@@ -132,14 +132,6 @@ async fn main() {
     assert!(response.success);
     info!("[Done] ZKISM was updated successfully");
 
-    let tmp = TempDir::new().expect("cannot create temp directory");
-    let snapshot_storage_path = dirs::home_dir()
-        .expect("cannot find home directory")
-        .join(&tmp)
-        .join("data")
-        .join("snapshots.db");
-    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
-    let snapshot = hyperlane_snapshot_store.get_snapshot(0).unwrap();
     let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
     info!("Proving Evolve Hyperlane deposit events...");
     let message_proof = prove_messages(
@@ -147,7 +139,6 @@ async fn main() {
         &evm_provider.clone(),
         &MockStateQueryProvider::new(evm_provider),
         client.clone(),
-        snapshot,
     )
     .await
     .unwrap();
