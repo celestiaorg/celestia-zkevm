@@ -9,7 +9,7 @@ use sp1_sdk::{
 };
 use storage::proofs::ProofStorage;
 use tokio::sync::mpsc::Receiver;
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::prover::{ProgramProver, ProofCommitted, ProverConfig};
 
@@ -32,6 +32,8 @@ pub struct BlockRangeExecProver {
     pending: BTreeSet<ProofCommitted>,
     rx: Receiver<ProofCommitted>,
     storage: Arc<dyn ProofStorage>,
+    next_expected: u64, // TODO: consider persisting this; initialize to last_aggregated_end + 1
+    batch_size: u64,    // e.g. 10, should be configurable
 }
 
 /// ProofInput is a convenience type used for proof aggregation inputs within the BlockRangeExecProver program.
@@ -120,6 +122,8 @@ impl BlockRangeExecProver {
             pending,
             rx,
             storage,
+            batch_size: 10,
+            next_expected: 1, // TODO: initialise
         })
     }
 
@@ -131,17 +135,64 @@ impl BlockRangeExecProver {
         }
     }
 
+    /// Starts the range prover loop.
     pub async fn run(mut self) -> Result<()> {
         while let Some(event) = self.rx.recv().await {
-            // collect proof committed events and check for contiguous range complete
-            // on insertion.
-            info!("rx: ProofCommitted for height: {}", event);
-
+            info!("ProofCommitted for height: {}", event);
             self.pending.insert(event);
 
-            info!("size pending: {}", self.pending.len());
+            debug!("size pending: {}", self.pending.len());
+
+            // Drain as many back-to-back batches as are ready now.
+            while let Some((start, end_inclusive)) = self.next_provable_range()? {
+                self.aggregate_range(start, end_inclusive).await?;
+            }
         }
 
+        Ok(())
+    }
+
+    /// Calculate the next provable range bounded by batch size.
+    /// If a complete batch exists then remove those entries from `pending`, advance the cursor, and return the range.
+    /// Note: the start and end range indices are inclusive.
+    fn next_provable_range(&mut self) -> Result<Option<(u64, u64)>> {
+        let start = self.next_expected;
+        let end = start + self.batch_size - 1;
+
+        let Some(min) = self.pending.first() else {
+            return Ok(None); // empty set
+        };
+
+        if min.height() > start {
+            return Ok(None); // missing start element
+        }
+
+        // Walk the ordered set from `start` and ensure we have exactly `batch_size` elements.
+        let mut cursor = start;
+        let iter = self.pending.range(ProofCommitted(start)..).peekable();
+        for proof in iter.take(self.batch_size as usize) {
+            if proof.height() != cursor {
+                return Ok(None); // missing contiguous element, incomplete batch
+            }
+            cursor += 1;
+        }
+
+        // Ensure batch is complete
+        if cursor <= end {
+            return Ok(None);
+        }
+
+        // Complete batch, remove elements and advance to next height.
+        for h in start..=end {
+            self.pending.remove(&ProofCommitted(h));
+        }
+
+        self.next_expected = cursor;
+        Ok(Some((start, end)))
+    }
+
+    /// Aggregates a range of block proofs, start and end inclusive.
+    async fn aggregate_range(&mut self, _start: u64, _end: u64) -> Result<()> {
         Ok(())
     }
 }

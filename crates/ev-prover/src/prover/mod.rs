@@ -58,6 +58,12 @@ pub trait ProgramProver {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ProofCommitted(pub u64);
 
+impl ProofCommitted {
+    pub fn height(&self) -> u64 {
+        self.0
+    }
+}
+
 impl Display for ProofCommitted {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
