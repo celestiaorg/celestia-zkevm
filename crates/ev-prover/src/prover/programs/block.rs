@@ -194,11 +194,11 @@ impl BlockExecProver {
         storage: Arc<dyn ProofStorage>,
         queue_capacity: usize,
         concurrency: usize,
-    ) -> Result<Arc<Self>> {
+    ) -> Arc<Self> {
         let config = BlockExecProver::default_config();
         let prover = ProverClient::from_env();
 
-        Ok(Arc::new(Self {
+        Arc::new(Self {
             app,
             config,
             prover,
@@ -206,7 +206,7 @@ impl BlockExecProver {
             storage,
             queue_capacity,
             concurrency,
-        }))
+        })
     }
 
     /// Returns the default prover configuration for the block execution program.

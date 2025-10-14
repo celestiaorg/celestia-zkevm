@@ -52,7 +52,7 @@ pub async fn start_server(config: Config) -> Result<()> {
             storage.clone(),
             queue_capacity,
             concurrency,
-        )?;
+        );
         async move {
             if let Err(e) = block_prover.run().await {
                 error!("Block prover task failed: {e:?}");
