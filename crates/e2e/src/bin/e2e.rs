@@ -1,5 +1,6 @@
 use alloy_primitives::{FixedBytes, hex::FromHex};
 use alloy_provider::ProviderBuilder;
+use celestia_grpc_client::types::ClientConfig;
 use celestia_grpc_client::{
     MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm, QueryIsmRequest, client::CelestiaIsmClient,
 };
@@ -22,7 +23,8 @@ async fn main() {
     dotenvy::dotenv().ok();
 
     // instantiate ISM client for submitting payloads and querying state
-    let ism_client = CelestiaIsmClient::from_env().await.unwrap();
+    let config = ClientConfig::from_env().expect("failed to create celestia client config");
+    let ism_client = CelestiaIsmClient::new(config).await.unwrap();
 
     let resp = ism_client
         .ism(QueryIsmRequest { id: ISM_ID.to_string() })

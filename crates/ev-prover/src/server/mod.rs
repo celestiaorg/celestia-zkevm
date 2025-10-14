@@ -44,7 +44,15 @@ pub async fn start_server(config: Config) -> Result<()> {
     let (proof_tx, proof_rx) = mpsc::channel(256);
 
     tokio::spawn({
-        let block_prover = BlockExecProver::new(AppContext::from_config(config_clone)?, proof_tx, storage.clone())?;
+        let queue_capacity = config_clone.queue_capacity;
+        let concurrency = config_clone.concurrency;
+        let block_prover = BlockExecProver::new(
+            AppContext::from_config(config_clone)?,
+            proof_tx,
+            storage.clone(),
+            queue_capacity,
+            concurrency,
+        )?;
         async move {
             if let Err(e) = block_prover.run().await {
                 error!("Block prover task failed: {e:?}");

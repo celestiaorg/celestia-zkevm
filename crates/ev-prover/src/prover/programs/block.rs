@@ -118,6 +118,8 @@ pub struct BlockExecProver {
     pub prover: EnvProver,
     pub tx: Sender<ProofCommitted>,
     pub storage: Arc<dyn ProofStorage>,
+    pub queue_capacity: usize,
+    pub concurrency: usize,
 }
 
 #[async_trait]
@@ -158,10 +160,6 @@ impl ProgramProver for BlockExecProver {
     }
 }
 
-// TODO: Add these as fields to the BlockExecProver to make configurable?
-const QUEUE_CAP: usize = 256;
-const CONCURRENCY: usize = 16;
-
 struct BlockEvent {
     height: u64,
     blobs: Vec<Blob>,
@@ -190,7 +188,13 @@ struct ScheduledProofJob {
 impl BlockExecProver {
     /// Creates a new instance of [`BlockExecProver`] for the provided [`AppContext`] using default configuration
     /// and prover environment settings.
-    pub fn new(app: AppContext, tx: Sender<ProofCommitted>, storage: Arc<dyn ProofStorage>) -> Result<Arc<Self>> {
+    pub fn new(
+        app: AppContext,
+        tx: Sender<ProofCommitted>,
+        storage: Arc<dyn ProofStorage>,
+        queue_capacity: usize,
+        concurrency: usize,
+    ) -> Result<Arc<Self>> {
         let config = BlockExecProver::default_config();
         let prover = ProverClient::from_env();
 
@@ -200,6 +204,8 @@ impl BlockExecProver {
             prover,
             tx,
             storage,
+            queue_capacity,
+            concurrency,
         }))
     }
 
@@ -253,12 +259,12 @@ impl BlockExecProver {
         let (client, mut subscription) = self.connect_and_subscribe().await?;
 
         // Queues for the 3-stage pipeline
-        let (event_tx, mut event_rx) = mpsc::channel::<BlockEvent>(QUEUE_CAP);
-        let (job_tx, mut job_rx) = mpsc::channel::<ProofJob>(QUEUE_CAP);
-        let (sched_tx, mut sched_rx) = mpsc::channel::<ScheduledProofJob>(QUEUE_CAP);
+        let (event_tx, mut event_rx) = mpsc::channel::<BlockEvent>(self.queue_capacity);
+        let (job_tx, mut job_rx) = mpsc::channel::<ProofJob>(self.queue_capacity);
+        let (sched_tx, mut sched_rx) = mpsc::channel::<ScheduledProofJob>(self.queue_capacity);
 
         // Stage 1: Prepare proof inputs (parallel, IO-bound)
-        let sem = Arc::new(Semaphore::new(CONCURRENCY));
+        let sem = Arc::new(Semaphore::new(self.concurrency));
         tokio::spawn({
             let client = client.clone();
             let prover = self.clone();
@@ -351,7 +357,7 @@ impl BlockExecProver {
         });
 
         // Stage 3: Prove (parallel, CPU/IO-bound for remote prover network)
-        let prove_sem = Arc::new(Semaphore::new(CONCURRENCY));
+        let prove_sem = Arc::new(Semaphore::new(self.concurrency));
         tokio::spawn({
             let prover = self.clone();
             let prove_sem = prove_sem.clone();
