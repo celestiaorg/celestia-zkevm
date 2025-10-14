@@ -32,8 +32,8 @@ pub struct BlockRangeExecProver {
     pending: BTreeSet<ProofCommitted>,
     rx: Receiver<ProofCommitted>,
     storage: Arc<dyn ProofStorage>,
-    next_expected: u64, // TODO: consider persisting this; initialize to last_aggregated_end + 1
-    batch_size: u64,    // e.g. 10, should be configurable
+    next_expected: Option<u64>, // TODO: consider persisting this; initialize to last_aggregated_end + 1
+    batch_size: u64,            // e.g. 10, should be configurable
 }
 
 /// ProofInput is a convenience type used for proof aggregation inputs within the BlockRangeExecProver program.
@@ -123,7 +123,7 @@ impl BlockRangeExecProver {
             rx,
             storage,
             batch_size: 10,
-            next_expected: 1, // TODO: initialise
+            next_expected: None, // TODO: initialise
         })
     }
 
@@ -157,7 +157,19 @@ impl BlockRangeExecProver {
     /// If a complete batch exists then remove those entries from `pending`, advance the cursor, and return the range.
     /// Note: the start and end range indices are inclusive.
     fn next_provable_range(&mut self) -> Result<Option<(u64, u64)>> {
-        let start = self.next_expected;
+        // TODO: this initialisation code using the Option<u64> is just for testing.
+        // ideally we can persist this somewhere, this just allows me to test locally quickly
+        let start;
+        if self.next_expected.is_none() {
+            start = self
+                .pending
+                .first()
+                .expect("expected first element but got none")
+                .height();
+        } else {
+            start = self.next_expected.unwrap();
+        }
+
         let end = start + self.batch_size - 1;
 
         let Some(min) = self.pending.first() else {
@@ -188,7 +200,7 @@ impl BlockRangeExecProver {
             self.pending.remove(&ProofCommitted(h));
         }
 
-        self.next_expected = cursor;
+        self.next_expected = Some(cursor);
         Ok(Some((start, end)))
     }
 
