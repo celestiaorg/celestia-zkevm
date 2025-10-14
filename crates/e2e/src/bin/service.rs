@@ -60,6 +60,7 @@ async fn main() {
     loop {
         // get trustd state from ISM
         let (trusted_root_hex, trusted_height) = query_ism(&ism_client).await.unwrap();
+        println!("Trusted Root Hex: {}", alloy::hex::encode(trusted_root_hex.clone()));
         let latest_celestia_height = celestia_height("http://localhost:26657").unwrap();
         if latest_celestia_height < inclusion_height(trusted_height).await.unwrap() + PROVER_INTERVAL {
             continue;
@@ -135,7 +136,7 @@ async fn main() {
 
         let message_proof_msg = MsgSubmitMessages::new(
             ISM_ID.to_string(),
-            inclusion_height(celestia_start_height + num_blocks).await.unwrap(),
+            celestia_start_height + num_blocks,
             message_proof.0.bytes(),
             message_proof.0.public_values.as_slice().to_vec(),
             ism_client.signer_address().to_string(),
