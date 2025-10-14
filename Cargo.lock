@@ -3367,7 +3367,6 @@ dependencies = [
  "jsonrpsee-core",
  "nmt-rs",
  "prost 0.12.6",
- "prost-build 0.12.6",
  "reqwest",
  "reth-chainspec",
  "rocksdb",
@@ -3390,11 +3389,9 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic 0.10.2",
- "tonic-build 0.10.2",
  "tonic-reflection",
  "tracing",
  "tracing-subscriber",
- "walkdir",
 ]
 
 [[package]]

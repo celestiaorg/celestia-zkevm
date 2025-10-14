@@ -54,10 +54,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 [build-dependencies]
-prost-build = "0.12"
 sp1-build = { workspace = true }
-tonic-build = "0.10"
-walkdir = "2.5.0"
 
 [dev-dependencies]
 tempfile = { workspace = true }
