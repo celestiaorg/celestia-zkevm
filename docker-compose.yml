@@ -176,7 +176,6 @@ services:
     volumes:
       - ./testnet/ev-prover/docker-entrypoint.sh:/app/docker-entrypoint.sh:ro
       - ./testnet/ev-prover/config.yaml:/home/ev-prover/.ev-prover/config/config.yaml:ro
-      - ./testnet/eth-genesis.json:/home/ev-prover/.ev-prover/config/eth-genesis.json:ro
       - ev-prover-data:/home/ev-prover
     entrypoint: /app/docker-entrypoint.sh
     healthcheck:
