@@ -144,9 +144,9 @@ impl BlockRangeExecProver {
             debug!("size pending: {}", self.pending.len());
 
             // Drain as many back-to-back batches as are ready now.
-            while let Some((start, end_inclusive)) = self.next_provable_range()? {
+            while let Some((start, end)) = self.next_provable_range()? {
                 info!("Ready to aggregate complete batch in range: ({start}-{end})");
-                self.aggregate_range(start, end_inclusive).await?;
+                self.aggregate_range(start, end).await?;
             }
         }
 
