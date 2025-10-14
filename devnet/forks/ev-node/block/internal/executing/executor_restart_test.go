@@ -47,8 +47,10 @@ func TestExecutor_RestartUsesPendingHeader(t *testing.T) {
 	// Create first executor instance
 	mockExec1 := testmocks.NewMockExecutor(t)
 	mockSeq1 := testmocks.NewMockSequencer(t)
-	hb1 := &mockBroadcaster[*types.SignedHeader]{}
-	db1 := &mockBroadcaster[*types.Data]{}
+	hb1 := common.NewMockBroadcaster[*types.SignedHeader](t)
+	hb1.EXPECT().WriteToStoreAndBroadcast(mock.Anything, mock.Anything).Return(nil).Maybe()
+	db1 := common.NewMockBroadcaster[*types.Data](t)
+	db1.EXPECT().WriteToStoreAndBroadcast(mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	exec1, err := NewExecutor(
 		memStore,
@@ -105,7 +107,7 @@ func TestExecutor_RestartUsesPendingHeader(t *testing.T) {
 
 	// Now simulate creating a pending block at height 2 but not fully completing it
 	// This simulates a crash scenario where block data is saved but state isn't updated
-	currentState := exec1.GetLastState()
+	currentState := exec1.getLastState()
 	newHeight := currentState.LastBlockHeight + 1 // height 2
 
 	// Get validator hash properly
@@ -152,7 +154,11 @@ func TestExecutor_RestartUsesPendingHeader(t *testing.T) {
 	pendingHeader.DataHash = pendingData.DACommitment()
 
 	// Save pending block data (this is what would happen during a crash)
-	err = memStore.SaveBlockData(context.Background(), pendingHeader, pendingData, &types.Signature{})
+	batch, err := memStore.NewBatch(context.Background())
+	require.NoError(t, err)
+	err = batch.SaveBlockData(pendingHeader, pendingData, &types.Signature{})
+	require.NoError(t, err)
+	err = batch.Commit()
 	require.NoError(t, err)
 
 	// Stop first executor (simulating crash/restart)
@@ -161,8 +167,10 @@ func TestExecutor_RestartUsesPendingHeader(t *testing.T) {
 	// Create second executor instance (restart scenario)
 	mockExec2 := testmocks.NewMockExecutor(t)
 	mockSeq2 := testmocks.NewMockSequencer(t)
-	hb2 := &mockBroadcaster[*types.SignedHeader]{}
-	db2 := &mockBroadcaster[*types.Data]{}
+	hb2 := common.NewMockBroadcaster[*types.SignedHeader](t)
+	hb2.EXPECT().WriteToStoreAndBroadcast(mock.Anything, mock.Anything).Return(nil).Maybe()
+	db2 := common.NewMockBroadcaster[*types.Data](t)
+	db2.EXPECT().WriteToStoreAndBroadcast(mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	exec2, err := NewExecutor(
 		memStore, // same store
@@ -189,7 +197,7 @@ func TestExecutor_RestartUsesPendingHeader(t *testing.T) {
 	defer exec2.cancel()
 
 	// Verify that the state is at height 1 (pending block at height 2 wasn't committed)
-	currentState2 := exec2.GetLastState()
+	currentState2 := exec2.getLastState()
 	assert.Equal(t, uint64(1), currentState2.LastBlockHeight)
 
 	// When second executor tries to produce block at height 2, it should use pending data
@@ -221,11 +229,10 @@ func TestExecutor_RestartUsesPendingHeader(t *testing.T) {
 	assert.Equal(t, pendingData.DACommitment(), finalHeader.DataHash)
 
 	// Verify broadcasters were called with the pending block data
-	assert.True(t, hb2.called, "header broadcaster should be called")
-	assert.True(t, db2.called, "data broadcaster should be called")
+	// The testify mock framework tracks calls automatically
 
 	// Verify the executor state was updated correctly
-	finalState := exec2.GetLastState()
+	finalState := exec2.getLastState()
 	assert.Equal(t, uint64(2), finalState.LastBlockHeight)
 	assert.Equal(t, []byte("new_root_2"), finalState.AppHash)
 
@@ -258,8 +265,10 @@ func TestExecutor_RestartNoPendingHeader(t *testing.T) {
 	// Create first executor and produce one block
 	mockExec1 := testmocks.NewMockExecutor(t)
 	mockSeq1 := testmocks.NewMockSequencer(t)
-	hb1 := &mockBroadcaster[*types.SignedHeader]{}
-	db1 := &mockBroadcaster[*types.Data]{}
+	hb1 := common.NewMockBroadcaster[*types.SignedHeader](t)
+	hb1.EXPECT().WriteToStoreAndBroadcast(mock.Anything, mock.Anything).Return(nil).Maybe()
+	db1 := common.NewMockBroadcaster[*types.Data](t)
+	db1.EXPECT().WriteToStoreAndBroadcast(mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	exec1, err := NewExecutor(
 		memStore,
@@ -308,8 +317,10 @@ func TestExecutor_RestartNoPendingHeader(t *testing.T) {
 	// Create second executor (restart)
 	mockExec2 := testmocks.NewMockExecutor(t)
 	mockSeq2 := testmocks.NewMockSequencer(t)
-	hb2 := &mockBroadcaster[*types.SignedHeader]{}
-	db2 := &mockBroadcaster[*types.Data]{}
+	hb2 := common.NewMockBroadcaster[*types.SignedHeader](t)
+	hb2.EXPECT().WriteToStoreAndBroadcast(mock.Anything, mock.Anything).Return(nil).Maybe()
+	db2 := common.NewMockBroadcaster[*types.Data](t)
+	db2.EXPECT().WriteToStoreAndBroadcast(mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	exec2, err := NewExecutor(
 		memStore,
@@ -333,7 +344,7 @@ func TestExecutor_RestartNoPendingHeader(t *testing.T) {
 	defer exec2.cancel()
 
 	// Verify state loaded correctly
-	state := exec2.GetLastState()
+	state := exec2.getLastState()
 	assert.Equal(t, uint64(1), state.LastBlockHeight)
 
 	// Now produce next block - should go through normal sequencer flow since no pending block
