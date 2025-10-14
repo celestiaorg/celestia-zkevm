@@ -2,7 +2,7 @@
 
 ## Abstract
 
-A Full Node is a top-level service that encapsulates different components of Rollkit and initializes/manages them.
+A Full Node is a top-level service that encapsulates different components of Evolve and initializes/manages them.
 
 ## Details
 
@@ -34,9 +34,9 @@ The [Mempool] is the transaction pool where all the transactions are stored befo
 
 The [Store] is initialized with `DefaultStore`, an implementation of the [store interface] which is used for storing and retrieving blocks, commits, and state. |
 
-### blockManager
+### Block components
 
-The [Block Manager] is responsible for managing the operations related to blocks such as creating and validating blocks.
+The [Block components] are responsible for managing the operations related to blocks such as creating and validating blocks.
 
 ### dalc
 
@@ -76,7 +76,7 @@ See [full node]
 
 [6] [Store Interface][store interface]
 
-[7] [Block Manager][block manager]
+[7] [Block Components][block components]
 
 [8] [Data Availability Layer Client][dalc]
 
@@ -84,13 +84,13 @@ See [full node]
 
 [10] [Block Sync Service][Block Sync Service]
 
-[full node]: https://github.com/rollkit/rollkit/blob/main/node/full.go
+[full node]: https://github.com/evstack/ev-node/blob/main/node/full.go
 [genesis]: https://github.com/cometbft/cometbft/blob/main/spec/core/genesis.md
-[node configuration]: https://github.com/rollkit/rollkit/blob/main/pkg/config/config.go
-[peer-to-peer client]: https://github.com/rollkit/rollkit/blob/main/pkg/p2p/client.go
-[Store]: https://github.com/rollkit/rollkit/blob/main/pkg/store/store.go
-[store interface]: https://github.com/rollkit/rollkit/blob/main/pkg/store/types.go
-[Block Manager]: https://github.com/rollkit/rollkit/blob/main/block/manager.go
-[dalc]: https://github.com/rollkit/rollkit/blob/main/core/da/da.go
-[Header Sync Service]: https://github.com/rollkit/rollkit/blob/main/pkg/sync/sync_service.go
-[Block Sync Service]: https://github.com/rollkit/rollkit/blob/main/pkg/sync/sync_service.go
+[node configuration]: https://github.com/evstack/ev-node/blob/main/pkg/config/config.go
+[peer-to-peer client]: https://github.com/evstack/ev-node/blob/main/pkg/p2p/client.go
+[Store]: https://github.com/evstack/ev-node/blob/main/pkg/store/store.go
+[store interface]: https://github.com/evstack/ev-node/blob/main/pkg/store/types.go
+[Block Components]: https://github.com/evstack/ev-node/blob/main/block/components.go
+[dalc]: https://github.com/evstack/ev-node/blob/main/core/da/da.go
+[Header Sync Service]: https://github.com/evstack/ev-node/blob/main/pkg/sync/sync_service.go
+[Block Sync Service]: https://github.com/evstack/ev-node/blob/main/pkg/sync/sync_service.go

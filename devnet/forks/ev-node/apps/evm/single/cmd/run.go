@@ -5,27 +5,29 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/rollkit/rollkit/da/jsonrpc"
-	"github.com/rollkit/rollkit/node"
-	"github.com/rollkit/rollkit/sequencers/single"
+	"github.com/evstack/ev-node/core/da"
+	"github.com/evstack/ev-node/da/jsonrpc"
+	"github.com/evstack/ev-node/node"
+	"github.com/evstack/ev-node/sequencers/single"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
 
-	"github.com/rollkit/rollkit/execution/evm"
+	"github.com/evstack/ev-node/execution/evm"
 
-	"github.com/rollkit/rollkit/core/execution"
-	rollcmd "github.com/rollkit/rollkit/pkg/cmd"
-	"github.com/rollkit/rollkit/pkg/config"
-	"github.com/rollkit/rollkit/pkg/p2p"
-	"github.com/rollkit/rollkit/pkg/p2p/key"
-	"github.com/rollkit/rollkit/pkg/store"
+	"github.com/evstack/ev-node/core/execution"
+	rollcmd "github.com/evstack/ev-node/pkg/cmd"
+	"github.com/evstack/ev-node/pkg/config"
+	genesispkg "github.com/evstack/ev-node/pkg/genesis"
+	"github.com/evstack/ev-node/pkg/p2p"
+	"github.com/evstack/ev-node/pkg/p2p/key"
+	"github.com/evstack/ev-node/pkg/store"
 )
 
 var RunCmd = &cobra.Command{
 	Use:     "start",
 	Aliases: []string{"node", "run"},
-	Short:   "Run the rollkit node with EVM execution client",
+	Short:   "Run the evolve node with EVM execution client",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		executor, err := createExecutionClient(cmd)
 		if err != nil {
@@ -39,7 +41,17 @@ var RunCmd = &cobra.Command{
 
 		logger := rollcmd.SetupLogger(nodeConfig.Log)
 
-		daJrpc, err := jsonrpc.NewClient(context.Background(), logger, nodeConfig.DA.Address, nodeConfig.DA.AuthToken, nodeConfig.DA.Namespace)
+		// Attach logger to the EVM engine client if available
+		if ec, ok := executor.(*evm.EngineClient); ok {
+			ec.SetLogger(logger.With().Str("module", "engine_client").Logger())
+		}
+
+		headerNamespace := da.NamespaceFromString(nodeConfig.DA.GetNamespace())
+		dataNamespace := da.NamespaceFromString(nodeConfig.DA.GetDataNamespace())
+
+		logger.Info().Str("headerNamespace", headerNamespace.HexString()).Str("dataNamespace", dataNamespace.HexString()).Msg("namespaces")
+
+		daJrpc, err := jsonrpc.NewClient(context.Background(), logger, nodeConfig.DA.Address, nodeConfig.DA.AuthToken, nodeConfig.DA.GasPrice, nodeConfig.DA.GasMultiplier, rollcmd.DefaultMaxBlobSize)
 		if err != nil {
 			return err
 		}
@@ -49,7 +61,17 @@ var RunCmd = &cobra.Command{
 			return err
 		}
 
-		singleMetrics, err := single.DefaultMetricsProvider(nodeConfig.Instrumentation.IsPrometheusEnabled())(nodeConfig.ChainID)
+		genesisPath := filepath.Join(filepath.Dir(nodeConfig.ConfigPath()), "genesis.json")
+		genesis, err := genesispkg.LoadGenesis(genesisPath)
+		if err != nil {
+			return fmt.Errorf("failed to load genesis: %w", err)
+		}
+
+		if genesis.DAStartHeight == 0 && !nodeConfig.Node.Aggregator {
+			logger.Warn().Msg("da_start_height is not set in genesis.json, ask your chain developer")
+		}
+
+		singleMetrics, err := single.DefaultMetricsProvider(nodeConfig.Instrumentation.IsPrometheusEnabled())(genesis.ChainID)
 		if err != nil {
 			return err
 		}
@@ -59,7 +81,7 @@ var RunCmd = &cobra.Command{
 			logger,
 			datastore,
 			&daJrpc.DA,
-			[]byte(nodeConfig.ChainID),
+			[]byte(genesis.ChainID),
 			nodeConfig.Node.BlockTime.Duration,
 			singleMetrics,
 			nodeConfig.Node.Aggregator,
@@ -73,12 +95,12 @@ var RunCmd = &cobra.Command{
 			return err
 		}
 
-		p2pClient, err := p2p.NewClient(nodeConfig, nodeKey, datastore, logger, nil)
+		p2pClient, err := p2p.NewClient(nodeConfig.P2P, nodeKey.PrivKey, datastore, genesis.ChainID, logger, nil)
 		if err != nil {
 			return err
 		}
 
-		return rollcmd.StartNode(logger, cmd, executor, sequencer, &daJrpc.DA, p2pClient, datastore, nodeConfig, node.NodeOptions{})
+		return rollcmd.StartNode(logger, cmd, executor, sequencer, &daJrpc.DA, p2pClient, datastore, nodeConfig, genesis, node.NodeOptions{})
 	},
 }
 

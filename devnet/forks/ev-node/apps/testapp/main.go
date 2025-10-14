@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	cmds "github.com/rollkit/rollkit/apps/testapp/cmd"
-	rollcmd "github.com/rollkit/rollkit/pkg/cmd"
+	cmds "github.com/evstack/ev-node/apps/testapp/cmd"
+	rollcmd "github.com/evstack/ev-node/pkg/cmd"
 )
 
 func main() {
@@ -20,6 +20,7 @@ func main() {
 		rollcmd.NetInfoCmd,
 		rollcmd.StoreUnsafeCleanCmd,
 		rollcmd.KeysCmd(),
+		cmds.NewRollbackCmd(),
 		initCmd,
 	)
 

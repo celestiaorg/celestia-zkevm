@@ -7,6 +7,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	pb "github.com/evstack/ev-node/types/pb/evnode/v1"
 	"net/http"
 	"path/filepath"
 	"testing"
@@ -14,7 +15,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	nodeclient "github.com/rollkit/rollkit/pkg/rpc/client"
+	nodeclient "github.com/evstack/ev-node/pkg/rpc/client"
 )
 
 var binaryPath string
@@ -51,8 +52,8 @@ func TestBasic(t *testing.T) {
 		"init",
 		"--home="+node1Home,
 		"--chain_id=testing",
-		"--rollkit.node.aggregator",
-		"--rollkit.signer.passphrase="+aggregatorPass,
+		"--evnode.node.aggregator",
+		"--evnode.signer.passphrase="+aggregatorPass,
 	)
 	require.NoError(t, err, "failed to init aggregator", output)
 
@@ -60,13 +61,13 @@ func TestBasic(t *testing.T) {
 	sut.ExecCmd(binaryPath,
 		"start",
 		"--home="+node1Home,
-		"--chain_id=testing",
-		"--rollkit.node.aggregator",
-		"--rollkit.signer.passphrase="+aggregatorPass,
-		"--rollkit.node.block_time=5ms",
-		"--rollkit.da.block_time=15ms",
+		"--evnode.node.aggregator",
+		"--evnode.signer.passphrase="+aggregatorPass,
+		"--evnode.node.block_time=5ms",
+		"--evnode.da.block_time=15ms",
 		"--kv-endpoint=127.0.0.1:9090",
 	)
+
 	sut.AwaitNodeUp(t, "http://127.0.0.1:7331", 2*time.Second)
 
 	// Give aggregator more time before starting the next node
@@ -90,9 +91,9 @@ func TestBasic(t *testing.T) {
 		binaryPath,
 		"start",
 		"--home="+node2Home,
-		"--rollkit.log.level=debug",
-		"--rollkit.p2p.listen_address="+node2P2P,
-		fmt.Sprintf("--rollkit.rpc.address=%s", node2RPC),
+		"--evnode.log.level=debug",
+		"--evnode.p2p.listen_address="+node2P2P,
+		fmt.Sprintf("--evnode.rpc.address=%s", node2RPC),
 	)
 
 	sut.AwaitNodeUp(t, "http://"+node2RPC, 2*time.Second)
@@ -146,8 +147,8 @@ func TestNodeRestartPersistence(t *testing.T) {
 		"init",
 		"--home="+nodeHome,
 		"--chain_id=testing",
-		"--rollkit.node.aggregator",
-		"--rollkit.signer.passphrase=12345678",
+		"--evnode.node.aggregator",
+		"--evnode.signer.passphrase=12345678",
 	)
 	require.NoError(t, err, "failed to init node", output)
 
@@ -155,22 +156,25 @@ func TestNodeRestartPersistence(t *testing.T) {
 	sut.ExecCmd(binaryPath,
 		"start",
 		"--home="+nodeHome,
-		"--chain_id=testing",
-		"--rollkit.node.aggregator",
-		"--rollkit.signer.passphrase=12345678",
-		"--rollkit.node.block_time=5ms",
-		"--rollkit.da.block_time=15ms",
+		"--evnode.node.aggregator",
+		"--evnode.signer.passphrase=12345678",
+		"--evnode.node.block_time=5ms",
+		"--evnode.da.block_time=15ms",
 		"--kv-endpoint=127.0.0.1:9090",
 	)
 	sut.AwaitNodeUp(t, "http://127.0.0.1:7331", 2*time.Second)
 	t.Log("Node started and is up.")
 
 	c := nodeclient.NewClient("http://127.0.0.1:7331")
-	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
-	t.Cleanup(cancel)
 
-	state, err := c.GetState(ctx)
-	require.NoError(t, err)
+	// wait for state to be available
+	var state *pb.State
+	require.Eventually(t, func() bool {
+		state, err = c.GetState(context.TODO())
+		return err == nil
+	}, 5*time.Second, 100*time.Millisecond, "state should become available")
+
+	require.NotNil(t, state)
 	if state.LastBlockHeight == 1 {
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -185,18 +189,17 @@ func TestNodeRestartPersistence(t *testing.T) {
 
 	// Wait a moment to ensure shutdown
 	require.Eventually(t, func() bool {
-		return sut.HasProcess(binaryPath)
+		return !sut.HasProcess(binaryPath)
 	}, 500*time.Millisecond, 10*time.Millisecond)
 
 	// Restart node
 	sut.ExecCmd(binaryPath,
 		"start",
 		"--home="+nodeHome,
-		"--chain_id=testing",
-		"--rollkit.node.aggregator",
-		"--rollkit.signer.passphrase=12345678",
-		"--rollkit.node.block_time=5ms",
-		"--rollkit.da.block_time=15ms",
+		"--evnode.node.aggregator",
+		"--evnode.signer.passphrase=12345678",
+		"--evnode.node.block_time=5ms",
+		"--evnode.da.block_time=15ms",
 		"--kv-endpoint=127.0.0.1:9090",
 	)
 	sut.AwaitNodeUp(t, "http://127.0.0.1:7331", 2*time.Second)

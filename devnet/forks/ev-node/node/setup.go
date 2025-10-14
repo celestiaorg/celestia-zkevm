@@ -3,9 +3,9 @@ package node
 import (
 	"time"
 
-	"github.com/rollkit/rollkit/block"
-	"github.com/rollkit/rollkit/pkg/config"
-	"github.com/rollkit/rollkit/pkg/p2p"
+	"github.com/evstack/ev-node/block"
+	"github.com/evstack/ev-node/pkg/config"
+	"github.com/evstack/ev-node/pkg/p2p"
 )
 
 const readHeaderTimeout = 10 * time.Second
@@ -21,6 +21,7 @@ func DefaultMetricsProvider(config *config.InstrumentationConfig) MetricsProvide
 			return block.PrometheusMetrics(config.Namespace, "chain_id", chainID),
 				p2p.PrometheusMetrics(config.Namespace, "chain_id", chainID)
 		}
+
 		return block.NopMetrics(), p2p.NopMetrics()
 	}
 }

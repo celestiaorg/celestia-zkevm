@@ -1,28 +1,34 @@
-# Rollkit
+# EV-node
 
-Rollkit is the first sovereign application framework. For more in-depth information about Rollkit, please visit our [website][docs].
+Ev-node is the basis of the Evolve Stack. For more in-depth information about Evolve, please visit our [website][docs].
 
 <!-- markdownlint-disable MD013 -->
-[![Go Report Card](https://goreportcard.com/badge/github.com/rollkit/rollkit)](https://goreportcard.com/report/github.com/rollkit/rollkit)
-[![codecov](https://codecov.io/gh/rollkit/rollkit/branch/main/graph/badge.svg?token=CWGA4RLDS9)](https://codecov.io/gh/rollkit/rollkit)
-[![GoDoc](https://godoc.org/github.com/rollkit/rollkit?status.svg)](https://godoc.org/github.com/rollkit/rollkit)
+[![Go Report Card](https://goreportcard.com/badge/github.com/evstack/ev-node)](https://goreportcard.com/report/github.com/evstack/ev-node)
+[![codecov](https://codecov.io/gh/evstack/ev-node/branch/main/graph/badge.svg?token=CWGA4RLDS9)](https://codecov.io/gh/evstack/ev-node)
+[![GoDoc](https://godoc.org/github.com/evstack/ev-node?status.svg)](https://godoc.org/github.com/evstack/ev-node)
 <!-- markdownlint-enable MD013 -->
 
-## Using Rollkit
+## Using Evolve
+
+Evolve supports multiple sync modes:
+
+- **Hybrid sync**: Sync from both DA layer and P2P network (default when peers are configured)
+- **DA-only sync**: Sync exclusively from DA layer by leaving P2P peers empty (see [Configuration Guide](docs/learn/config.md#da-only-sync-mode))
+- **P2P-priority sync**: Prioritize P2P with DA as fallback
 
 ### Example Implementation: TestApp CLI
 
-The easiest way to understand how to use Rollkit is by exploring our example implementation, TestApp.
+The easiest way to understand how to use Evolve is by exploring our example implementation, TestApp.
 
 Requires Go version >= 1.22.
 
-TestApp is a CLI tool that demonstrates how to run different kinds of nodes using the Rollkit framework.
-It serves as a reference implementation and helps you understand how to build your own Rollkit-based blockchain.
+TestApp is a CLI tool that demonstrates how to run different kinds of nodes using the Evolve framework.
+It serves as a reference implementation and helps you understand how to build your own Evolve-based blockchain.
 
 #### Install
 
 To install the example `testapp`, simply run the following command at the root of the
-rollkit repo:
+ev-node repo:
 
 ```bash
 make install
@@ -36,17 +42,17 @@ testapp version
 
 #### Quick Start
 
-You can spin up a local TestApp network (powered by Rollkit) with the following command:
+You can spin up a local TestApp network (powered by Evolve) with the following command:
 
 ```bash
 testapp start
 ```
 
-## Building with Rollkit
+## Building with Evolve
 
-Rollkit is the first sovereign application framework that allows you to launch
+Evolve is the first sovereign application framework that allows you to launch
 a sovereign, customizable blockchain as easily as a smart contract.
-TestApp serves as a reference implementation to help you get started with your own Rollkit-based blockchain.
+TestApp serves as a reference implementation to help you get started with your own Evolve-based blockchain.
 
 Check out our tutorials on our [website][docs].
 
@@ -57,12 +63,12 @@ in the form of code, documentation, bug reports, feature
 requests, or anything else.
 
 If you're looking for issues to work on, try looking at the
-[good first issue list](https://github.com/rollkit/rollkit/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+[good first issue list](https://github.com/evstack/ev-node/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
 Issues with this tag are suitable for a new external contributor and is a great
 way to find something you can help with!
 
 See
-[the contributing guide](https://github.com/rollkit/rollkit/blob/main/CONTRIBUTING.md)
+[the contributing guide](https://github.com/evstack/ev-node/blob/main/CONTRIBUTING.md)
 for more details.
 
 Please join our
@@ -93,13 +99,11 @@ make proto-lint
 1. Install [hadolint](https://github.com/hadolint/hadolint)
 1. Install [yamllint](https://yamllint.readthedocs.io/en/stable/quickstart.html)
 
-
-
 ## Audits
 
 | Date | Auditor | Version | Report |
 |---|---|---|---|
-| 2024/01/12 | [Informal Systems](https://informal.systems/) | [eccdd...bcb9d](https://github.com/rollkit/rollkit/commit/eccdd0f1793a5ac532011ef4d896de9e0d8bcb9d) | [informal-systems.pdf](docs/audit/informal-systems.pdf) |
-| 2024/01/10 | [Binary Builders](https://binary.builders/)   | [eccdd...bcb9d](https://github.com/rollkit/rollkit/commit/eccdd0f1793a5ac532011ef4d896de9e0d8bcb9d) | [binary-builders.pdf](docs/audit/binary-builders.pdf)   |
+| 2024/01/12 | [Informal Systems](https://informal.systems/) | [eccdd...bcb9d](https://github.com/evstack/ev-node/commit/eccdd0f1793a5ac532011ef4d896de9e0d8bcb9d) | [informal-systems.pdf](docs/audit/informal-systems.pdf) |
+| 2024/01/10 | [Binary Builders](https://binary.builders/)   | [eccdd...bcb9d](https://github.com/evstack/ev-node/commit/eccdd0f1793a5ac532011ef4d896de9e0d8bcb9d) | [binary-builders.pdf](docs/audit/binary-builders.pdf)   |
 
-[docs]: https://rollkit.dev
+[docs]: <https://ev.xyz>

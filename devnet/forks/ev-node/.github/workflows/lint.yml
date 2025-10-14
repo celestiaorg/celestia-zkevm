@@ -9,8 +9,8 @@ jobs:
     name: golangci-lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: ./go.mod
         # This steps sets the GIT_DIFF environment variable to true
@@ -32,7 +32,7 @@ jobs:
 
   # hadolint lints the Dockerfile
   hadolint:
-    uses: rollkit/.github/.github/workflows/reusable_dockerfile_lint.yml@v0.5.0 # yamllint disable-line rule:line-length
+    uses: evstack/.github/.github/workflows/reusable_dockerfile_lint.yml@v0.5.0 # yamllint disable-line rule:line-length
     with:
       dockerfile: Dockerfile
       failure-threshold: error
@@ -40,21 +40,21 @@ jobs:
   yamllint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: rollkit/.github/.github/actions/yamllint@v0.5.0
+      - uses: actions/checkout@v5
+      - uses: evstack/.github/.github/actions/yamllint@v0.5.0
 
   markdown-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: rollkit/.github/.github/actions/markdown-lint@v0.5.0
+      - uses: actions/checkout@v5
+      - uses: evstack/.github/.github/actions/markdown-lint@v0.5.0
 
   # Checks that the .goreleaser.yaml file is valid
   goreleaser-check:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: latest

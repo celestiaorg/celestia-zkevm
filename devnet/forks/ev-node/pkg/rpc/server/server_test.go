@@ -12,18 +12,19 @@ import (
 
 	"connectrpc.com/connect"
 	ds "github.com/ipfs/go-datastore"
-	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/rollkit/rollkit/pkg/p2p"
-	"github.com/rollkit/rollkit/pkg/store"
-	"github.com/rollkit/rollkit/test/mocks"
-	"github.com/rollkit/rollkit/types"
-	pb "github.com/rollkit/rollkit/types/pb/rollkit/v1"
+	"github.com/evstack/ev-node/pkg/config"
+	"github.com/evstack/ev-node/pkg/p2p"
+	"github.com/evstack/ev-node/pkg/store"
+	"github.com/evstack/ev-node/test/mocks"
+	"github.com/evstack/ev-node/types"
+	pb "github.com/evstack/ev-node/types/pb/evnode/v1"
 )
 
 func TestGetBlock(t *testing.T) {
@@ -44,16 +45,15 @@ func TestGetBlock(t *testing.T) {
 	binary.LittleEndian.PutUint64(dataDAHeightBytes, expectedDataDAHeight)
 
 	// Create server with mock store
-	logger := logging.Logger("test")
-	_ = logging.SetLogLevel("test", "FATAL")
+	logger := zerolog.Nop()
 	server := NewStoreServer(mockStore, logger)
 
 	// Test GetBlock with height - success case
 	t.Run("by height with DA heights", func(t *testing.T) {
 		// Setup mock expectations
 		mockStore.On("GetBlockData", mock.Anything, height).Return(header, data, nil).Once()
-		mockStore.On("GetMetadata", mock.Anything, fmt.Sprintf("%s/%d/h", store.RollkitHeightToDAHeightKey, height)).Return(headerDAHeightBytes, nil).Once()
-		mockStore.On("GetMetadata", mock.Anything, fmt.Sprintf("%s/%d/d", store.RollkitHeightToDAHeightKey, height)).Return(dataDAHeightBytes, nil).Once()
+		mockStore.On("GetMetadata", mock.Anything, fmt.Sprintf("%s/%d/h", store.HeightToDAHeightKey, height)).Return(headerDAHeightBytes, nil).Once()
+		mockStore.On("GetMetadata", mock.Anything, fmt.Sprintf("%s/%d/d", store.HeightToDAHeightKey, height)).Return(dataDAHeightBytes, nil).Once()
 
 		req := connect.NewRequest(&pb.GetBlockRequest{
 			Identifier: &pb.GetBlockRequest_Height{
@@ -73,8 +73,8 @@ func TestGetBlock(t *testing.T) {
 	// Test GetBlock with height - metadata not found
 	t.Run("by height DA heights not found", func(t *testing.T) {
 		mockStore.On("GetBlockData", mock.Anything, height).Return(header, data, nil).Once()
-		mockStore.On("GetMetadata", mock.Anything, fmt.Sprintf("%s/%d/h", store.RollkitHeightToDAHeightKey, height)).Return(nil, ds.ErrNotFound).Once()
-		mockStore.On("GetMetadata", mock.Anything, fmt.Sprintf("%s/%d/d", store.RollkitHeightToDAHeightKey, height)).Return(nil, ds.ErrNotFound).Once()
+		mockStore.On("GetMetadata", mock.Anything, fmt.Sprintf("%s/%d/h", store.HeightToDAHeightKey, height)).Return(nil, ds.ErrNotFound).Once()
+		mockStore.On("GetMetadata", mock.Anything, fmt.Sprintf("%s/%d/d", store.HeightToDAHeightKey, height)).Return(nil, ds.ErrNotFound).Once()
 
 		req := connect.NewRequest(&pb.GetBlockRequest{
 			Identifier: &pb.GetBlockRequest_Height{
@@ -95,8 +95,8 @@ func TestGetBlock(t *testing.T) {
 		// Important: The header returned by GetBlockByHash must also have its height set for DA height lookup
 		headerForHash := &types.SignedHeader{Header: types.Header{BaseHeader: types.BaseHeader{Height: height}}}
 		mockStore.On("GetBlockByHash", mock.Anything, hashBytes).Return(headerForHash, data, nil).Once()
-		mockStore.On("GetMetadata", mock.Anything, fmt.Sprintf("%s/%d/h", store.RollkitHeightToDAHeightKey, height)).Return(headerDAHeightBytes, nil).Once()
-		mockStore.On("GetMetadata", mock.Anything, fmt.Sprintf("%s/%d/d", store.RollkitHeightToDAHeightKey, height)).Return(dataDAHeightBytes, nil).Once()
+		mockStore.On("GetMetadata", mock.Anything, fmt.Sprintf("%s/%d/h", store.HeightToDAHeightKey, height)).Return(headerDAHeightBytes, nil).Once()
+		mockStore.On("GetMetadata", mock.Anything, fmt.Sprintf("%s/%d/d", store.HeightToDAHeightKey, height)).Return(dataDAHeightBytes, nil).Once()
 
 		req := connect.NewRequest(&pb.GetBlockRequest{
 			Identifier: &pb.GetBlockRequest_Hash{
@@ -137,8 +137,7 @@ func TestGetBlock(t *testing.T) {
 func TestGetBlock_Latest(t *testing.T) {
 
 	mockStore := mocks.NewMockStore(t)
-	logger := logging.Logger("test")
-	_ = logging.SetLogLevel("test", "FATAL")
+	logger := zerolog.Nop()
 	server := NewStoreServer(mockStore, logger)
 
 	latestHeight := uint64(20)
@@ -157,8 +156,8 @@ func TestGetBlock_Latest(t *testing.T) {
 	// Expectation for GetBlockData with the latest height
 	mockStore.On("GetBlockData", context.Background(), latestHeight).Return(header, data, nil).Once()
 	// Expectation for DA height metadata
-	mockStore.On("GetMetadata", mock.Anything, fmt.Sprintf("%s/%d/h", store.RollkitHeightToDAHeightKey, latestHeight)).Return(headerDAHeightBytes, nil).Once()
-	mockStore.On("GetMetadata", mock.Anything, fmt.Sprintf("%s/%d/d", store.RollkitHeightToDAHeightKey, latestHeight)).Return(dataDAHeightBytes, nil).Once()
+	mockStore.On("GetMetadata", mock.Anything, fmt.Sprintf("%s/%d/h", store.HeightToDAHeightKey, latestHeight)).Return(headerDAHeightBytes, nil).Once()
+	mockStore.On("GetMetadata", mock.Anything, fmt.Sprintf("%s/%d/d", store.HeightToDAHeightKey, latestHeight)).Return(dataDAHeightBytes, nil).Once()
 
 	req := connect.NewRequest(&pb.GetBlockRequest{
 		Identifier: &pb.GetBlockRequest_Height{
@@ -194,8 +193,7 @@ func TestGetState(t *testing.T) {
 	mockStore.On("GetState", mock.Anything).Return(state, nil)
 
 	// Create server with mock store
-	logger := logging.Logger("test")
-	_ = logging.SetLogLevel("test", "FATAL")
+	logger := zerolog.Nop()
 	server := NewStoreServer(mockStore, logger)
 
 	// Call GetState
@@ -218,8 +216,7 @@ func TestGetState(t *testing.T) {
 func TestGetState_Error(t *testing.T) {
 	mockStore := mocks.NewMockStore(t)
 	mockStore.On("GetState", mock.Anything).Return(types.State{}, fmt.Errorf("state error"))
-	logger := logging.Logger("test")
-	_ = logging.SetLogLevel("test", "FATAL")
+	logger := zerolog.Nop()
 	server := NewStoreServer(mockStore, logger)
 	resp, err := server.GetState(context.Background(), connect.NewRequest(&emptypb.Empty{}))
 	require.Error(t, err)
@@ -238,8 +235,7 @@ func TestGetMetadata(t *testing.T) {
 	mockStore.On("GetMetadata", mock.Anything, key).Return(value, nil)
 
 	// Create server with mock store
-	logger := logging.Logger("test")
-	_ = logging.SetLogLevel("test", "FATAL")
+	logger := zerolog.Nop()
 	server := NewStoreServer(mockStore, logger)
 
 	// Call GetMetadata
@@ -257,12 +253,72 @@ func TestGetMetadata(t *testing.T) {
 func TestGetMetadata_Error(t *testing.T) {
 	mockStore := mocks.NewMockStore(t)
 	mockStore.On("GetMetadata", mock.Anything, "bad").Return(nil, fmt.Errorf("meta error"))
-	logger := logging.Logger("test")
-	_ = logging.SetLogLevel("test", "FATAL")
+	logger := zerolog.Nop()
 	server := NewStoreServer(mockStore, logger)
 	resp, err := server.GetMetadata(context.Background(), connect.NewRequest(&pb.GetMetadataRequest{Key: "bad"}))
 	require.Error(t, err)
 	require.Nil(t, resp)
+}
+
+func TestGetGenesisDaHeight(t *testing.T) {
+	expectedHeight := uint64(123)
+	heightBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(heightBytes, expectedHeight)
+
+	mockStore := mocks.NewMockStore(t)
+	mockStore.On("GetMetadata", mock.Anything, store.GenesisDAHeightKey).Return(heightBytes, nil).Once()
+
+	logger := zerolog.Nop()
+	server := NewStoreServer(mockStore, logger)
+
+	t.Run("success", func(t *testing.T) {
+		req := connect.NewRequest(&emptypb.Empty{})
+		resp, err := server.GetGenesisDaHeight(context.Background(), req)
+
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.Equal(t, expectedHeight, resp.Msg.Height)
+		mockStore.AssertExpectations(t)
+	})
+}
+
+func TestGetGenesisDaHeight_NotFound(t *testing.T) {
+	mockStore := mocks.NewMockStore(t)
+	mockStore.On("GetMetadata", mock.Anything, store.GenesisDAHeightKey).Return(nil, fmt.Errorf("genesis DA height not found")).Once()
+
+	logger := zerolog.Nop()
+	server := NewStoreServer(mockStore, logger)
+
+	req := connect.NewRequest(&emptypb.Empty{})
+	resp, err := server.GetGenesisDaHeight(context.Background(), req)
+
+	require.Error(t, err)
+	require.Nil(t, resp)
+	var connectErr *connect.Error
+	require.ErrorAs(t, err, &connectErr)
+	require.Equal(t, connect.CodeNotFound, connectErr.Code())
+	mockStore.AssertExpectations(t)
+}
+
+func TestGetGenesisDaHeight_InvalidLength(t *testing.T) {
+	mockStore := mocks.NewMockStore(t)
+	// Return invalid length bytes (not 8 bytes)
+	invalidBytes := []byte{1, 2, 3, 4} // Only 4 bytes
+	mockStore.On("GetMetadata", mock.Anything, store.GenesisDAHeightKey).Return(invalidBytes, nil).Once()
+
+	logger := zerolog.Nop()
+	server := NewStoreServer(mockStore, logger)
+
+	req := connect.NewRequest(&emptypb.Empty{})
+	resp, err := server.GetGenesisDaHeight(context.Background(), req)
+
+	require.Error(t, err)
+	require.Nil(t, resp)
+	var connectErr *connect.Error
+	require.ErrorAs(t, err, &connectErr)
+	require.Equal(t, connect.CodeNotFound, connectErr.Code())
+	require.Contains(t, connectErr.Message(), "invalid metadata value")
+	mockStore.AssertExpectations(t)
 }
 
 func TestP2PServer_GetPeerInfo(t *testing.T) {
@@ -319,9 +375,9 @@ func TestHealthLiveEndpoint(t *testing.T) {
 	mockP2PManager := &mocks.MockP2PRPC{} // Assuming this mock is sufficient or can be adapted
 
 	// Create the service handler
-	logger := logging.Logger("test")
-	_ = logging.SetLogLevel("test", "FATAL")
-	handler, err := NewServiceHandler(mockStore, mockP2PManager, logger)
+	logger := zerolog.Nop()
+	testConfig := config.DefaultConfig()
+	handler, err := NewServiceHandler(mockStore, mockP2PManager, nil, logger, testConfig, nil)
 	assert.NoError(err)
 	assert.NotNil(handler)
 
@@ -341,4 +397,56 @@ func TestHealthLiveEndpoint(t *testing.T) {
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(err)
 	assert.Equal("OK\n", string(body)) // fmt.Fprintln adds a newline
+}
+
+func TestHealthReadyEndpoint(t *testing.T) {
+	cases := []struct {
+		name         string
+		local        uint64
+		bestKnown    uint64
+		peers        int
+		expectedCode int
+	}{
+		{name: "at_head", local: 100, bestKnown: 100, peers: 1, expectedCode: http.StatusOK},
+		{name: "within_1_block", local: 99, bestKnown: 100, peers: 1, expectedCode: http.StatusOK},
+		{name: "within_3_blocks", local: 97, bestKnown: 100, peers: 1, expectedCode: http.StatusOK},
+		{name: "just_over_3_blocks", local: 96, bestKnown: 100, peers: 1, expectedCode: http.StatusServiceUnavailable},
+		{name: "local_ahead", local: 101, bestKnown: 100, peers: 1, expectedCode: http.StatusOK},
+		{name: "no_blocks_yet", local: 0, bestKnown: 100, peers: 1, expectedCode: http.StatusServiceUnavailable},
+		{name: "unknown_best_known", local: 100, bestKnown: 0, peers: 1, expectedCode: http.StatusServiceUnavailable},
+		{name: "no_peers", local: 100, bestKnown: 100, peers: 0, expectedCode: http.StatusServiceUnavailable},
+	}
+
+	logger := zerolog.Nop()
+	testConfig := config.DefaultConfig()
+	testConfig.Node.Aggregator = false
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockStore := mocks.NewMockStore(t)
+			mockP2P := mocks.NewMockP2PRPC(t)
+
+			// only expect Height() when peers are present handler returns early on no peers
+			if tc.peers > 0 {
+				mockStore.On("Height", mock.Anything).Return(tc.local, nil)
+			}
+
+			var peers []peer.AddrInfo
+			for i := 0; i < tc.peers; i++ {
+				peers = append(peers, peer.AddrInfo{})
+			}
+			mockP2P.On("GetPeers").Return(peers, nil)
+
+			bestKnown := func() uint64 { return tc.bestKnown }
+			handler, err := NewServiceHandler(mockStore, mockP2P, nil, logger, testConfig, bestKnown)
+			require.NoError(t, err)
+			server := httptest.NewServer(handler)
+			defer server.Close()
+
+			resp, err := http.Get(server.URL + "/health/ready")
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			require.Equal(t, tc.expectedCode, resp.StatusCode)
+		})
+	}
 }

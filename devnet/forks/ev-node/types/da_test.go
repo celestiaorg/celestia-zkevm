@@ -6,18 +6,17 @@ import (
 	"testing"
 	"time"
 
-	logging "github.com/ipfs/go-log/v2"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	coreda "github.com/rollkit/rollkit/core/da"
-	"github.com/rollkit/rollkit/test/mocks"
-	"github.com/rollkit/rollkit/types"
+	coreda "github.com/evstack/ev-node/core/da"
+	"github.com/evstack/ev-node/test/mocks"
+	"github.com/evstack/ev-node/types"
 )
 
 func TestSubmitWithHelpers(t *testing.T) {
-	logger := logging.Logger("test")
-	_ = logging.SetLogLevel("test", "FATAL")
+	logger := zerolog.Nop()
 
 	testCases := []struct {
 		name           string
@@ -118,9 +117,11 @@ func TestSubmitWithHelpers(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDA := mocks.NewMockDA(t)
-			mockDA.On("SubmitWithOptions", mock.Anything, tc.data, tc.gasPrice, mock.Anything, tc.options).Return(tc.submitIDs, tc.submitErr)
+			encodedNamespace := coreda.NamespaceFromString("test-namespace")
 
-			result := types.SubmitWithHelpers(context.Background(), mockDA, logger, tc.data, tc.gasPrice, tc.options)
+			mockDA.On("SubmitWithOptions", mock.Anything, tc.data, tc.gasPrice, encodedNamespace.Bytes(), tc.options).Return(tc.submitIDs, tc.submitErr)
+
+			result := types.SubmitWithHelpers(context.Background(), mockDA, logger, tc.data, tc.gasPrice, encodedNamespace.Bytes(), tc.options)
 
 			assert.Equal(t, tc.expectedCode, result.Code)
 			if tc.expectedErrMsg != "" {
@@ -138,8 +139,7 @@ func TestSubmitWithHelpers(t *testing.T) {
 }
 
 func TestRetrieveWithHelpers(t *testing.T) {
-	logger := logging.Logger("test")
-	_ = logging.SetLogLevel("test", "FATAL")
+	logger := zerolog.Nop()
 	dataLayerHeight := uint64(100)
 	mockIDs := [][]byte{[]byte("id1"), []byte("id2")}
 	mockBlobs := [][]byte{[]byte("blobA"), []byte("blobB")}
@@ -221,6 +221,7 @@ func TestRetrieveWithHelpers(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDA := mocks.NewMockDA(t)
+			encodedNamespace := coreda.NamespaceFromString("test-namespace")
 
 			mockDA.On("GetIDs", mock.Anything, dataLayerHeight, mock.Anything).Return(tc.getIDsResult, tc.getIDsErr)
 
@@ -228,7 +229,7 @@ func TestRetrieveWithHelpers(t *testing.T) {
 				mockDA.On("Get", mock.Anything, tc.getIDsResult.IDs, mock.Anything).Return(mockBlobs, tc.getBlobsErr)
 			}
 
-			result := types.RetrieveWithHelpers(context.Background(), mockDA, logger, dataLayerHeight, []byte("test-namespace"))
+			result := types.RetrieveWithHelpers(context.Background(), mockDA, logger, dataLayerHeight, encodedNamespace.Bytes(), 5*time.Second)
 
 			assert.Equal(t, tc.expectedCode, result.Code)
 			assert.Equal(t, tc.expectedHeight, result.Height)
@@ -244,4 +245,54 @@ func TestRetrieveWithHelpers(t *testing.T) {
 			mockDA.AssertExpectations(t)
 		})
 	}
+}
+
+func TestRetrieveWithHelpers_Timeout(t *testing.T) {
+	logger := zerolog.Nop()
+	dataLayerHeight := uint64(100)
+	encodedNamespace := coreda.NamespaceFromString("test-namespace")
+
+	t.Run("timeout during GetIDs", func(t *testing.T) {
+		mockDA := mocks.NewMockDA(t)
+
+		// Mock GetIDs to block until context is cancelled
+		mockDA.On("GetIDs", mock.Anything, dataLayerHeight, mock.Anything).Run(func(args mock.Arguments) {
+			ctx := args.Get(0).(context.Context)
+			<-ctx.Done() // Wait for context cancellation
+		}).Return(nil, context.DeadlineExceeded)
+
+		// Use a very short timeout to ensure it triggers
+		result := types.RetrieveWithHelpers(context.Background(), mockDA, logger, dataLayerHeight, encodedNamespace.Bytes(), 1*time.Millisecond)
+
+		assert.Equal(t, coreda.StatusError, result.Code)
+		assert.Contains(t, result.Message, "failed to get IDs")
+		assert.Contains(t, result.Message, "context deadline exceeded")
+		mockDA.AssertExpectations(t)
+	})
+
+	t.Run("timeout during Get", func(t *testing.T) {
+		mockDA := mocks.NewMockDA(t)
+		mockIDs := [][]byte{[]byte("id1")}
+		mockTimestamp := time.Now()
+
+		// Mock GetIDs to succeed
+		mockDA.On("GetIDs", mock.Anything, dataLayerHeight, mock.Anything).Return(&coreda.GetIDsResult{
+			IDs:       mockIDs,
+			Timestamp: mockTimestamp,
+		}, nil)
+
+		// Mock Get to block until context is cancelled
+		mockDA.On("Get", mock.Anything, mockIDs, mock.Anything).Run(func(args mock.Arguments) {
+			ctx := args.Get(0).(context.Context)
+			<-ctx.Done() // Wait for context cancellation
+		}).Return(nil, context.DeadlineExceeded)
+
+		// Use a very short timeout to ensure it triggers
+		result := types.RetrieveWithHelpers(context.Background(), mockDA, logger, dataLayerHeight, encodedNamespace.Bytes(), 1*time.Millisecond)
+
+		assert.Equal(t, coreda.StatusError, result.Code)
+		assert.Contains(t, result.Message, "failed to get blobs for batch")
+		assert.Contains(t, result.Message, "context deadline exceeded")
+		mockDA.AssertExpectations(t)
+	})
 }
