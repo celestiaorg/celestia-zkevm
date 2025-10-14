@@ -174,7 +174,22 @@ pub async fn parallel_prover(
         let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
         for blob in blobs.as_slice() {
             let data = match SignedData::decode(blob.data.as_slice()) {
-                Ok(data) => data.data.unwrap(),
+                Ok(data) => {
+                    let data = data.data.unwrap();
+                    if data.txs.is_empty() {
+                        println!(
+                            "No transactions found in EV Block: {:?}, which was included in Celestia block {}",
+                            data.clone().metadata.unwrap().height,
+                            block_number
+                        );
+                    } else {
+                        println!(
+                            "Transaction found in Data: {:?}, which was included in Celestia block {}",
+                            data, block_number
+                        );
+                    }
+                    data
+                }
                 Err(_) => continue,
             };
             let height = data.metadata.unwrap().height;
@@ -461,10 +476,28 @@ async fn write_inputs(
     debug!("Got NamespaceProofs, total: {}", proofs.len());
 
     let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
+    println!("Processing {} blobs for block: {}", blobs.len(), block_number);
     for blob in blobs.as_slice() {
         let data = match SignedData::decode(blob.data.as_slice()) {
-            Ok(data) => data.data.unwrap(),
-            Err(_) => continue,
+            Ok(data) => {
+                let data = data.data.unwrap();
+                if data.txs.is_empty() {
+                    println!(
+                        "No transactions found in EV Block: {:?}, which was included in Celestia block {}",
+                        data.clone().metadata.unwrap().height,
+                        block_number
+                    );
+                } else {
+                    println!(
+                        "Transaction found in Data: {:?}, which was included in Celestia block {}",
+                        data, block_number
+                    );
+                }
+                data
+            }
+            Err(_) => {
+                continue;
+            }
         };
         let height = data.metadata.unwrap().height;
         debug!("Got SignedData for EVM block {height}");

@@ -12,7 +12,7 @@ body:
       label: Version Information
       description: Please provide versions of all relevant components
       placeholder: |
-        ev-node:
+        Rollkit:
         Execution Implementation:
     validations:
       required: true
@@ -112,7 +112,7 @@ body:
       description: |
         Please provide relevant logs from different components:
         - Node logs
-        - Ev-node logs
+        - Rollkit logs
         - DA logs
         - Sequencer logs
         - Execution logs

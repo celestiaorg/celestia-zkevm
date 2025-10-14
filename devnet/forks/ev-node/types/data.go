@@ -29,7 +29,7 @@ type Metadata struct {
 	LastDataHash Hash
 }
 
-// Data defines Evolve block data.
+// Data defines Rollkit block data.
 type Data struct {
 	*Metadata
 	Txs Txs

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ipfs/go-datastore"
+	logging "github.com/ipfs/go-log/v2"
 	libp2p "github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -22,10 +23,10 @@ import (
 	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/libp2p/go-libp2p/p2p/net/conngater"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/rs/zerolog"
 
-	"github.com/evstack/ev-node/pkg/config"
-	rollhash "github.com/evstack/ev-node/pkg/hash"
+	"github.com/rollkit/rollkit/pkg/config"
+	rollhash "github.com/rollkit/rollkit/pkg/hash"
+	"github.com/rollkit/rollkit/pkg/p2p/key"
 )
 
 // TODO(tzdybal): refactor to configuration parameters
@@ -43,7 +44,7 @@ const (
 // Those seed nodes serve Kademlia DHT protocol, and are agnostic to ORU chain. Using DHT
 // peer routing and discovery clients find other peers within ORU network.
 type Client struct {
-	logger zerolog.Logger
+	logger logging.EventLogger
 
 	conf    config.P2PConfig
 	chainID string
@@ -62,45 +63,50 @@ type Client struct {
 //
 // Basic checks on parameters are done, and default parameters are provided for unset-configuration
 func NewClient(
-	conf config.P2PConfig,
-	privKey crypto.PrivKey,
+	conf config.Config,
+	nodeKey *key.NodeKey,
 	ds datastore.Datastore,
-	chainID string,
-	logger zerolog.Logger,
+	logger logging.EventLogger,
 	metrics *Metrics,
 ) (*Client, error) {
+	if conf.RootDir == "" {
+		return nil, fmt.Errorf("rootDir is required")
+	}
 
 	gater, err := conngater.NewBasicConnectionGater(ds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection gater: %w", err)
 	}
 
+	if nodeKey == nil {
+		return nil, fmt.Errorf("node key is required")
+	}
+
 	return &Client{
-		conf:    conf,
+		conf:    conf.P2P,
 		gater:   gater,
-		privKey: privKey,
-		chainID: chainID,
+		privKey: nodeKey.PrivKey,
+		chainID: conf.ChainID,
 		logger:  logger,
 		metrics: metrics,
 	}, nil
 }
 
 func NewClientWithHost(
-	conf config.P2PConfig,
-	privKey crypto.PrivKey,
+	conf config.Config,
+	nodeKey *key.NodeKey,
 	ds datastore.Datastore,
-	chainID string,
-	logger zerolog.Logger,
+	logger logging.EventLogger,
 	metrics *Metrics,
 	h host.Host, // injected host (mocknet or custom)
 ) (*Client, error) {
-	c, err := NewClient(conf, privKey, ds, chainID, logger, metrics)
+	c, err := NewClient(conf, nodeKey, ds, logger, metrics)
 	if err != nil {
 		return nil, err
 	}
 
 	// Reject hosts whose identity does not match the supplied node key
-	expectedID, _ := peer.IDFromPrivateKey(privKey)
+	expectedID, _ := peer.IDFromPrivateKey(nodeKey.PrivKey)
 	if h.ID() != expectedID {
 		return nil, fmt.Errorf(
 			"injected host ID %s does not match node key ID %s",
@@ -121,7 +127,7 @@ func NewClientWithHost(
 // 3. Setup DHT, establish connection to seed nodes and initialize peer discovery.
 // 4. Use active peer discovery to look for peers from same ORU network.
 func (c *Client) Start(ctx context.Context) error {
-	c.logger.Debug().Msg("starting P2P client")
+	c.logger.Debug("starting P2P client")
 
 	if c.host != nil {
 		return c.startWithHost(ctx, c.host)
@@ -137,30 +143,30 @@ func (c *Client) Start(ctx context.Context) error {
 func (c *Client) startWithHost(ctx context.Context, h host.Host) error {
 	c.host = h
 	for _, a := range c.host.Addrs() {
-		c.logger.Info().Str("address", fmt.Sprintf("%s/p2p/%s", a, c.host.ID())).Msg("listening on address")
+		c.logger.Info("listening on address ", fmt.Sprintf("%s/p2p/%s", a, c.host.ID()))
 	}
 
-	c.logger.Debug().Str("blacklist", c.conf.BlockedPeers).Msg("blocking blacklisted peers")
+	c.logger.Debug("blocking blacklisted peers blacklist ", c.conf.BlockedPeers)
 	if err := c.setupBlockedPeers(c.parseAddrInfoList(c.conf.BlockedPeers)); err != nil {
 		return err
 	}
 
-	c.logger.Debug().Str("whitelist", c.conf.AllowedPeers).Msg("allowing whitelisted peers")
+	c.logger.Debug("allowing whitelisted peers whitelist ", c.conf.AllowedPeers)
 	if err := c.setupAllowedPeers(c.parseAddrInfoList(c.conf.AllowedPeers)); err != nil {
 		return err
 	}
 
-	c.logger.Debug().Msg("setting up gossiping")
+	c.logger.Debug("setting up gossiping")
 	if err := c.setupGossiping(ctx); err != nil {
 		return err
 	}
 
-	c.logger.Debug().Msg("setting up DHT")
+	c.logger.Debug("setting up DHT")
 	if err := c.setupDHT(ctx); err != nil {
 		return err
 	}
 
-	c.logger.Debug().Msg("setting up active peer discovery")
+	c.logger.Debug("setting up active peer discovery")
 	if err := c.peerDiscovery(ctx); err != nil {
 		return err
 	}
@@ -251,11 +257,11 @@ func (c *Client) listen() (host.Host, error) {
 func (c *Client) setupDHT(ctx context.Context) error {
 	peers := c.parseAddrInfoList(c.conf.Peers)
 	if len(peers) == 0 {
-		c.logger.Info().Msg("no peers - only listening for connections")
+		c.logger.Info("no peers - only listening for connections")
 	}
 
 	for _, sa := range peers {
-		c.logger.Debug().Str("addr", sa.String()).Msg("peer")
+		c.logger.Debug("peer", "addr", sa)
 	}
 
 	var err error
@@ -348,7 +354,7 @@ func (c *Client) tryConnect(ctx context.Context, peer peer.AddrInfo) {
 
 	err := c.host.Connect(ctx, peer)
 	if err != nil && ctx.Err() == nil {
-		c.logger.Error().Str("peer", peer.String()).Err(err).Msg("failed to connect to peer")
+		c.logger.Error("failed to connect to peer", "peer", peer, "error", err)
 	}
 }
 
@@ -371,12 +377,12 @@ func (c *Client) parseAddrInfoList(addrInfoStr string) []peer.AddrInfo {
 	for _, p := range peers {
 		maddr, err := multiaddr.NewMultiaddr(p)
 		if err != nil {
-			c.logger.Error().Str("address", p).Err(err).Msg("failed to parse peer")
+			c.logger.Error("failed to parse peer, address: ", p, "error: ", err)
 			continue
 		}
 		addrInfo, err := peer.AddrInfoFromP2pAddr(maddr)
 		if err != nil {
-			c.logger.Error().Str("address", maddr.String()).Err(err).Msg("failed to create addr info for peer")
+			c.logger.Error("failed to create addr info for peer, address: ", maddr, "error: ", err)
 			continue
 		}
 		addrs = append(addrs, *addrInfo)

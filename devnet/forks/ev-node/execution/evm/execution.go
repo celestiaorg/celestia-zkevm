@@ -17,12 +17,13 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/rs/zerolog"
 
-	"github.com/evstack/ev-node/core/execution"
+	"github.com/rollkit/rollkit/core/execution"
 )
 
 var (
+	// ErrNilPayloadStatus indicates that PayloadID returned by EVM was nil
+	ErrNilPayloadStatus = errors.New("nil payload status")
 	// ErrInvalidPayloadStatus indicates that EVM returned status != VALID
 	ErrInvalidPayloadStatus = errors.New("invalid payload status")
 )
@@ -44,8 +45,6 @@ type EngineClient struct {
 	currentHeadBlockHash      common.Hash // Store last non-finalized HeadBlockHash
 	currentSafeBlockHash      common.Hash // Store last non-finalized SafeBlockHash
 	currentFinalizedBlockHash common.Hash // Store last finalized block hash
-
-	logger zerolog.Logger
 }
 
 // NewEngineExecutionClient creates a new instance of EngineAPIExecutionClient
@@ -90,13 +89,7 @@ func NewEngineExecutionClient(
 		currentHeadBlockHash:      genesisHash,
 		currentSafeBlockHash:      genesisHash,
 		currentFinalizedBlockHash: genesisHash,
-		logger:                    zerolog.Nop(),
 	}, nil
-}
-
-// SetLogger allows callers to attach a structured logger.
-func (c *EngineClient) SetLogger(l zerolog.Logger) {
-	c.logger = l
 }
 
 // InitChain initializes the blockchain with the given genesis parameters
@@ -154,7 +147,7 @@ func (c *EngineClient) GetTxs(ctx context.Context) ([][]byte, error) {
 
 // ExecuteTxs executes the given transactions at the specified block height and timestamp
 func (c *EngineClient) ExecuteTxs(ctx context.Context, txs [][]byte, blockHeight uint64, timestamp time.Time, prevStateRoot []byte) (updatedStateRoot []byte, maxBytes uint64, err error) {
-	// convert evolve tx to hex strings for ev-reth
+	// convert rollkit tx to hex strings for rollkit-reth
 	txsPayload := make([]string, len(txs))
 	for i, tx := range txs {
 		// Use the raw transaction bytes directly instead of re-encoding
@@ -173,44 +166,36 @@ func (c *EngineClient) ExecuteTxs(ctx context.Context, txs [][]byte, blockHeight
 	}
 
 	// update forkchoice to get the next payload id
-	// Create evolve-compatible payloadtimestamp.Unix()
-	evPayloadAttrs := map[string]interface{}{
+	var forkchoiceResult engine.ForkChoiceResponse
+
+	// Create rollkit-compatible payload attributes with flattened structure
+	rollkitPayloadAttrs := map[string]interface{}{
 		// Standard Ethereum payload attributes (flattened) - using camelCase as expected by JSON
 		"timestamp":             timestamp.Unix(),
 		"prevRandao":            c.derivePrevRandao(blockHeight),
 		"suggestedFeeRecipient": c.feeRecipient,
 		"withdrawals":           []*types.Withdrawal{},
 		// V3 requires parentBeaconBlockRoot
-		"parentBeaconBlockRoot": common.Hash{}.Hex(), // Use zero hash for evolve
-		// evolve-specific fields
+		"parentBeaconBlockRoot": common.Hash{}.Hex(), // Use zero hash for rollkit
+		// Rollkit-specific fields
 		"transactions": txsPayload,
 		"gasLimit":     prevGasLimit, // Use camelCase to match JSON conventions
 	}
 
-	c.logger.Debug().
-		Uint64("height", blockHeight).
-		Int("tx_count", len(txs)).
-		Msg("engine_forkchoiceUpdatedV3")
-
-	var forkchoiceResult engine.ForkChoiceResponse
-	err = c.engineClient.CallContext(ctx, &forkchoiceResult, "engine_forkchoiceUpdatedV3", args, evPayloadAttrs)
+	err = c.engineClient.CallContext(ctx, &forkchoiceResult, "engine_forkchoiceUpdatedV3",
+		args,
+		rollkitPayloadAttrs,
+	)
 	if err != nil {
 		return nil, 0, fmt.Errorf("forkchoice update failed: %w", err)
 	}
-	if forkchoiceResult.PayloadID == nil {
-		c.logger.Error().
-			Str("status", string(forkchoiceResult.PayloadStatus.Status)).
-			Str("latestValidHash", forkchoiceResult.PayloadStatus.LatestValidHash.Hex()).
-			Interface("validationError", forkchoiceResult.PayloadStatus.ValidationError).
-			Interface("forkchoiceState", args).
-			Interface("payloadAttributes", evPayloadAttrs).
-			Uint64("blockHeight", blockHeight).
-			Msg("returned nil PayloadID")
 
-		return nil, 0, fmt.Errorf("returned nil PayloadID - (status: %s, latestValidHash: %s)",
-			forkchoiceResult.PayloadStatus.Status,
-			forkchoiceResult.PayloadStatus.LatestValidHash.Hex())
+	if forkchoiceResult.PayloadID == nil {
+		return nil, 0, ErrNilPayloadStatus
 	}
+
+	// Small delay to allow payload building to complete
+	time.Sleep(10 * time.Millisecond)
 
 	// get payload
 	var payloadResult engine.ExecutionPayloadEnvelope
@@ -232,11 +217,6 @@ func (c *EngineClient) ExecuteTxs(ctx context.Context, txs [][]byte, blockHeight
 	}
 
 	if newPayloadResult.Status != engine.VALID {
-		c.logger.Warn().
-			Str("status", string(newPayloadResult.Status)).
-			Str("latestValidHash", newPayloadResult.LatestValidHash.Hex()).
-			Interface("validationError", newPayloadResult.ValidationError).
-			Msg("engine_newPayloadV4 returned non-VALID status")
 		return nil, 0, ErrInvalidPayloadStatus
 	}
 
@@ -269,17 +249,15 @@ func (c *EngineClient) setFinal(ctx context.Context, blockHash common.Hash, isFi
 	c.mu.Unlock()
 
 	var forkchoiceResult engine.ForkChoiceResponse
-	err := c.engineClient.CallContext(ctx, &forkchoiceResult, "engine_forkchoiceUpdatedV3", args, nil)
+	err := c.engineClient.CallContext(ctx, &forkchoiceResult, "engine_forkchoiceUpdatedV3",
+		args,
+		nil,
+	)
 	if err != nil {
 		return fmt.Errorf("forkchoice update failed with error: %w", err)
 	}
 
 	if forkchoiceResult.PayloadStatus.Status != engine.VALID {
-		c.logger.Warn().
-			Str("status", string(forkchoiceResult.PayloadStatus.Status)).
-			Str("latestValidHash", forkchoiceResult.PayloadStatus.LatestValidHash.Hex()).
-			Interface("validationError", forkchoiceResult.PayloadStatus.ValidationError).
-			Msg("forkchoiceUpdatedV3 returned non-VALID status")
 		return ErrInvalidPayloadStatus
 	}
 

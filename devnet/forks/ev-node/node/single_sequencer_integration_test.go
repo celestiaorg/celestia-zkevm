@@ -13,18 +13,20 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	coreda "github.com/evstack/ev-node/core/da"
-	coreexecutor "github.com/evstack/ev-node/core/execution"
-	evconfig "github.com/evstack/ev-node/pkg/config"
+	coreda "github.com/rollkit/rollkit/core/da"
+	coreexecutor "github.com/rollkit/rollkit/core/execution"
+	rollkitconfig "github.com/rollkit/rollkit/pkg/config"
+
+	testutils "github.com/celestiaorg/utils/test"
 )
 
 // FullNodeTestSuite is a test suite for full node integration tests
 type FullNodeTestSuite struct {
 	suite.Suite
-	ctx    context.Context
-	cancel context.CancelFunc
-	node   *FullNode
-
+	ctx       context.Context
+	cancel    context.CancelFunc
+	node      *FullNode
+	executor  *coreexecutor.DummyExecutor
 	errCh     chan error
 	runningWg sync.WaitGroup
 }
@@ -65,6 +67,8 @@ func (s *FullNodeTestSuite) SetupTest() {
 
 	s.node = node
 
+	s.executor = node.blockManager.GetExecutor().(*coreexecutor.DummyExecutor)
+
 	// Start the node in a goroutine using Run instead of Start
 	s.startNodeInBackground(s.node)
 
@@ -76,8 +80,17 @@ func (s *FullNodeTestSuite) SetupTest() {
 	err = waitForFirstBlockToBeDAIncluded(s.node)
 	require.NoError(err, "Failed to get DA inclusion")
 
-	// Verify block components are properly initialized
-	require.NotNil(s.node.blockComponents, "Block components should be initialized")
+	// Verify sequencer client is working
+	err = testutils.Retry(30, 100*time.Millisecond, func() error {
+		if s.node.blockManager.SeqClient() == nil {
+			return fmt.Errorf("sequencer client not initialized")
+		}
+		return nil
+	})
+	require.NoError(err, "Sequencer client initialization failed")
+
+	// Verify block manager is properly initialized
+	require.NotNil(s.node.blockManager, "Block manager should be initialized")
 }
 
 // TearDownTest cancels the test context and waits for the node to stop, ensuring proper cleanup after each test.
@@ -96,7 +109,7 @@ func (s *FullNodeTestSuite) TearDownTest() {
 		select {
 		case <-waitCh:
 			// Node stopped successfully
-		case <-time.After(10 * time.Second):
+		case <-time.After(5 * time.Second):
 			s.T().Log("Warning: Node did not stop gracefully within timeout")
 		}
 
@@ -122,25 +135,7 @@ func TestFullNodeTestSuite(t *testing.T) {
 // It checks that blocks are produced, state is updated, and the injected transaction is included in one of the blocks.
 func (s *FullNodeTestSuite) TestBlockProduction() {
 	testTx := []byte("test transaction")
-
-	// Inject transaction through the node's block components (same as integration tests)
-	if s.node.blockComponents != nil && s.node.blockComponents.Executor != nil {
-		// Access the core executor from the block executor
-		coreExec := s.node.blockComponents.Executor.GetCoreExecutor()
-		if dummyExec, ok := coreExec.(interface{ InjectTx([]byte) }); ok {
-			dummyExec.InjectTx(testTx)
-			// Notify the executor about new transactions
-			s.node.blockComponents.Executor.NotifyNewTransactions()
-		} else {
-			s.T().Fatalf("Could not cast core executor to DummyExecutor")
-		}
-	} else {
-		s.T().Fatalf("Block components or executor not available")
-	}
-
-	// Wait for reaper to process transactions (reaper runs every 1 second by default)
-	time.Sleep(1200 * time.Millisecond)
-
+	s.executor.InjectTx(testTx)
 	err := waitForAtLeastNBlocks(s.node, 5, Store)
 	s.NoError(err, "Failed to produce more than 5 blocks")
 
@@ -181,32 +176,15 @@ func (s *FullNodeTestSuite) TestBlockProduction() {
 // TestSubmitBlocksToDA verifies that blocks produced by the node are properly submitted to the Data Availability (DA) layer.
 // It injects a transaction, waits for several blocks to be produced and DA-included, and asserts that all blocks are DA included.
 func (s *FullNodeTestSuite) TestSubmitBlocksToDA() {
-	// Inject transaction through the node's block components
-	if s.node.blockComponents != nil && s.node.blockComponents.Executor != nil {
-		coreExec := s.node.blockComponents.Executor.GetCoreExecutor()
-		if dummyExec, ok := coreExec.(interface{ InjectTx([]byte) }); ok {
-			dummyExec.InjectTx([]byte("test transaction"))
-			// Notify the executor about new transactions
-			s.node.blockComponents.Executor.NotifyNewTransactions()
-		} else {
-			s.T().Fatalf("Could not cast core executor to DummyExecutor")
-		}
-	} else {
-		s.T().Fatalf("Block components or executor not available")
-	}
-
-	// Wait for reaper to process transactions (reaper runs every 1 second by default)
-	time.Sleep(1200 * time.Millisecond)
+	s.executor.InjectTx([]byte("test transaction"))
 	n := uint64(5)
 	err := waitForAtLeastNBlocks(s.node, n, Store)
 	s.NoError(err, "Failed to produce second block")
 	err = waitForAtLeastNDAIncludedHeight(s.node, n)
 	s.NoError(err, "Failed to get DA inclusion")
+	// Verify that all blocks are DA included
 	for height := uint64(1); height <= n; height++ {
-		header, data, err := s.node.Store.GetBlockData(s.ctx, height)
-		require.NoError(s.T(), err)
-
-		ok, err := s.node.blockComponents.Submitter.IsHeightDAIncluded(height, header, data)
+		ok, err := s.node.blockManager.IsDAIncluded(s.ctx, height)
 		require.NoError(s.T(), err)
 		require.True(s.T(), ok, "Block at height %d is not DA included", height)
 	}
@@ -218,7 +196,7 @@ func (s *FullNodeTestSuite) TestGenesisInitialization() {
 	require := require.New(s.T())
 
 	// Verify genesis state
-	state := s.node.blockComponents.GetLastState()
+	state := s.node.blockManager.GetLastState()
 	require.Equal(s.node.genesis.InitialHeight, state.InitialHeight)
 	require.Equal(s.node.genesis.ChainID, state.ChainID)
 }
@@ -226,6 +204,7 @@ func (s *FullNodeTestSuite) TestGenesisInitialization() {
 // TestStateRecovery verifies that the node can recover its state after a restart.
 // It would check that the block height after restart is at least as high as before.
 func TestStateRecovery(t *testing.T) {
+
 	require := require.New(t)
 
 	// Set up one sequencer
@@ -251,8 +230,22 @@ func TestStateRecovery(t *testing.T) {
 	require.NoError(err)
 	require.GreaterOrEqual(originalHeight, blocksToWaitFor)
 
-	// Stop the current node and wait for shutdown with a timeout
-	shutdownAndWait(t, []context.CancelFunc{cancel}, &runningWg, 60*time.Second)
+	// Stop the current node
+	cancel()
+
+	// Wait for the node to stop
+	waitCh := make(chan struct{})
+	go func() {
+		runningWg.Wait()
+		close(waitCh)
+	}()
+
+	select {
+	case <-waitCh:
+		// Node stopped successfully
+	case <-time.After(2 * time.Second):
+		t.Fatalf("Node did not stop gracefully within timeout")
+	}
 
 	// Create a new node instance using the same components
 	executor, sequencer, dac, p2pClient, _, _, stopDAHeightTicker = createTestComponents(t, config)
@@ -262,7 +255,7 @@ func TestStateRecovery(t *testing.T) {
 	// Verify state persistence
 	recoveredHeight, err := getNodeHeight(node, Store)
 	require.NoError(err)
-	require.GreaterOrEqual(recoveredHeight, originalHeight, "recovered height should be greater than or equal to original height")
+	require.GreaterOrEqual(recoveredHeight, originalHeight)
 }
 
 // TestMaxPendingHeadersAndData verifies that the sequencer will stop producing blocks when the maximum number of pending headers or data is reached.
@@ -274,7 +267,7 @@ func TestMaxPendingHeadersAndData(t *testing.T) {
 	config.Node.MaxPendingHeadersAndData = 2
 
 	// Set DA block time large enough to avoid header submission to DA layer
-	config.DA.BlockTime = evconfig.DurationWrapper{Duration: 100 * time.Second}
+	config.DA.BlockTime = rollkitconfig.DurationWrapper{Duration: 100 * time.Second}
 
 	node, cleanup := createNodeWithCleanup(t, config)
 	defer cleanup()
@@ -295,7 +288,7 @@ func TestMaxPendingHeadersAndData(t *testing.T) {
 	require.LessOrEqual(height, config.Node.MaxPendingHeadersAndData)
 
 	// Stop the node and wait for shutdown
-	shutdownAndWait(t, []context.CancelFunc{cancel}, &runningWg, 10*time.Second)
+	shutdownAndWait(t, []context.CancelFunc{cancel}, &runningWg, 5*time.Second)
 }
 
 // TestBatchQueueThrottlingWithDAFailure tests that when DA layer fails and MaxPendingHeadersAndData
@@ -307,9 +300,9 @@ func TestBatchQueueThrottlingWithDAFailure(t *testing.T) {
 
 	// Set up configuration with low limits to trigger throttling quickly
 	config := getTestConfig(t, 1)
-	config.Node.MaxPendingHeadersAndData = 3 // Low limit to quickly reach pending limit after DA failure
-	config.Node.BlockTime = evconfig.DurationWrapper{Duration: 25 * time.Millisecond}
-	config.DA.BlockTime = evconfig.DurationWrapper{Duration: 100 * time.Millisecond} // Longer DA time to ensure blocks are produced first
+	config.Node.MaxPendingHeadersAndData = 3  // Low limit to quickly reach pending limit after DA failure
+	config.Node.BlockTime = rollkitconfig.DurationWrapper{Duration: 100 * time.Millisecond}
+	config.DA.BlockTime = rollkitconfig.DurationWrapper{Duration: 1 * time.Second}  // Longer DA time to ensure blocks are produced first
 
 	// Create test components
 	executor, sequencer, dummyDA, p2pClient, ds, _, stopDAHeightTicker := createTestComponents(t, config)
@@ -327,22 +320,23 @@ func TestBatchQueueThrottlingWithDAFailure(t *testing.T) {
 	node, cleanup := createNodeWithCustomComponents(t, config, executor, sequencer, dummyDAImpl, p2pClient, ds, func() {})
 	defer cleanup()
 
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	var runningWg sync.WaitGroup
 	startNodeInBackground(t, []*FullNode{node}, []context.Context{ctx}, &runningWg, 0)
 
 	// Wait for the node to start producing blocks
-	waitForBlockN(t, 1, node, config.Node.BlockTime.Duration)
+	require.NoError(waitForFirstBlock(node, Store))
 
 	// Inject some initial transactions to get the system working
 	for i := 0; i < 5; i++ {
 		dummyExecutor.InjectTx([]byte(fmt.Sprintf("initial-tx-%d", i)))
 	}
 
-	waitForBlockN(t, 2, node, config.Node.BlockTime.Duration)
-	t.Log("Initial blocks produced successfully")
+	// Wait for at least 5 blocks to be produced before simulating DA failure
+	require.NoError(waitForAtLeastNBlocks(node, 5, Store))
+	t.Log("Initial 5 blocks produced successfully")
 
 	// Get the current height before DA failure
 	initialHeight, err := getNodeHeight(node, Store)
@@ -365,7 +359,7 @@ func TestBatchQueueThrottlingWithDAFailure(t *testing.T) {
 				return
 			default:
 				dummyExecutor.InjectTx([]byte(fmt.Sprintf("tx-after-da-failure-%d", i)))
-				time.Sleep(config.Node.BlockTime.Duration / 2) // Inject faster than block time
+				time.Sleep(10 * time.Millisecond) // Inject faster than block time
 			}
 		}
 	}()
@@ -388,11 +382,11 @@ func TestBatchQueueThrottlingWithDAFailure(t *testing.T) {
 	// The height should not have increased much due to MaxPendingHeadersAndData limit
 	// Allow at most 3 additional blocks due to timing and pending blocks in queue
 	heightIncrease := finalHeight - heightAfterDAFailure
-	require.LessOrEqual(heightIncrease, uint64(3),
+	require.LessOrEqual(heightIncrease, uint64(3), 
 		"Height should not increase significantly when DA is down and MaxPendingHeadersAndData limit is reached")
 
 	t.Logf("Successfully demonstrated that MaxPendingHeadersAndData prevents runaway block production when DA fails")
-	t.Logf("Height progression: initial=%d, after_DA_failure=%d, final=%d",
+	t.Logf("Height progression: initial=%d, after_DA_failure=%d, final=%d", 
 		initialHeight, heightAfterDAFailure, finalHeight)
 
 	// This test demonstrates the scenario described in the PR:
@@ -404,17 +398,7 @@ func TestBatchQueueThrottlingWithDAFailure(t *testing.T) {
 
 	t.Log("NOTE: This test uses DummySequencer. In a real deployment with SingleSequencer,")
 	t.Log("the batch queue would fill up and return ErrQueueFull, providing backpressure.")
-}
 
-// waitForBlockN waits for the node to produce a block with height >= n.
-func waitForBlockN(t *testing.T, n uint64, node *FullNode, blockInterval time.Duration, timeout ...time.Duration) {
-	t.Helper()
-	if len(timeout) == 0 {
-		timeout = []time.Duration{time.Duration(n+1)*blockInterval + time.Second/2}
-	}
-	require.Eventually(t, func() bool {
-		got, err := getNodeHeight(node, Store)
-		require.NoError(t, err)
-		return got >= n
-	}, timeout[0], blockInterval/2)
+	// Shutdown
+	shutdownAndWait(t, []context.CancelFunc{cancel}, &runningWg, 5*time.Second)
 }

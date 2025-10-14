@@ -8,21 +8,18 @@ import (
 	"os"
 	"time"
 
-	"github.com/evstack/ev-node/pkg/config"
-	"github.com/evstack/ev-node/pkg/rpc/client"
-	"github.com/evstack/ev-node/pkg/rpc/server"
-	"github.com/evstack/ev-node/pkg/store"
-	"github.com/rs/zerolog"
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/rollkit/rollkit/pkg/rpc/client"
+	"github.com/rollkit/rollkit/pkg/rpc/server"
+	"github.com/rollkit/rollkit/pkg/store"
 )
 
 // StartStoreServer starts a Store RPC server with the provided store instance
-func StartStoreServer(s store.Store, address string, logger zerolog.Logger) {
+func StartStoreServer(s store.Store, address string, logger logging.EventLogger) {
 	// Create and start the server
 	// Start RPC server
 	rpcAddr := fmt.Sprintf("%s:%d", "localhost", 8080)
-
-	cfg := config.DefaultConfig()
-	handler, err := server.NewServiceHandler(s, nil, nil, logger, cfg, nil)
+	handler, err := server.NewServiceHandler(s, nil, logger)
 	if err != nil {
 		panic(err)
 	}
@@ -38,7 +35,7 @@ func StartStoreServer(s store.Store, address string, logger zerolog.Logger) {
 	// Start the server in a separate goroutine
 	go func() {
 		if err := rpcServer.ListenAndServe(); err != http.ErrServerClosed {
-			logger.Error().Err(err).Msg("RPC server error")
+			logger.Error("RPC server error", err)
 			os.Exit(1)
 		}
 	}()
@@ -77,12 +74,12 @@ func ExampleClient() {
 
 // ExampleServer demonstrates how to create and start a Store RPC server
 func ExampleServer(s store.Store) {
-	logger := zerolog.New(os.Stderr).With().Timestamp().Str("component", "exampleServer").Logger()
+	logger := logging.Logger("exampleServer")
+	_ = logging.SetLogLevel("exampleServer", "FATAL")
 
 	// Start RPC server
 	rpcAddr := fmt.Sprintf("%s:%d", "localhost", 8080)
-	cfg := config.DefaultConfig()
-	handler, err := server.NewServiceHandler(s, nil, nil, logger, cfg, nil)
+	handler, err := server.NewServiceHandler(s, nil, logger)
 	if err != nil {
 		panic(err)
 	}

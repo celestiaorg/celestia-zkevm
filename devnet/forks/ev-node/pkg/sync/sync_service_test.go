@@ -8,18 +8,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/evstack/ev-node/pkg/config"
-	genesispkg "github.com/evstack/ev-node/pkg/genesis"
-	"github.com/evstack/ev-node/pkg/p2p"
-	"github.com/evstack/ev-node/pkg/p2p/key"
-	"github.com/evstack/ev-node/pkg/signer"
-	"github.com/evstack/ev-node/pkg/signer/noop"
-	"github.com/evstack/ev-node/types"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/sync"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
-	"github.com/rs/zerolog"
+	"github.com/rollkit/rollkit/pkg/config"
+	genesispkg "github.com/rollkit/rollkit/pkg/genesis"
+	"github.com/rollkit/rollkit/pkg/p2p"
+	"github.com/rollkit/rollkit/pkg/p2p/key"
+	"github.com/rollkit/rollkit/pkg/signer"
+	"github.com/rollkit/rollkit/pkg/signer/noop"
+	"github.com/rollkit/rollkit/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,25 +32,24 @@ func TestHeaderSyncServiceRestart(t *testing.T) {
 	rnd := rand.New(rand.NewSource(1)) // nolint:gosec // test code only
 	mn := mocknet.New()
 
-	chainId := "test-chain-id"
-
 	proposerAddr := []byte("test")
 	genesisDoc := genesispkg.Genesis{
-		ChainID:         chainId,
-		StartTime:       time.Now(),
-		InitialHeight:   1,
-		ProposerAddress: proposerAddr,
+		ChainID:            "test-chain-id",
+		GenesisDAStartTime: time.Now(),
+		InitialHeight:      1,
+		ProposerAddress:    proposerAddr,
 	}
-	conf := config.DefaultConfig()
+	conf := config.DefaultConfig
 	conf.RootDir = t.TempDir()
 	nodeKey, err := key.LoadOrGenNodeKey(filepath.Dir(conf.ConfigPath()))
 	require.NoError(t, err)
-	logger := zerolog.Nop()
+	logger := logging.Logger("test")
+	_ = logging.SetLogLevel("test", "debug")
 	priv := nodeKey.PrivKey
 	h, err := mn.AddPeer(priv, nil)
 	require.NoError(t, err)
 
-	p2pClient, err := p2p.NewClientWithHost(conf.P2P, nodeKey.PrivKey, mainKV, chainId, logger, p2p.NopMetrics(), h)
+	p2pClient, err := p2p.NewClientWithHost(conf, nodeKey, mainKV, logger, p2p.NopMetrics(), h)
 	require.NoError(t, err)
 
 	// Start p2p client before creating sync service
@@ -88,7 +87,7 @@ func TestHeaderSyncServiceRestart(t *testing.T) {
 
 	h2, err := mn.AddPeer(priv, nil)
 	require.NoError(t, err)
-	p2pClient, err = p2p.NewClientWithHost(conf.P2P, nodeKey.PrivKey, mainKV, chainId, logger, p2p.NopMetrics(), h2)
+	p2pClient, err = p2p.NewClientWithHost(conf, nodeKey, mainKV, logger, p2p.NopMetrics(), h2)
 	require.NoError(t, err)
 
 	// Start p2p client again

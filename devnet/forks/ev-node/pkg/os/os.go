@@ -7,18 +7,20 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-
-	"github.com/rs/zerolog"
 )
+
+type logger interface {
+	Info(msg string, keyvals ...any)
+}
 
 // TrapSignal catches the SIGTERM/SIGINT and executes cb function. After that it exits
 // with code 0.
-func TrapSignal(logger zerolog.Logger, cb func()) {
+func TrapSignal(logger logger, cb func()) {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		for sig := range c {
-			logger.Info().Str("captured, exiting", sig.String()).Msg("signal trapped")
+			logger.Info("signal trapped", "msg", fmt.Sprintf("captured %v, exiting...", sig))
 			if cb != nil {
 				cb()
 			}

@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	coresequencer "github.com/evstack/ev-node/core/sequencer"
-	pb "github.com/evstack/ev-node/types/pb/evnode/v1"
+	coresequencer "github.com/rollkit/rollkit/core/sequencer"
+	pb "github.com/rollkit/rollkit/types/pb/rollkit/v1"
 )
 
 // createTestBatch creates a batch with dummy transactions for testing
@@ -51,8 +51,8 @@ func TestNewBatchQueue(t *testing.T) {
 			if bq == nil {
 				t.Fatal("expected non-nil BatchQueue")
 			}
-			if bq.Size() != tc.expectQueueLen {
-				t.Errorf("expected queue length %d, got %d", tc.expectQueueLen, bq.Size())
+			if len(bq.queue) != tc.expectQueueLen {
+				t.Errorf("expected queue length %d, got %d", tc.expectQueueLen, len(bq.queue))
 			}
 			if bq.db == nil {
 				t.Fatal("expected non-nil db")
@@ -106,8 +106,8 @@ func TestAddBatch(t *testing.T) {
 			}
 
 			// Verify queue length
-			if bq.Size() != tc.expectQueueLen {
-				t.Errorf("expected queue length %d, got %d", tc.expectQueueLen, bq.Size())
+			if len(bq.queue) != tc.expectQueueLen {
+				t.Errorf("expected queue length %d, got %d", tc.expectQueueLen, len(bq.queue))
 			}
 
 			// Verify batches were stored in datastore
@@ -280,15 +280,13 @@ func TestLoad_WithMixedData(t *testing.T) {
 	require.NoError(loadErr, "Load returned an unexpected error")
 
 	// Verify queue contains only the valid batches
-	require.Equal(2, bq.Size(), "Queue should contain only the 2 valid batches")
+	require.Equal(2, len(bq.queue), "Queue should contain only the 2 valid batches")
 	// Check hashes to be sure (order might vary depending on datastore query)
 	loadedHashes := make(map[string]bool)
-bq.mu.Lock()
-for i := bq.head; i < len(bq.queue); i++ {
-	h, _ := bq.queue[i].Hash()
-	loadedHashes[hex.EncodeToString(h)] = true
-}
-bq.mu.Unlock()
+	for _, batch := range bq.queue {
+		h, _ := batch.Hash()
+		loadedHashes[hex.EncodeToString(h)] = true
+	}
 	require.True(loadedHashes[hexHash1], "Valid batch 1 not found in queue")
 	require.True(loadedHashes[hexHash2], "Valid batch 2 not found in queue")
 
@@ -327,8 +325,8 @@ func TestConcurrency(t *testing.T) {
 	addWg.Wait()
 
 	// Verify we have expected number of batches
-	if bq.Size() != numOperations {
-		t.Errorf("expected %d batches, got %d", numOperations, bq.Size())
+	if len(bq.queue) != numOperations {
+		t.Errorf("expected %d batches, got %d", numOperations, len(bq.queue))
 	}
 
 	// Next operations concurrently (only half)
@@ -353,8 +351,8 @@ func TestConcurrency(t *testing.T) {
 	nextWg.Wait()
 
 	// Verify we have expected number of batches left
-	if bq.Size() != numOperations-nextCount {
-		t.Errorf("expected %d batches left, got %d", numOperations-nextCount, bq.Size())
+	if len(bq.queue) != numOperations-nextCount {
+		t.Errorf("expected %d batches left, got %d", numOperations-nextCount, len(bq.queue))
 	}
 
 	// Test Load
@@ -438,13 +436,13 @@ func TestBatchQueue_QueueLimit(t *testing.T) {
 			}
 
 			// For limited queues, verify the queue doesn't exceed maxSize
-			if tc.maxSize > 0 && bq.Size() > tc.maxSize {
-				t.Errorf("queue size %d exceeds limit %d", bq.Size(), tc.maxSize)
+			if tc.maxSize > 0 && len(bq.queue) > tc.maxSize {
+				t.Errorf("queue size %d exceeds limit %d", len(bq.queue), tc.maxSize)
 			}
 
 			// For unlimited queues, verify all batches were added
-			if tc.maxSize == 0 && !tc.expectErr && bq.Size() != tc.batchesToAdd {
-				t.Errorf("expected %d batches in unlimited queue, got %d", tc.batchesToAdd, bq.Size())
+			if tc.maxSize == 0 && !tc.expectErr && len(bq.queue) != tc.batchesToAdd {
+				t.Errorf("expected %d batches in unlimited queue, got %d", tc.batchesToAdd, len(bq.queue))
 			}
 		})
 	}
@@ -467,8 +465,8 @@ func TestBatchQueue_QueueLimit_WithNext(t *testing.T) {
 	}
 
 	// Verify queue is full
-	if bq.Size() != maxSize {
-		t.Errorf("expected queue size %d, got %d", maxSize, bq.Size())
+	if len(bq.queue) != maxSize {
+		t.Errorf("expected queue size %d, got %d", maxSize, len(bq.queue))
 	}
 
 	// Try to add one more batch - should fail
@@ -488,8 +486,8 @@ func TestBatchQueue_QueueLimit_WithNext(t *testing.T) {
 	}
 
 	// Verify queue size decreased
-	if bq.Size() != maxSize-1 {
-		t.Errorf("expected queue size %d after Next(), got %d", maxSize-1, bq.Size())
+	if len(bq.queue) != maxSize-1 {
+		t.Errorf("expected queue size %d after Next(), got %d", maxSize-1, len(bq.queue))
 	}
 
 	// Now adding a batch should succeed
@@ -500,8 +498,8 @@ func TestBatchQueue_QueueLimit_WithNext(t *testing.T) {
 	}
 
 	// Verify queue is full again
-	if bq.Size() != maxSize {
-		t.Errorf("expected queue size %d after adding back, got %d", maxSize, bq.Size())
+	if len(bq.queue) != maxSize {
+		t.Errorf("expected queue size %d after adding back, got %d", maxSize, len(bq.queue))
 	}
 }
 
@@ -545,8 +543,8 @@ func TestBatchQueue_QueueLimit_Concurrency(t *testing.T) {
 	wg.Wait()
 
 	// Verify queue size doesn't exceed limit
-	if bq.Size() > maxSize {
-		t.Errorf("queue size %d exceeds limit %d", bq.Size(), maxSize)
+	if len(bq.queue) > maxSize {
+		t.Errorf("queue size %d exceeds limit %d", len(bq.queue), maxSize)
 	}
 
 	// Verify some batches were successfully added
@@ -561,7 +559,7 @@ func TestBatchQueue_QueueLimit_Concurrency(t *testing.T) {
 
 	// Verify the sum makes sense
 	if addedCount+errorCount != int64(totalBatches) {
-		t.Errorf("expected %d total operations, got %d added + %d errors = %d",
+		t.Errorf("expected %d total operations, got %d added + %d errors = %d", 
 			totalBatches, addedCount, errorCount, addedCount+errorCount)
 	}
 

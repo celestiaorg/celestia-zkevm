@@ -2,7 +2,7 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [ready_for_review, synchronize]
     # Optional: Only run on specific file changes
     # paths:
     #   - "src/**/*.ts"
@@ -27,68 +27,51 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
       - name: Run Claude Code Review
         id: claude-review
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@beta
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          track_progress: true
-          use_sticky_comment: true
-          prompt: |
-            Perform a comprehensive code review with the following focus areas:
 
-            1. **Code Quality & Architecture**
-                - Verify adherence to idiomatic Go style (effective-go, golangci-lint compliance, naming conventions).
-                - Assess package structure for clarity and modularity (avoid cyclic dependencies, promote clean boundaries).
-                - Ensure interfaces are used appropriately — not over-abstracted but testable.
-                - Review concurrency patterns (goroutines, channels, sync primitives) for correctness and deadlock safety.
-                - Check configuration management (flags, environment variables, config files) for clarity and consistency.
-                - Validate that logging, error propagation, and context handling (context.Context) are consistent and properly implemented.
+          # Optional: Specify model (defaults to Claude Sonnet 4, uncomment for Claude Opus 4)
+          # model: "claude-opus-4-20250514"
 
-            2. **Error Handling & Resilience**
-              - Verify consistent error wrapping and context (use of %w, errors.Join, or fmt.Errorf).
-              - Ensure external dependencies (network, file I/O, DB connections) have proper retry, timeout, and cancellation logic.
-              - Confirm panics are avoided or safely recovered from in long-running goroutines.
-              - Assess logging for meaningful messages while avoiding sensitive data exposure.
+          # Direct prompt for automated review (no @claude mention needed)
+          direct_prompt: |
+            Please review this pull request and provide feedback on:
+            - Code quality and best practices
+            - Potential bugs or issues
+            - Performance considerations
+            - Security concerns
+            - Test coverage
 
-            3. **Security**
-              - Review authentication/authorization logic and credential management.
-              - Check input validation and sanitization for APIs, CLI, or device message payloads.
-              - Ensure secrets are not hard-coded or logged.
-              - Confirm secure handling of TLS, tokens, and crypto functions where applicable.
-              - Validate dependencies for known vulnerabilities and verify minimal privilege access patterns.
+            Be constructive and helpful in your feedback.
 
-            4. **Performance & Resource Efficiency**
-              - Inspect hot paths for unnecessary allocations or blocking operations.
-              - Check for proper use of connection pools, goroutine lifecycle management, and cleanup.
-              - Review memory and CPU usage in concurrent loops, background workers, and I/O pipelines.
-              - Evaluate database or cache query efficiency and connection reuse.
+          # Optional: Use sticky comments to make Claude reuse the same comment on subsequent pushes to the same PR
+          # use_sticky_comment: true
 
+          # Optional: Customize review based on file types
+          # direct_prompt: |
+          #   Review this PR focusing on:
+          #   - For TypeScript files: Type safety and proper interface usage
+          #   - For API endpoints: Security, input validation, and error handling
+          #   - For React components: Performance, accessibility, and best practices
+          #   - For tests: Coverage, edge cases, and test quality
 
-            5. **Testing & Reliability**
-              - Verify presence and adequacy of unit, integration, and end-to-end tests.
-              - Check test naming, isolation, and reproducibility.
-              - Ensure key edge cases (timeouts, partial failures, concurrent access) are covered.
-              - Review use of mocks/fakes for external dependencies.
-              - Confirm go test and CI workflows run cleanly and consistently.
+          # Optional: Different prompts for different authors
+          # direct_prompt: |
+          #   ${{ github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' &&
+          #   'Welcome! Please review this PR from a first-time contributor. Be encouraging and provide detailed explanations for any suggestions.' ||
+          #   'Please provide a thorough code review focusing on our coding standards and best practices.' }}
 
+          # Optional: Add specific tools for running tests or linting
+          # allowed_tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
 
-            6. **Documentation & Developer Experience**
-              - Confirm code comments and docstrings clearly describe public APIs, exported structs, and interfaces.
-              - Review README.md, setup scripts, and examples for developer onboarding.
-              - Ensure configuration and runtime parameters are documented.
-              - Check generated API documentation (if applicable) for completeness and alignment with implementation.
-
-
-              Feedback Guidelines
-             	•	Use inline comments for file- or line-specific issues and improvements.
-             	•	Use top-level comments for architectural observations, general patterns, or praise.
-             	•	Prioritize clarity, robustness, and production readiness in all feedback.
-
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://docs.anthropic.com/en/docs/claude-code/sdk#command-line for available options
-          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+          # Optional: Skip review for certain conditions
+          # if: |
+          #   !contains(github.event.pull_request.title, '[skip-review]') &&
+          #   !contains(github.event.pull_request.title, '[WIP]')

@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/celestiaorg/go-square/v3/share"
-	"github.com/evstack/ev-node/core/da"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -19,119 +17,109 @@ import (
 )
 
 const (
-	FlagPrefixRollkit = "rollkit."
-	FlagPrefixEvnode  = "evnode."
-
 	// Base configuration flags
 
 	// FlagRootDir is a flag for specifying the root directory
 	FlagRootDir = "home"
 	// FlagDBPath is a flag for specifying the database path
-	FlagDBPath = FlagPrefixEvnode + "db_path"
+	FlagDBPath = "rollkit.db_path"
+	// FlagChainID is a flag for specifying the chain ID
+	FlagChainID = "chain_id"
 
 	// Node configuration flags
 
 	// FlagAggregator is a flag for running node in aggregator mode
-	FlagAggregator = FlagPrefixEvnode + "node.aggregator"
+	FlagAggregator = "rollkit.node.aggregator"
 	// FlagLight is a flag for running the node in light mode
-	FlagLight = FlagPrefixEvnode + "node.light"
+	FlagLight = "rollkit.node.light"
 	// FlagBlockTime is a flag for specifying the block time
-	FlagBlockTime = FlagPrefixEvnode + "node.block_time"
+	FlagBlockTime = "rollkit.node.block_time"
 	// FlagTrustedHash is a flag for specifying the trusted hash
-	FlagTrustedHash = FlagPrefixEvnode + "node.trusted_hash"
+	FlagTrustedHash = "rollkit.node.trusted_hash"
 	// FlagLazyAggregator is a flag for enabling lazy aggregation mode that only produces blocks when transactions are available
-	FlagLazyAggregator = FlagPrefixEvnode + "node.lazy_mode"
+	FlagLazyAggregator = "rollkit.node.lazy_mode"
 	// FlagMaxPendingHeadersAndData is a flag to limit and pause block production when too many headers or data are waiting for DA confirmation
-	FlagMaxPendingHeadersAndData = FlagPrefixEvnode + "node.max_pending_headers_and_data"
+	FlagMaxPendingHeadersAndData = "rollkit.node.max_pending_headers_and_data"
 	// FlagLazyBlockTime is a flag for specifying the maximum interval between blocks in lazy aggregation mode
-	FlagLazyBlockTime = FlagPrefixEvnode + "node.lazy_block_interval"
-	// FlagReadinessMaxBlocksBehind configures how many blocks behind best-known head is still considered ready
-	FlagReadinessMaxBlocksBehind = FlagPrefixEvnode + "node.readiness_max_blocks_behind"
-	// FlagClearCache is a flag for clearing the cache
-	FlagClearCache = FlagPrefixEvnode + "clear_cache"
+	FlagLazyBlockTime = "rollkit.node.lazy_block_interval"
 
 	// Data Availability configuration flags
 
 	// FlagDAAddress is a flag for specifying the data availability layer address
-	FlagDAAddress = FlagPrefixEvnode + "da.address"
+	FlagDAAddress = "rollkit.da.address"
 	// FlagDAAuthToken is a flag for specifying the data availability layer auth token
-	FlagDAAuthToken = FlagPrefixEvnode + "da.auth_token" // #nosec G101
+	FlagDAAuthToken = "rollkit.da.auth_token" // #nosec G101
 	// FlagDABlockTime is a flag for specifying the data availability layer block time
-	FlagDABlockTime = FlagPrefixEvnode + "da.block_time"
+	FlagDABlockTime = "rollkit.da.block_time"
 	// FlagDAGasPrice is a flag for specifying the data availability layer gas price
-	FlagDAGasPrice = FlagPrefixEvnode + "da.gas_price"
+	FlagDAGasPrice = "rollkit.da.gas_price"
 	// FlagDAGasMultiplier is a flag for specifying the data availability layer gas price retry multiplier
-	FlagDAGasMultiplier = FlagPrefixEvnode + "da.gas_multiplier"
+	FlagDAGasMultiplier = "rollkit.da.gas_multiplier"
+	// FlagDAStartHeight is a flag for specifying the data availability layer start height
+	FlagDAStartHeight = "rollkit.da.start_height"
 	// FlagDANamespace is a flag for specifying the DA namespace ID
-	FlagDANamespace = FlagPrefixEvnode + "da.namespace"
-	// FlagDADataNamespace is a flag for specifying the DA data namespace ID
-	FlagDADataNamespace = FlagPrefixEvnode + "da.data_namespace"
+	FlagDANamespace = "rollkit.da.namespace"
 	// FlagDASubmitOptions is a flag for data availability submit options
-	FlagDASubmitOptions = FlagPrefixEvnode + "da.submit_options"
+	FlagDASubmitOptions = "rollkit.da.submit_options"
 	// FlagDAMempoolTTL is a flag for specifying the DA mempool TTL
-	FlagDAMempoolTTL = FlagPrefixEvnode + "da.mempool_ttl"
-	// FlagDAMaxSubmitAttempts is a flag for specifying the maximum DA submit attempts
-	FlagDAMaxSubmitAttempts = FlagPrefixEvnode + "da.max_submit_attempts"
+	FlagDAMempoolTTL = "rollkit.da.mempool_ttl"
 
 	// P2P configuration flags
 
 	// FlagP2PListenAddress is a flag for specifying the P2P listen address
-	FlagP2PListenAddress = FlagPrefixEvnode + "p2p.listen_address"
+	FlagP2PListenAddress = "rollkit.p2p.listen_address"
 	// FlagP2PPeers is a flag for specifying the P2P peers
-	FlagP2PPeers = FlagPrefixEvnode + "p2p.peers"
+	FlagP2PPeers = "rollkit.p2p.peers"
 	// FlagP2PBlockedPeers is a flag for specifying the P2P blocked peers
-	FlagP2PBlockedPeers = FlagPrefixEvnode + "p2p.blocked_peers"
+	FlagP2PBlockedPeers = "rollkit.p2p.blocked_peers"
 	// FlagP2PAllowedPeers is a flag for specifying the P2P allowed peers
-	FlagP2PAllowedPeers = FlagPrefixEvnode + "p2p.allowed_peers"
+	FlagP2PAllowedPeers = "rollkit.p2p.allowed_peers"
 
 	// Instrumentation configuration flags
 
 	// FlagPrometheus is a flag for enabling Prometheus metrics
-	FlagPrometheus = FlagPrefixEvnode + "instrumentation.prometheus"
+	FlagPrometheus = "rollkit.instrumentation.prometheus"
 	// FlagPrometheusListenAddr is a flag for specifying the Prometheus listen address
-	FlagPrometheusListenAddr = FlagPrefixEvnode + "instrumentation.prometheus_listen_addr"
+	FlagPrometheusListenAddr = "rollkit.instrumentation.prometheus_listen_addr"
 	// FlagMaxOpenConnections is a flag for specifying the maximum number of open connections
-	FlagMaxOpenConnections = FlagPrefixEvnode + "instrumentation.max_open_connections"
+	FlagMaxOpenConnections = "rollkit.instrumentation.max_open_connections"
 	// FlagPprof is a flag for enabling pprof profiling endpoints for runtime debugging
-	FlagPprof = FlagPrefixEvnode + "instrumentation.pprof"
+	FlagPprof = "rollkit.instrumentation.pprof"
 	// FlagPprofListenAddr is a flag for specifying the pprof listen address
-	FlagPprofListenAddr = FlagPrefixEvnode + "instrumentation.pprof_listen_addr"
+	FlagPprofListenAddr = "rollkit.instrumentation.pprof_listen_addr"
 
 	// Logging configuration flags
 
 	// FlagLogLevel is a flag for specifying the log level
-	FlagLogLevel = FlagPrefixEvnode + "log.level"
+	FlagLogLevel = "rollkit.log.level"
 	// FlagLogFormat is a flag for specifying the log format
-	FlagLogFormat = FlagPrefixEvnode + "log.format"
+	FlagLogFormat = "rollkit.log.format"
 	// FlagLogTrace is a flag for enabling stack traces in error logs
-	FlagLogTrace = FlagPrefixEvnode + "log.trace"
+	FlagLogTrace = "rollkit.log.trace"
 
 	// Signer configuration flags
 
 	// FlagSignerType is a flag for specifying the signer type
-	FlagSignerType = FlagPrefixEvnode + "signer.signer_type"
+	FlagSignerType = "rollkit.signer.type"
 	// FlagSignerPath is a flag for specifying the signer path
-	FlagSignerPath = FlagPrefixEvnode + "signer.signer_path"
+	FlagSignerPath = "rollkit.signer.path"
 
 	// FlagSignerPassphrase is a flag for specifying the signer passphrase
 	//nolint:gosec
-	FlagSignerPassphrase = FlagPrefixEvnode + "signer.passphrase"
+	FlagSignerPassphrase = "rollkit.signer.passphrase"
 
 	// RPC configuration flags
 
 	// FlagRPCAddress is a flag for specifying the RPC server address
-	FlagRPCAddress = FlagPrefixEvnode + "rpc.address"
-	// FlagRPCEnableDAVisualization is a flag for enabling DA visualization endpoints
-	FlagRPCEnableDAVisualization = FlagPrefixEvnode + "rpc.enable_da_visualization"
+	FlagRPCAddress = "rollkit.rpc.address"
 )
 
 // Config stores Rollkit configuration.
 type Config struct {
-	RootDir    string `mapstructure:"-" yaml:"-" comment:"Root directory where rollkit files are located"`
-	ClearCache bool   `mapstructure:"-" yaml:"-" comment:"Clear the cache"`
-
 	// Base configuration
-	DBPath string `mapstructure:"db_path" yaml:"db_path" comment:"Path inside the root directory where the database is located"`
+	RootDir string `mapstructure:"-" yaml:"-" comment:"Root directory where rollkit files are located"`
+	DBPath  string `mapstructure:"db_path" yaml:"db_path" comment:"Path inside the root directory where the database is located"`
+	ChainID string `mapstructure:"chain_id" yaml:"chain_id" comment:"Chain ID for your chain"`
 	// P2P configuration
 	P2P P2PConfig `mapstructure:"p2p" yaml:"p2p"`
 
@@ -156,30 +144,15 @@ type Config struct {
 
 // DAConfig contains all Data Availability configuration parameters
 type DAConfig struct {
-	Address           string          `mapstructure:"address" yaml:"address" comment:"Address of the data availability layer service (host:port). This is the endpoint where Rollkit will connect to submit and retrieve data."`
-	AuthToken         string          `mapstructure:"auth_token" yaml:"auth_token" comment:"Authentication token for the data availability layer service. Required if the DA service needs authentication."`
-	GasPrice          float64         `mapstructure:"gas_price" yaml:"gas_price" comment:"Gas price for data availability transactions. Use -1 for automatic gas price determination. Higher values may result in faster inclusion."`
-	GasMultiplier     float64         `mapstructure:"gas_multiplier" yaml:"gas_multiplier" comment:"Multiplier applied to gas price when retrying failed DA submissions. Values > 1 increase gas price on retries to improve chances of inclusion."`
-	SubmitOptions     string          `mapstructure:"submit_options" yaml:"submit_options" comment:"Additional options passed to the DA layer when submitting data. Format depends on the specific DA implementation being used."`
-	Namespace         string          `mapstructure:"namespace" yaml:"namespace" comment:"Namespace ID used when submitting blobs to the DA layer. When a DataNamespace is provided, only the header is sent to this namespace."`
-	DataNamespace     string          `mapstructure:"data_namespace" yaml:"data_namespace" comment:"Namespace ID for submitting data to DA layer. Use this to speed-up light clients."`
-	BlockTime         DurationWrapper `mapstructure:"block_time" yaml:"block_time" comment:"Average block time of the DA chain (duration). Determines frequency of DA layer syncing, maximum backoff time for retries, and is multiplied by MempoolTTL to calculate transaction expiration. Examples: \"15s\", \"30s\", \"1m\", \"2m30s\", \"10m\"."`
-	MempoolTTL        uint64          `mapstructure:"mempool_ttl" yaml:"mempool_ttl" comment:"Number of DA blocks after which a transaction is considered expired and dropped from the mempool. Controls retry backoff timing."`
-	MaxSubmitAttempts int             `mapstructure:"max_submit_attempts" yaml:"max_submit_attempts" comment:"Maximum number of attempts to submit data to the DA layer before giving up. Higher values provide more resilience but can delay error reporting."`
-}
-
-// GetNamespace returns the namespace for header submissions.
-func (d *DAConfig) GetNamespace() string {
-	return d.Namespace
-}
-
-// GetDataNamespace returns the namespace for data submissions, falling back to the header namespace if not set
-func (d *DAConfig) GetDataNamespace() string {
-	if d.DataNamespace != "" {
-		return d.DataNamespace
-	}
-
-	return d.GetNamespace()
+	Address       string          `mapstructure:"address" yaml:"address" comment:"Address of the data availability layer service (host:port). This is the endpoint where Rollkit will connect to submit and retrieve data."`
+	AuthToken     string          `mapstructure:"auth_token" yaml:"auth_token" comment:"Authentication token for the data availability layer service. Required if the DA service needs authentication."`
+	GasPrice      float64         `mapstructure:"gas_price" yaml:"gas_price" comment:"Gas price for data availability transactions. Use -1 for automatic gas price determination. Higher values may result in faster inclusion."`
+	GasMultiplier float64         `mapstructure:"gas_multiplier" yaml:"gas_multiplier" comment:"Multiplier applied to gas price when retrying failed DA submissions. Values > 1 increase gas price on retries to improve chances of inclusion."`
+	SubmitOptions string          `mapstructure:"submit_options" yaml:"submit_options" comment:"Additional options passed to the DA layer when submitting data. Format depends on the specific DA implementation being used."`
+	Namespace     string          `mapstructure:"namespace" yaml:"namespace" comment:"Namespace ID used when submitting blobs to the DA layer."`
+	BlockTime     DurationWrapper `mapstructure:"block_time" yaml:"block_time" comment:"Average block time of the DA chain (duration). Determines frequency of DA layer syncing, maximum backoff time for retries, and is multiplied by MempoolTTL to calculate transaction expiration. Examples: \"15s\", \"30s\", \"1m\", \"2m30s\", \"10m\"."`
+	StartHeight   uint64          `mapstructure:"start_height" yaml:"start_height" comment:"Starting block height on the DA layer from which to begin syncing. Useful when deploying a new chain on an existing DA chain."`
+	MempoolTTL    uint64          `mapstructure:"mempool_ttl" yaml:"mempool_ttl" comment:"Number of DA blocks after which a transaction is considered expired and dropped from the mempool. Controls retry backoff timing."`
 }
 
 // NodeConfig contains all Rollkit specific configuration parameters
@@ -196,9 +169,6 @@ type NodeConfig struct {
 
 	// Header configuration
 	TrustedHash string `mapstructure:"trusted_hash" yaml:"trusted_hash" comment:"Initial trusted hash used to bootstrap the header exchange service. Allows nodes to start synchronizing from a specific trusted point in the chain instead of genesis. When provided, the node will fetch the corresponding header/block from peers using this hash and use it as a starting point for synchronization. If not provided, the node will attempt to fetch the genesis block instead."`
-
-	// Readiness / health configuration
-	ReadinessMaxBlocksBehind uint64 `mapstructure:"readiness_max_blocks_behind" yaml:"readiness_max_blocks_behind" comment:"How many blocks behind best-known head the node can be and still be considered ready. 0 means must be exactly at head."`
 }
 
 // LogConfig contains all logging configuration parameters
@@ -224,11 +194,10 @@ type SignerConfig struct {
 
 // RPCConfig contains all RPC server configuration parameters
 type RPCConfig struct {
-	Address               string `mapstructure:"address" yaml:"address" comment:"Address to bind the RPC server to (host:port). Default: 127.0.0.1:7331"`
-	EnableDAVisualization bool   `mapstructure:"enable_da_visualization" yaml:"enable_da_visualization" comment:"Enable DA visualization endpoints for monitoring blob submissions. Default: false"`
+	Address string `mapstructure:"address" yaml:"address" comment:"Address to bind the RPC server to (host:port). Default: 127.0.0.1:7331"`
 }
 
-// Validate ensures validates the config and ensure that the root directory exists.
+// Validate ensures that the root directory exists.
 // It creates the directory if it does not exist.
 func (c *Config) Validate() error {
 	if c.RootDir == "" {
@@ -240,35 +209,6 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("could not create directory %q: %w", fullDir, err)
 	}
 
-	// Validate namespaces
-	if err := validateNamespace(c.DA.GetNamespace()); err != nil {
-		return fmt.Errorf("could not validate namespace (%s): %w", c.DA.GetNamespace(), err)
-	}
-
-	if len(c.DA.GetDataNamespace()) > 0 {
-		if err := validateNamespace(c.DA.GetDataNamespace()); err != nil {
-			return fmt.Errorf("could not validate data namespace (%s): %w", c.DA.GetDataNamespace(), err)
-		}
-	}
-
-	// Validate lazy mode configuration
-	if c.Node.LazyMode && c.Node.LazyBlockInterval.Duration <= c.Node.BlockTime.Duration {
-		return fmt.Errorf("LazyBlockInterval (%v) must be greater than BlockTime (%v) in lazy mode",
-			c.Node.LazyBlockInterval.Duration, c.Node.BlockTime.Duration)
-	}
-
-	return nil
-}
-
-func validateNamespace(namespace string) error {
-	if namespace == "" {
-		return fmt.Errorf("namespace cannot be empty")
-	}
-
-	ns := da.NamespaceFromString(namespace)
-	if _, err := share.NewNamespaceFromBytes(ns.Bytes()); err != nil {
-		return fmt.Errorf("could not validate namespace (%s): %w", namespace, err)
-	}
 	return nil
 }
 
@@ -281,30 +221,19 @@ func (c *Config) ConfigPath() string {
 // This includes logging configuration and root directory settings.
 // It should be used in apps that do not already define their logger and home flag.
 func AddGlobalFlags(cmd *cobra.Command, defaultHome string) {
-	def := DefaultConfig()
-
-	cmd.PersistentFlags().String(FlagLogLevel, def.Log.Level, "Set the log level (debug, info, warn, error)")
-	cmd.PersistentFlags().String(FlagLogFormat, def.Log.Format, "Set the log format (text, json)")
-	cmd.PersistentFlags().Bool(FlagLogTrace, def.Log.Trace, "Enable stack traces in error logs")
+	cmd.PersistentFlags().String(FlagLogLevel, DefaultConfig.Log.Level, "Set the log level (debug, info, warn, error)")
+	cmd.PersistentFlags().String(FlagLogFormat, DefaultConfig.Log.Format, "Set the log format (text, json)")
+	cmd.PersistentFlags().Bool(FlagLogTrace, DefaultConfig.Log.Trace, "Enable stack traces in error logs")
 	cmd.PersistentFlags().String(FlagRootDir, DefaultRootDirWithName(defaultHome), "Root directory for application data")
 }
 
-// AddFlags adds Evolve specific configuration options to cobra Command.
+// AddFlags adds Rollkit specific configuration options to cobra Command.
 func AddFlags(cmd *cobra.Command) {
-	def := DefaultConfig()
-
-	// Set normalization function to support both flag prefixes
-	cmd.Flags().SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
-		if strings.HasPrefix(name, FlagPrefixRollkit) {
-			return pflag.NormalizedName(strings.Replace(name, FlagPrefixRollkit, FlagPrefixEvnode, 1))
-		}
-
-		return pflag.NormalizedName(name)
-	})
+	def := DefaultConfig
 
 	// Add base flags
 	cmd.Flags().String(FlagDBPath, def.DBPath, "path for the node database")
-	cmd.Flags().Bool(FlagClearCache, def.ClearCache, "clear the cache")
+	cmd.Flags().String(FlagChainID, def.ChainID, "chain ID")
 
 	// Node configuration flags
 	cmd.Flags().Bool(FlagAggregator, def.Node.Aggregator, "run node in aggregator mode")
@@ -314,7 +243,6 @@ func AddFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool(FlagLazyAggregator, def.Node.LazyMode, "produce blocks only when transactions are available or after lazy block time")
 	cmd.Flags().Uint64(FlagMaxPendingHeadersAndData, def.Node.MaxPendingHeadersAndData, "maximum headers or data pending DA confirmation before pausing block production (0 for no limit)")
 	cmd.Flags().Duration(FlagLazyBlockTime, def.Node.LazyBlockInterval.Duration, "maximum interval between blocks in lazy aggregation mode")
-	cmd.Flags().Uint64(FlagReadinessMaxBlocksBehind, def.Node.ReadinessMaxBlocksBehind, "how many blocks behind best-known head the node can be and still be considered ready (0 = must be at head)")
 
 	// Data Availability configuration flags
 	cmd.Flags().String(FlagDAAddress, def.DA.Address, "DA address (host:port)")
@@ -322,11 +250,10 @@ func AddFlags(cmd *cobra.Command) {
 	cmd.Flags().Duration(FlagDABlockTime, def.DA.BlockTime.Duration, "DA chain block time (for syncing)")
 	cmd.Flags().Float64(FlagDAGasPrice, def.DA.GasPrice, "DA gas price for blob transactions")
 	cmd.Flags().Float64(FlagDAGasMultiplier, def.DA.GasMultiplier, "DA gas price multiplier for retrying blob transactions")
-	cmd.Flags().String(FlagDANamespace, def.DA.Namespace, "DA namespace for header (or blob) submissions")
-	cmd.Flags().String(FlagDADataNamespace, def.DA.DataNamespace, "DA namespace for data submissions")
+	cmd.Flags().Uint64(FlagDAStartHeight, def.DA.StartHeight, "starting DA block height (for syncing)")
+	cmd.Flags().String(FlagDANamespace, def.DA.Namespace, "DA namespace to submit blob transactions")
 	cmd.Flags().String(FlagDASubmitOptions, def.DA.SubmitOptions, "DA submit options")
 	cmd.Flags().Uint64(FlagDAMempoolTTL, def.DA.MempoolTTL, "number of DA blocks until transaction is dropped from the mempool")
-	cmd.Flags().Int(FlagDAMaxSubmitAttempts, def.DA.MaxSubmitAttempts, "maximum number of attempts to submit data to the DA layer before giving up")
 
 	// P2P configuration flags
 	cmd.Flags().String(FlagP2PListenAddress, def.P2P.ListenAddress, "P2P listen address (host:port)")
@@ -336,7 +263,6 @@ func AddFlags(cmd *cobra.Command) {
 
 	// RPC configuration flags
 	cmd.Flags().String(FlagRPCAddress, def.RPC.Address, "RPC server address (host:port)")
-	cmd.Flags().Bool(FlagRPCEnableDAVisualization, def.RPC.EnableDAVisualization, "enable DA visualization endpoints for monitoring blob submissions")
 
 	// Instrumentation configuration flags
 	instrDef := DefaultInstrumentationConfig()
@@ -360,13 +286,6 @@ func Load(cmd *cobra.Command) (Config, error) {
 	home, _ := cmd.Flags().GetString(FlagRootDir)
 	if home == "" {
 		home = DefaultRootDir
-	} else if !filepath.IsAbs(home) {
-		// Convert relative path to absolute path
-		absHome, err := filepath.Abs(home)
-		if err != nil {
-			return Config{}, fmt.Errorf("failed to resolve home directory: %w", err)
-		}
-		home = absHome
 	}
 
 	v := viper.New()
@@ -407,13 +326,6 @@ func LoadFromViper(inputViper *viper.Viper) (Config, error) {
 	home := inputViper.GetString(FlagRootDir)
 	if home == "" {
 		home = DefaultRootDir
-	} else if !filepath.IsAbs(home) {
-		// Convert relative path to absolute path
-		absHome, err := filepath.Abs(home)
-		if err != nil {
-			return Config{}, fmt.Errorf("failed to resolve home directory: %w", err)
-		}
-		home = absHome
 	}
 
 	// create a new viper instance for reading the config file
@@ -439,17 +351,8 @@ func LoadFromViper(inputViper *viper.Viper) (Config, error) {
 
 	// then override with settings from input viper (higher precedence)
 	for _, key := range inputViper.AllKeys() {
-		// we must not override config with default flags value
-		if !inputViper.IsSet(key) {
-			continue
-		}
-
 		// Handle special case for prefixed keys
-		if after, ok := strings.CutPrefix(key, FlagPrefixEvnode); ok {
-			// Strip the prefix for the merged viper
-			strippedKey := after
-			mergedViper.Set(strippedKey, inputViper.Get(key))
-		} else if after, ok := strings.CutPrefix(key, FlagPrefixRollkit); ok {
+		if after, ok := strings.CutPrefix(key, "rollkit."); ok {
 			// Strip the prefix for the merged viper
 			strippedKey := after
 			mergedViper.Set(strippedKey, inputViper.Get(key))
@@ -464,7 +367,7 @@ func LoadFromViper(inputViper *viper.Viper) (Config, error) {
 // loadFromViper is a helper function that processes a viper instance and returns a Config.
 // It is used by both Load and LoadFromViper to ensure consistent behavior.
 func loadFromViper(v *viper.Viper, home string) (Config, error) {
-	cfg := DefaultConfig()
+	cfg := DefaultConfig
 	cfg.RootDir = home
 
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
@@ -472,7 +375,7 @@ func loadFromViper(v *viper.Viper, home string) (Config, error) {
 			mapstructure.StringToTimeDurationHookFunc(),
 			mapstructure.StringToSliceHookFunc(","),
 			func(f reflect.Type, t reflect.Type, data any) (any, error) {
-				if t == reflect.TypeFor[DurationWrapper]() && f.Kind() == reflect.String {
+				if t == reflect.TypeOf(DurationWrapper{}) && f.Kind() == reflect.String {
 					if str, ok := data.(string); ok {
 						duration, err := time.ParseDuration(str)
 						if err != nil {
@@ -506,9 +409,7 @@ func bindFlags(basename string, cmd *cobra.Command, v *viper.Viper) (err error) 
 	}()
 
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		// trimm possible prefixes from the flag name
-		flagName := strings.TrimPrefix(f.Name, FlagPrefixEvnode)
-		flagName = strings.TrimPrefix(flagName, FlagPrefixRollkit)
+		flagName := strings.TrimPrefix(f.Name, "rollkit.") // trimm the prefix from the flag name
 
 		// Environment variables can't have dashes in them, so bind them to their equivalent
 		// keys with underscores, e.g. --favorite-color to STING_FAVORITE_COLOR

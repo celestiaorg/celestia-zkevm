@@ -24,7 +24,7 @@ test-integration:
 ## test-e2e: Running e2e tests
 test-e2e: build build-da build-evm-single
 	@echo "--> Running e2e tests"
-	@cd test/e2e && go test -mod=readonly -failfast -timeout=15m -tags='e2e evm' ./... --binary=../../build/testapp --evm-binary=../../build/evm-single
+	@cd test/e2e && go test -mod=readonly -failfast -timeout=15m -tags='e2e evm' ./... --binary=$(CURDIR)/build/testapp --evm-binary=$(CURDIR)/build/evm-single
 .PHONY: test-e2e
 
 ## test-integration-cover: generate code coverage report for integration tests.
@@ -36,46 +36,40 @@ test-integration-cover:
 ## test-cover: generate code coverage report.
 test-cover:
 	@echo "--> Running unit tests"
-	@go run -tags=cover -race scripts/test_cover.go
+	@go run -tags=cover scripts/test_cover.go
 .PHONY: test-cover
-
-## bench: run micro-benchmarks for internal cache
-bench:
-	@echo "--> Running internal cache benchmarks"
-	@go test -bench=. -benchmem -run=^$$ ./block/internal/cache
-.PHONY: bench
 
 ## test-evm: Running EVM tests
 test-evm:
 	@echo "--> Running EVM tests"
-	@cd execution/evm/test && go test -mod=readonly -failfast -timeout=15m ./... -tags=evm
+	@cd execution/evm && go test -mod=readonly -failfast -timeout=15m ./... -tags=evm
 
 ## test-docker-e2e: Running Docker E2E tests
 test-docker-e2e: docker-build-if-local
 	@echo "--> Running Docker E2E tests"
 	@echo "--> Verifying Docker image exists locally..."
-	@if [ -z "$(EV_NODE_IMAGE_REPO)" ] || [ "$(EV_NODE_IMAGE_REPO)" = "ev-node" ]; then \
+	@if [ -z "$(ROLLKIT_IMAGE_REPO)" ] || [ "$(ROLLKIT_IMAGE_REPO)" = "rollkit" ]; then \
 		echo "--> Verifying Docker image exists locally..."; \
-		docker image inspect evstack:local-dev >/dev/null 2>&1 || (echo "ERROR: evstack:local-dev image not found. Run 'make docker-build' first." && exit 1); \
+		docker image inspect rollkit:local-dev >/dev/null 2>&1 || (echo "ERROR: rollkit:local-dev image not found. Run 'make docker-build' first." && exit 1); \
 	fi
 	@cd test/docker-e2e && go test -mod=readonly -failfast -v -tags='docker_e2e' -timeout=30m ./...
 	@$(MAKE) docker-cleanup-if-local
 
 ## docker-build-if-local: Build Docker image if using local repository
 docker-build-if-local:
-	@if [ -z "$(EV_NODE_IMAGE_REPO)" ] || [ "$(EV_NODE_IMAGE_REPO)" = "evstack" ]; then \
+	@if [ -z "$(ROLLKIT_IMAGE_REPO)" ] || [ "$(ROLLKIT_IMAGE_REPO)" = "rollkit" ]; then \
 		echo "--> Local repository detected, building Docker image..."; \
 		$(MAKE) docker-build; \
 	else \
-		echo "--> Using remote repository: $(EV_NODE_IMAGE_REPO)"; \
+		echo "--> Using remote repository: $(ROLLKIT_IMAGE_REPO)"; \
 	fi
 .PHONY: docker-build-if-local
 
 ## docker-cleanup-if-local: Clean up local Docker image if using local repository
 docker-cleanup-if-local:
-	@if [ -z "$(EV_NODE_IMAGE_REPO)" ] || [ "$(EV_NODE_IMAGE_REPO)" = "evstack" ]; then \
+	@if [ -z "$(ROLLKIT_IMAGE_REPO)" ] || [ "$(ROLLKIT_IMAGE_REPO)" = "rollkit" ]; then \
 		echo "--> Untagging local Docker image (preserving layers for faster rebuilds)..."; \
-		docker rmi evstack:local-dev --no-prune 2>/dev/null || echo "Image evstack:local-dev not found or already removed"; \
+		docker rmi rollkit:local-dev --no-prune 2>/dev/null || echo "Image rollkit:local-dev not found or already removed"; \
 	else \
 		echo "--> Using remote repository, no cleanup needed"; \
 	fi

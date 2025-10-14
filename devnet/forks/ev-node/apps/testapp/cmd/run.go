@@ -7,16 +7,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	kvexecutor "github.com/evstack/ev-node/apps/testapp/kv"
-	"github.com/evstack/ev-node/core/da"
-	"github.com/evstack/ev-node/da/jsonrpc"
-	"github.com/evstack/ev-node/node"
-	rollcmd "github.com/evstack/ev-node/pkg/cmd"
-	genesispkg "github.com/evstack/ev-node/pkg/genesis"
-	"github.com/evstack/ev-node/pkg/p2p"
-	"github.com/evstack/ev-node/pkg/p2p/key"
-	"github.com/evstack/ev-node/pkg/store"
-	"github.com/evstack/ev-node/sequencers/single"
+	kvexecutor "github.com/rollkit/rollkit/apps/testapp/kv"
+	"github.com/rollkit/rollkit/da/jsonrpc"
+	"github.com/rollkit/rollkit/node"
+	rollcmd "github.com/rollkit/rollkit/pkg/cmd"
+	"github.com/rollkit/rollkit/pkg/p2p"
+	"github.com/rollkit/rollkit/pkg/p2p/key"
+	"github.com/rollkit/rollkit/pkg/store"
+	"github.com/rollkit/rollkit/sequencers/single"
 )
 
 var RunCmd = &cobra.Command{
@@ -34,7 +32,7 @@ var RunCmd = &cobra.Command{
 		// Get KV endpoint flag
 		kvEndpoint, _ := cmd.Flags().GetString(flagKVEndpoint)
 		if kvEndpoint == "" {
-			logger.Info().Msg("KV endpoint flag not set, using default from http_server")
+			logger.Info("KV endpoint flag not set, using default from http_server")
 		}
 
 		// Create test implementations
@@ -46,12 +44,7 @@ var RunCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		headerNamespace := da.NamespaceFromString(nodeConfig.DA.GetNamespace())
-		dataNamespace := da.NamespaceFromString(nodeConfig.DA.GetDataNamespace())
-
-		logger.Info().Str("headerNamespace", headerNamespace.HexString()).Str("dataNamespace", dataNamespace.HexString()).Msg("namespaces")
-
-		daJrpc, err := jsonrpc.NewClient(ctx, logger, nodeConfig.DA.Address, nodeConfig.DA.AuthToken, nodeConfig.DA.GasPrice, nodeConfig.DA.GasMultiplier, rollcmd.DefaultMaxBlobSize)
+		daJrpc, err := jsonrpc.NewClient(ctx, logger, nodeConfig.DA.Address, nodeConfig.DA.AuthToken, nodeConfig.DA.Namespace)
 		if err != nil {
 			return err
 		}
@@ -78,18 +71,8 @@ var RunCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to start KV executor HTTP server: %w", err)
 			} else {
-				logger.Info().Str("endpoint", kvEndpoint).Msg("KV executor HTTP server started")
+				logger.Info("KV executor HTTP server started", "endpoint", kvEndpoint)
 			}
-		}
-
-		genesisPath := filepath.Join(filepath.Dir(nodeConfig.ConfigPath()), "genesis.json")
-		genesis, err := genesispkg.LoadGenesis(genesisPath)
-		if err != nil {
-			return fmt.Errorf("failed to load genesis: %w", err)
-		}
-
-		if genesis.DAStartHeight == 0 && !nodeConfig.Node.Aggregator {
-			logger.Warn().Msg("da_start_height is not set in genesis.json, ask your chain developer")
 		}
 
 		sequencer, err := single.NewSequencer(
@@ -97,7 +80,7 @@ var RunCmd = &cobra.Command{
 			logger,
 			datastore,
 			&daJrpc.DA,
-			[]byte(genesis.ChainID),
+			[]byte(nodeConfig.ChainID),
 			nodeConfig.Node.BlockTime.Duration,
 			singleMetrics,
 			nodeConfig.Node.Aggregator,
@@ -106,11 +89,11 @@ var RunCmd = &cobra.Command{
 			return err
 		}
 
-		p2pClient, err := p2p.NewClient(nodeConfig.P2P, nodeKey.PrivKey, datastore, genesis.ChainID, logger, p2p.NopMetrics())
+		p2pClient, err := p2p.NewClient(nodeConfig, nodeKey, datastore, logger, p2p.NopMetrics())
 		if err != nil {
 			return err
 		}
 
-		return rollcmd.StartNode(logger, cmd, executor, sequencer, &daJrpc.DA, p2pClient, datastore, nodeConfig, genesis, node.NodeOptions{})
+		return rollcmd.StartNode(logger, cmd, executor, sequencer, &daJrpc.DA, p2pClient, datastore, nodeConfig, node.NodeOptions{})
 	},
 }

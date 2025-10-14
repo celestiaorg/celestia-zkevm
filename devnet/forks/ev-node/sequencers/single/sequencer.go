@@ -8,10 +8,10 @@ import (
 	"time"
 
 	ds "github.com/ipfs/go-datastore"
-	"github.com/rs/zerolog"
+	logging "github.com/ipfs/go-log/v2"
 
-	coreda "github.com/evstack/ev-node/core/da"
-	coresequencer "github.com/evstack/ev-node/core/sequencer"
+	coreda "github.com/rollkit/rollkit/core/da"
+	coresequencer "github.com/rollkit/rollkit/core/sequencer"
 )
 
 // ErrInvalidId is returned when the chain id is invalid
@@ -23,7 +23,7 @@ var _ coresequencer.Sequencer = &Sequencer{}
 
 // Sequencer implements core sequencing interface
 type Sequencer struct {
-	logger zerolog.Logger
+	logger logging.EventLogger
 
 	proposer bool
 
@@ -40,7 +40,7 @@ type Sequencer struct {
 // NewSequencer creates a new Single Sequencer
 func NewSequencer(
 	ctx context.Context,
-	logger zerolog.Logger,
+	logger logging.EventLogger,
 	db ds.Batching,
 	da coreda.DA,
 	id []byte,
@@ -54,7 +54,7 @@ func NewSequencer(
 // NewSequencerWithQueueSize creates a new Single Sequencer with configurable queue size
 func NewSequencerWithQueueSize(
 	ctx context.Context,
-	logger zerolog.Logger,
+	logger logging.EventLogger,
 	db ds.Batching,
 	da coreda.DA,
 	id []byte,
@@ -90,7 +90,7 @@ func (c *Sequencer) SubmitBatchTxs(ctx context.Context, req coresequencer.Submit
 	}
 
 	if req.Batch == nil || len(req.Batch.Transactions) == 0 {
-		c.logger.Info().Str("Id", string(req.Id)).Msg("Skipping submission of empty batch")
+		c.logger.Info("Skipping submission of empty batch", "Id", string(req.Id))
 		return &coresequencer.SubmitBatchTxsResponse{}, nil
 	}
 
@@ -99,10 +99,9 @@ func (c *Sequencer) SubmitBatchTxs(ctx context.Context, req coresequencer.Submit
 	err := c.queue.AddBatch(ctx, batch)
 	if err != nil {
 		if errors.Is(err, ErrQueueFull) {
-			c.logger.Warn().
-				Int("txCount", len(batch.Transactions)).
-				Str("chainId", string(req.Id)).
-				Msg("Batch queue is full, rejecting batch submission")
+			c.logger.Warn("Batch queue is full, rejecting batch submission",
+				"txCount", len(batch.Transactions),
+				"chainId", string(req.Id))
 			return nil, fmt.Errorf("batch queue is full, cannot accept more batches: %w", err)
 		}
 		return nil, fmt.Errorf("failed to add batch: %w", err)

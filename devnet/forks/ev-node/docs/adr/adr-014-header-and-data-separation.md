@@ -115,9 +115,9 @@ The `publishBlock` method in `manager.go` now creates the header and data struct
 
 ### Header Producer
 
-Before the separation: Only the entire `Block` struct composed of both header and data was submitted to the DA layer. The `Block` and `SignedHeader` were both gossipped over two separate p2p layers: gossiping `Block` to just full nodes and gossiping the `SignedHeader` to full nodes and future light nodes to join that will only sync headers (and proofs).
+Before the separation: Only the entire `Block` struct composed of both header and data was submitted to the DA layer. The `Block` and `SignedHeader` were both gossipped over two separate p2p layers: gossipping `Block` to just full nodes and gossipping the `SignedHeader` to full nodes and future light nodes to join that will only sync headers (and proofs).
 
-After the separation: The `SignedHeader` and `Data` are submitted separately to the DA layer. Note that the `SignedHeader` has a `Header` that is linked to the `Data` via a `DataCommitment` from the DA layer. `SignedHeader` and `Data` are both gossipped over two separate p2p layers: gossiping `Data` to just full nodes and gossiping the `SignedHeader` to full nodes and future light nodes to join that will only sync headers (and proofs).
+After the separation: The `SignedHeader` and `Data` are submitted separately to the DA layer. Note that the `SignedHeader` has a `Header` that is linked to the `Data` via a `DataCommitment` from the DA layer. `SignedHeader` and `Data` are both gossipped over two separate p2p layers: gossipping `Data` to just full nodes and gossipping the `SignedHeader` to full nodes and future light nodes to join that will only sync headers (and proofs).
 
 In based sequencing mode, the header producer is equivalent to a full node.
 
@@ -161,7 +161,7 @@ flowchart LR
 
 ### Syncing Full Node
 
-Before the separation: Full Nodes get the entire `Block` struct via p2p or the DA layer. They can choose to apply the block as soon as they get it via p2p OR just wait to see it on the DA layer. This depends on whether a full node opts in to the p2p layer or not. Gossiping the `SignedHeader` over p2p is primarily for light nodes to get the header.
+Before the separation: Full Nodes get the entire `Block` struct via p2p or the DA layer. They can choose to apply the block as soon as they get it via p2p OR just wait to see it on the DA layer. This depends on whether a full node opts in to the p2p layer or not. Gossipping the `SignedHeader` over p2p is primarily for light nodes to get the header.
 
 After the separation: Full nodes get the `Data` struct and the `SignedHeader` struct separately over p2p and DA layers. In code, this refers to the `HeaderStore` and the `DataStore` in block manager. A Full node should wait for having both the `Data` struct and the corresponding `SignedHeader` to it before applying the block data to its associated state machine. This is so that the full node can verify that its locally produced header's state commitment after it applies the `Data` associated to a block is consistent with the `Header` inside the `SignedHeader` that is received from the header producer. The `Header` should contain a link to its associated Data via a `DataCommitment` that is a pointer to the location of the `Data` on the DA layer.
 
@@ -215,9 +215,9 @@ sequenceDiagram
 
 ## Implementation
 
-The implementation of this separation can be found in the Rollkit repository, specifically in the changes made to the `manager.go` file. The `publishBlock` method illustrates the creation of separate header and data structures, and the associated logic for handling them independently. See [Rollkit PR #1789](https://github.com/evstack/ev-node/pull/1789)
+The implementation of this separation can be found in the Rollkit repository, specifically in the changes made to the `manager.go` file. The `publishBlock` method illustrates the creation of separate header and data structures, and the associated logic for handling them independently. See [Rollkit PR #1789](https://github.com/rollkit/rollkit/pull/1789)
 
 ## References
 
-- [Rollkit PR #1789](https://github.com/evstack/ev-node/pull/1789)
+- [Rollkit PR #1789](https://github.com/rollkit/rollkit/pull/1789)
 - [Proposer-Builder Separation](https://www.alchemy.com/overviews/proposer-builder-separation)

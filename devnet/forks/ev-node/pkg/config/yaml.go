@@ -28,7 +28,7 @@ func (d *DurationWrapper) UnmarshalText(text []byte) error {
 	return err
 }
 
-// ErrReadYaml is the error returned when reading the evnode.yml file fails.
+// ErrReadYaml is the error returned when reading the rollkit.yaml file fails.
 var ErrReadYaml = fmt.Errorf("reading %s", ConfigName)
 
 // SaveAsYaml saves the current configuration to a YAML file.
@@ -91,7 +91,7 @@ func (c *Config) SaveAsYaml() error {
 	}
 
 	// process structs fields and comments
-	processFields(reflect.TypeFor[Config](), "")
+	processFields(reflect.TypeOf(Config{}), "")
 
 	data, err := yaml.MarshalWithOptions(c, yaml.WithComment(yamlCommentMap))
 	if err != nil {

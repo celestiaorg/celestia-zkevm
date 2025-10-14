@@ -8,9 +8,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/evstack/ev-node/pkg/signer" // Used for signer.Signer interface
-	"github.com/evstack/ev-node/pkg/signer/noop"
-	"github.com/evstack/ev-node/types" // Import the types package
+	"github.com/rollkit/rollkit/pkg/signer" // Used for signer.Signer interface
+	"github.com/rollkit/rollkit/pkg/signer/noop"
+	"github.com/rollkit/rollkit/types" // Import the types package
 )
 
 var _ time.Time     // Dummy usage to prevent time import from being removed
@@ -123,7 +123,7 @@ func TestGetGenesisWithPrivkey(t *testing.T) {
 			assert.NotNil(t, pubKey)
 			assert.Equal(t, tc.chainID, gen.ChainID)
 			assert.Equal(t, uint64(1), gen.InitialHeight)
-			assert.NotZero(t, gen.StartTime)
+			assert.NotZero(t, gen.GenesisDAStartTime) // Corrected field name
 
 			// Verify the proposer address in genesis
 			expectedAddress := types.KeyAddress(pubKey)

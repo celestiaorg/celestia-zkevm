@@ -6,24 +6,23 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/celestiaorg/go-header"
 	goheaderp2p "github.com/celestiaorg/go-header/p2p"
 	goheaderstore "github.com/celestiaorg/go-header/store"
 	goheadersync "github.com/celestiaorg/go-header/sync"
 	ds "github.com/ipfs/go-datastore"
+	logging "github.com/ipfs/go-log/v2"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/net/conngater"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/rs/zerolog"
 
-	"github.com/evstack/ev-node/pkg/config"
-	"github.com/evstack/ev-node/pkg/genesis"
-	"github.com/evstack/ev-node/pkg/p2p"
-	"github.com/evstack/ev-node/types"
+	"github.com/rollkit/rollkit/pkg/config"
+	"github.com/rollkit/rollkit/pkg/genesis"
+	"github.com/rollkit/rollkit/pkg/p2p"
+	"github.com/rollkit/rollkit/types"
 )
 
 type syncType string
@@ -33,15 +32,12 @@ const (
 	dataSync   syncType = "dataSync"
 )
 
-// TODO: when we add pruning we can remove this
-const ninetyNineYears = 99 * 365 * 24 * time.Hour
-
 // SyncService is the P2P Sync Service for blocks and headers.
 //
 // Uses the go-header library for handling all P2P logic.
 type SyncService[H header.Header[H]] struct {
 	conf     config.Config
-	logger   zerolog.Logger
+	logger   logging.EventLogger
 	syncType syncType
 
 	genesis genesis.Genesis
@@ -69,7 +65,7 @@ func NewDataSyncService(
 	conf config.Config,
 	genesis genesis.Genesis,
 	p2p *p2p.Client,
-	logger zerolog.Logger,
+	logger logging.EventLogger,
 ) (*DataSyncService, error) {
 	return newSyncService[*types.Data](store, dataSync, conf, genesis, p2p, logger)
 }
@@ -80,7 +76,7 @@ func NewHeaderSyncService(
 	conf config.Config,
 	genesis genesis.Genesis,
 	p2p *p2p.Client,
-	logger zerolog.Logger,
+	logger logging.EventLogger,
 ) (*HeaderSyncService, error) {
 	return newSyncService[*types.SignedHeader](store, headerSync, conf, genesis, p2p, logger)
 }
@@ -91,7 +87,7 @@ func newSyncService[H header.Header[H]](
 	conf config.Config,
 	genesis genesis.Genesis,
 	p2p *p2p.Client,
-	logger zerolog.Logger,
+	logger logging.EventLogger,
 ) (*SyncService[H], error) {
 	if p2p == nil {
 		return nil, errors.New("p2p client cannot be nil")
@@ -117,32 +113,41 @@ func newSyncService[H header.Header[H]](
 }
 
 // Store returns the store of the SyncService
-func (syncService *SyncService[H]) Store() header.Store[H] {
+func (syncService *SyncService[H]) Store() *goheaderstore.Store[H] {
 	return syncService.store
 }
 
-// WriteToStoreAndBroadcast initializes store if needed and broadcasts provided header or block.
+func (syncService *SyncService[H]) initStoreAndStartSyncer(ctx context.Context, initial H) error {
+	if initial.IsZero() {
+		return errors.New("failed to initialize the store and start syncer")
+	}
+	if err := syncService.store.Init(ctx, initial); err != nil {
+		return err
+	}
+	if err := syncService.StartSyncer(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+// WriteToStoreAndBroadcast initializes store if needed and broadcasts  provided header or block.
 // Note: Only returns an error in case store can't be initialized. Logs error if there's one while broadcasting.
 func (syncService *SyncService[H]) WriteToStoreAndBroadcast(ctx context.Context, headerOrData H) error {
 	if syncService.genesis.InitialHeight == 0 {
 		return fmt.Errorf("invalid initial height; cannot be zero")
 	}
-
-	if headerOrData.IsZero() {
-		return fmt.Errorf("empty header/data cannot write to store or broadcast")
-	}
-
 	isGenesis := headerOrData.Height() == syncService.genesis.InitialHeight
-	if isGenesis { // when starting the syncer for the first time, we have no blocks, so initFromP2P didn't initialize the genesis block.
-		if err := syncService.initStore(ctx, headerOrData); err != nil {
-			return fmt.Errorf("failed to initialize the store: %w", err)
+	// For genesis header/block initialize the store and start the syncer
+	if isGenesis {
+		if err := syncService.store.Init(ctx, headerOrData); err != nil {
+			return errors.New("failed to initialize the store")
 		}
 	}
 
 	firstStart := false
 	if !syncService.syncerStatus.started.Load() {
 		firstStart = true
-		if err := syncService.startSyncer(ctx); err != nil {
+		if err := syncService.StartSyncer(ctx); err != nil {
 			return fmt.Errorf("failed to start syncer after initializing the store: %w", err)
 		}
 	}
@@ -157,92 +162,36 @@ func (syncService *SyncService[H]) WriteToStoreAndBroadcast(ctx context.Context,
 			// for starting the syncer. Hence, we ignore the error.
 			// exact reason: validation failed, err header verification failed: known header: '1' <= current '1'
 			(isGenesis && errors.Is(err, pubsub.ValidationError{Reason: pubsub.RejectValidationFailed})) {
-
 			return nil
 		}
-
-		syncService.logger.Error().Err(err).Msg("failed to broadcast")
+		return fmt.Errorf("failed to broadcast: %w", err)
 	}
-
 	return nil
+}
+
+func (syncService *SyncService[H]) isInitialized() bool {
+	return syncService.store.Height() > 0
 }
 
 // Start is a part of Service interface.
 func (syncService *SyncService[H]) Start(ctx context.Context) error {
-	// setup P2P infrastructure, but don't start Subscriber yet.
-	peerIDs, err := syncService.setupP2PInfrastructure(ctx)
+	peerIDs, err := syncService.setupP2P(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to setup syncer P2P infrastructure: %w", err)
+		return err
 	}
 
-	// create syncer, must be before initFromP2PWithRetry which calls startSyncer.
-	if syncService.syncer, err = newSyncer(
-		syncService.ex,
-		syncService.store,
-		syncService.sub,
-		[]goheadersync.Option{goheadersync.WithBlockTime(syncService.conf.Node.BlockTime.Duration)},
-	); err != nil {
-		return fmt.Errorf("failed to create syncer: %w", err)
+	if err := syncService.prepareSyncer(ctx); err != nil {
+		return err
 	}
 
-	// initialize stores from P2P (blocking until genesis is fetched for followers)
-	// Aggregators (no peers configured) return immediately and initialize on first produced block.
-	if err := syncService.initFromP2PWithRetry(ctx, peerIDs); err != nil {
-		return fmt.Errorf("failed to initialize stores from P2P: %w", err)
-	}
-
-	// start the subscriber, stores are guaranteed to have genesis for followers.
-	//
-	// NOTE: we must start the subscriber after the syncer is initialized in initFromP2PWithRetry to ensure p2p syncing
-	// works correctly.
-	if err := syncService.startSubscriber(ctx); err != nil {
-		return fmt.Errorf("failed to start subscriber: %w", err)
-	}
-
-	return nil
+	return syncService.setFirstAndStart(ctx, peerIDs)
 }
 
-// startSyncer starts the SyncService's syncer
-func (syncService *SyncService[H]) startSyncer(ctx context.Context) error {
-	if syncService.syncerStatus.isStarted() {
-		return nil
-	}
-
-	if err := syncService.syncer.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start syncer: %w", err)
-	}
-
-	syncService.syncerStatus.started.Store(true)
-	return nil
-}
-
-// initStore initializes the store with the given initial header.
-// it is a no-op if the store is already initialized.
-func (syncService *SyncService[H]) initStore(ctx context.Context, initial H) error {
-	if initial.IsZero() {
-		return errors.New("failed to initialize the store")
-	}
-
-	if _, err := syncService.store.Head(ctx); errors.Is(err, header.ErrNotFound) || errors.Is(err, header.ErrEmptyStore) {
-		if err := syncService.store.Append(ctx, initial); err != nil {
-			return err
-		}
-
-		if err := syncService.store.Sync(ctx); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// setupP2PInfrastructure sets up the P2P infrastructure (Exchange, ExchangeServer, Store)
-// but does not start the Subscriber. Returns peer IDs for later use.
-func (syncService *SyncService[H]) setupP2PInfrastructure(ctx context.Context) ([]peer.ID, error) {
+// setupP2P sets up the P2P configuration for the SyncService and starts the necessary components.
+// it returns IDs of peers in configuration (seeds) and available in the network.
+func (syncService *SyncService[H]) setupP2P(ctx context.Context) ([]peer.ID, error) {
 	ps := syncService.p2p.PubSub()
 	var err error
-
-	// Create subscriber but DON'T start it yet
 	syncService.sub, err = goheaderp2p.NewSubscriber[H](
 		ps,
 		pubsub.DefaultMsgIdFn,
@@ -253,6 +202,12 @@ func (syncService *SyncService[H]) setupP2PInfrastructure(ctx context.Context) (
 		return nil, err
 	}
 
+	if err := syncService.sub.Start(ctx); err != nil {
+		return nil, fmt.Errorf("error while starting subscriber: %w", err)
+	}
+	if syncService.topicSubscription, err = syncService.sub.Subscribe(); err != nil {
+		return nil, fmt.Errorf("error while subscribing: %w", err)
+	}
 	if err := syncService.store.Start(ctx); err != nil {
 		return nil, fmt.Errorf("error while starting store: %w", err)
 	}
@@ -271,7 +226,6 @@ func (syncService *SyncService[H]) setupP2PInfrastructure(ctx context.Context) (
 	}
 
 	peerIDs := syncService.getPeerIDs()
-
 	if syncService.ex, err = newP2PExchange[H](syncService.p2p.Host(), peerIDs, networkID, syncService.genesis.ChainID, syncService.p2p.ConnectionGater()); err != nil {
 		return nil, fmt.Errorf("error while creating exchange: %w", err)
 	}
@@ -281,86 +235,60 @@ func (syncService *SyncService[H]) setupP2PInfrastructure(ctx context.Context) (
 	return peerIDs, nil
 }
 
-// startSubscriber starts the Subscriber and subscribes to the P2P topic.
-// This should be called AFTER stores are initialized to ensure proper validation.
-func (syncService *SyncService[H]) startSubscriber(ctx context.Context) error {
-	if err := syncService.sub.Start(ctx); err != nil {
-		return fmt.Errorf("error while starting subscriber: %w", err)
-	}
-
+// prepareSyncer initializes the syncer for the SyncService with the provided options.
+// If the initialization is successful and the SyncService is already initialized,
+// it starts the syncer by calling StartSyncer.
+// Returns error if initialization or starting of syncer fails.
+func (syncService *SyncService[H]) prepareSyncer(ctx context.Context) error {
 	var err error
-	if syncService.topicSubscription, err = syncService.sub.Subscribe(); err != nil {
-		return fmt.Errorf("error while subscribing: %w", err)
+	if syncService.syncer, err = newSyncer(
+		syncService.ex,
+		syncService.store,
+		syncService.sub,
+		[]goheadersync.Option{goheadersync.WithBlockTime(syncService.conf.Node.BlockTime.Duration)},
+	); err != nil {
+		return err
 	}
 
+	if syncService.isInitialized() {
+		if err := syncService.StartSyncer(ctx); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-// initFromP2PWithRetry initializes the syncer from P2P with a retry mechanism.
+// setFirstAndStart looks up for the trusted hash or the genesis header/block.
 // If trusted hash is available, it fetches the trusted header/block (by hash) from peers.
 // Otherwise, it tries to fetch the genesis header/block by height.
-func (syncService *SyncService[H]) initFromP2PWithRetry(ctx context.Context, peerIDs []peer.ID) error {
-	if len(peerIDs) == 0 {
-		return nil
-	}
-
-	tryInit := func(ctx context.Context) (bool, error) {
-		var (
-			trusted H
-			err     error
-		)
-
+// If trusted header/block is available, syncer is started.
+func (syncService *SyncService[H]) setFirstAndStart(ctx context.Context, peerIDs []peer.ID) error {
+	// Look to see if trusted hash is passed, if not get the genesis header/block
+	var trusted H
+	// Try fetching the trusted header/block from peers if exists
+	if len(peerIDs) > 0 {
 		if syncService.conf.Node.TrustedHash != "" {
 			trustedHashBytes, err := hex.DecodeString(syncService.conf.Node.TrustedHash)
 			if err != nil {
-				return false, fmt.Errorf("failed to parse the trusted hash for initializing the store: %w", err)
+				return fmt.Errorf("failed to parse the trusted hash for initializing the store: %w", err)
 			}
+
 			if trusted, err = syncService.ex.Get(ctx, trustedHashBytes); err != nil {
-				return false, fmt.Errorf("failed to fetch the trusted header/block for initializing the store: %w", err)
+				return fmt.Errorf("failed to fetch the trusted header/block for initializing the store: %w", err)
 			}
 		} else {
+			// Try fetching the genesis header/block if available, otherwise fallback to block
+			var err error
 			if trusted, err = syncService.ex.GetByHeight(ctx, syncService.genesis.InitialHeight); err != nil {
-				return false, fmt.Errorf("failed to fetch the genesis: %w", err)
+				// Full/light nodes have to wait for aggregator to publish the genesis block
+				// proposing aggregator can init the store and start the syncer when the first block is published
+				return fmt.Errorf("failed to fetch the genesis: %w", err)
 			}
 		}
 
-		if err := syncService.initStore(ctx, trusted); err != nil {
-			return false, fmt.Errorf("failed to initialize the store: %w", err)
-		}
-		if err := syncService.startSyncer(ctx); err != nil {
-			return false, err
-		}
-		return true, nil
+		return syncService.initStoreAndStartSyncer(ctx, trusted)
 	}
-
-	// block with exponential backoff until initialization succeeds or context is canceled.
-	backoff := 1 * time.Second
-	maxBackoff := 10 * time.Second
-
-	timeoutTimer := time.NewTimer(time.Minute * 10)
-	defer timeoutTimer.Stop()
-
-	for {
-		ok, err := tryInit(ctx)
-		if ok {
-			return nil
-		}
-
-		syncService.logger.Info().Err(err).Dur("retry_in", backoff).Msg("headers not yet available from peers, waiting to initialize header sync")
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-timeoutTimer.C:
-			return fmt.Errorf("timeout reached while trying to initialize the store after 10 minutes: %w", err)
-		case <-time.After(backoff):
-		}
-
-		backoff *= 2
-		if backoff > maxBackoff {
-			backoff = maxBackoff
-		}
-	}
+	return nil
 }
 
 // Stop is a part of Service interface.
@@ -419,10 +347,21 @@ func newSyncer[H header.Header[H]](
 ) (*goheadersync.Syncer[H], error) {
 	opts = append(opts,
 		goheadersync.WithMetrics(),
-		goheadersync.WithPruningWindow(ninetyNineYears),
-		goheadersync.WithTrustingPeriod(ninetyNineYears),
 	)
 	return goheadersync.NewSyncer(ex, store, sub, opts...)
+}
+
+// StartSyncer starts the SyncService's syncer
+func (syncService *SyncService[H]) StartSyncer(ctx context.Context) error {
+	if syncService.syncerStatus.isStarted() {
+		return nil
+	}
+	err := syncService.syncer.Start(ctx)
+	if err != nil {
+		return err
+	}
+	syncService.syncerStatus.started.Store(true)
+	return nil
 }
 
 func (syncService *SyncService[H]) getNetworkID(network string) string {
@@ -441,22 +380,22 @@ func (syncService *SyncService[H]) getPeerIDs() []peer.ID {
 	return peerIDs
 }
 
-func getPeers(seeds string, logger zerolog.Logger) []peer.ID {
+func getPeers(seeds string, logger logging.EventLogger) []peer.ID {
 	var peerIDs []peer.ID
 	if seeds == "" {
 		return peerIDs
 	}
-	sl := strings.SplitSeq(seeds, ",")
+	sl := strings.Split(seeds, ",")
 
-	for seed := range sl {
+	for _, seed := range sl {
 		maddr, err := multiaddr.NewMultiaddr(seed)
 		if err != nil {
-			logger.Error().Str("address", seed).Err(err).Msg("failed to parse peer")
+			logger.Error("failed to parse peer", "address", seed, "error", err)
 			continue
 		}
 		addrInfo, err := peer.AddrInfoFromP2pAddr(maddr)
 		if err != nil {
-			logger.Error().Str("address", maddr.String()).Err(err).Msg("failed to create addr info for peer")
+			logger.Error("failed to create addr info for peer", "address", maddr, "error", err)
 			continue
 		}
 		peerIDs = append(peerIDs, addrInfo.ID)

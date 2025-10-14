@@ -16,20 +16,19 @@ import (
 
 func TestDefaultConfig(t *testing.T) {
 	// Test that default config has expected values
-	def := DefaultConfig()
-	def.RootDir = t.TempDir()
-
+	def := DefaultConfig
 	assert.Equal(t, "data", def.DBPath)
 	assert.Equal(t, false, def.Node.Aggregator)
 	assert.Equal(t, false, def.Node.Light)
-	assert.Equal(t, DefaultConfig().DA.Address, def.DA.Address)
+	assert.Equal(t, DefaultConfig.DA.Address, def.DA.Address)
 	assert.Equal(t, "", def.DA.AuthToken)
 	assert.Equal(t, float64(-1), def.DA.GasPrice)
 	assert.Equal(t, float64(0), def.DA.GasMultiplier)
 	assert.Equal(t, "", def.DA.SubmitOptions)
-	assert.NotEmpty(t, def.DA.Namespace)
+	assert.Equal(t, "", def.DA.Namespace)
 	assert.Equal(t, 1*time.Second, def.Node.BlockTime.Duration)
 	assert.Equal(t, 6*time.Second, def.DA.BlockTime.Duration)
+	assert.Equal(t, uint64(0), def.DA.StartHeight)
 	assert.Equal(t, uint64(0), def.DA.MempoolTTL)
 	assert.Equal(t, uint64(0), def.Node.MaxPendingHeadersAndData)
 	assert.Equal(t, false, def.Node.LazyMode)
@@ -38,7 +37,6 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Equal(t, "file", def.Signer.SignerType)
 	assert.Equal(t, "config", def.Signer.SignerPath)
 	assert.Equal(t, "127.0.0.1:7331", def.RPC.Address)
-	assert.NoError(t, def.Validate())
 }
 
 func TestAddFlags(t *testing.T) {
@@ -52,34 +50,33 @@ func TestAddFlags(t *testing.T) {
 	persistentFlags := cmd.PersistentFlags()
 
 	// Test specific flags
-	assertFlagValue(t, flags, FlagDBPath, DefaultConfig().DBPath)
+	assertFlagValue(t, flags, FlagDBPath, DefaultConfig.DBPath)
 
 	// Node flags
-	assertFlagValue(t, flags, FlagAggregator, DefaultConfig().Node.Aggregator)
-	assertFlagValue(t, flags, FlagLight, DefaultConfig().Node.Light)
-	assertFlagValue(t, flags, FlagBlockTime, DefaultConfig().Node.BlockTime.Duration)
-	assertFlagValue(t, flags, FlagTrustedHash, DefaultConfig().Node.TrustedHash)
-	assertFlagValue(t, flags, FlagLazyAggregator, DefaultConfig().Node.LazyMode)
-	assertFlagValue(t, flags, FlagMaxPendingHeadersAndData, DefaultConfig().Node.MaxPendingHeadersAndData)
-	assertFlagValue(t, flags, FlagLazyBlockTime, DefaultConfig().Node.LazyBlockInterval.Duration)
-	assertFlagValue(t, flags, FlagReadinessMaxBlocksBehind, DefaultConfig().Node.ReadinessMaxBlocksBehind)
+	assertFlagValue(t, flags, FlagAggregator, DefaultConfig.Node.Aggregator)
+	assertFlagValue(t, flags, FlagLight, DefaultConfig.Node.Light)
+	assertFlagValue(t, flags, FlagBlockTime, DefaultConfig.Node.BlockTime.Duration)
+	assertFlagValue(t, flags, FlagTrustedHash, DefaultConfig.Node.TrustedHash)
+	assertFlagValue(t, flags, FlagLazyAggregator, DefaultConfig.Node.LazyMode)
+	assertFlagValue(t, flags, FlagMaxPendingHeadersAndData, DefaultConfig.Node.MaxPendingHeadersAndData)
+	assertFlagValue(t, flags, FlagLazyBlockTime, DefaultConfig.Node.LazyBlockInterval.Duration)
 
 	// DA flags
-	assertFlagValue(t, flags, FlagDAAddress, DefaultConfig().DA.Address)
-	assertFlagValue(t, flags, FlagDAAuthToken, DefaultConfig().DA.AuthToken)
-	assertFlagValue(t, flags, FlagDABlockTime, DefaultConfig().DA.BlockTime.Duration)
-	assertFlagValue(t, flags, FlagDAGasPrice, DefaultConfig().DA.GasPrice)
-	assertFlagValue(t, flags, FlagDAGasMultiplier, DefaultConfig().DA.GasMultiplier)
-	assertFlagValue(t, flags, FlagDANamespace, DefaultConfig().DA.Namespace)
-	assertFlagValue(t, flags, FlagDASubmitOptions, DefaultConfig().DA.SubmitOptions)
-	assertFlagValue(t, flags, FlagDAMempoolTTL, DefaultConfig().DA.MempoolTTL)
-	assertFlagValue(t, flags, FlagDAMaxSubmitAttempts, DefaultConfig().DA.MaxSubmitAttempts)
+	assertFlagValue(t, flags, FlagDAAddress, DefaultConfig.DA.Address)
+	assertFlagValue(t, flags, FlagDAAuthToken, DefaultConfig.DA.AuthToken)
+	assertFlagValue(t, flags, FlagDABlockTime, DefaultConfig.DA.BlockTime.Duration)
+	assertFlagValue(t, flags, FlagDAGasPrice, DefaultConfig.DA.GasPrice)
+	assertFlagValue(t, flags, FlagDAGasMultiplier, DefaultConfig.DA.GasMultiplier)
+	assertFlagValue(t, flags, FlagDAStartHeight, DefaultConfig.DA.StartHeight)
+	assertFlagValue(t, flags, FlagDANamespace, DefaultConfig.DA.Namespace)
+	assertFlagValue(t, flags, FlagDASubmitOptions, DefaultConfig.DA.SubmitOptions)
+	assertFlagValue(t, flags, FlagDAMempoolTTL, DefaultConfig.DA.MempoolTTL)
 
 	// P2P flags
-	assertFlagValue(t, flags, FlagP2PListenAddress, DefaultConfig().P2P.ListenAddress)
-	assertFlagValue(t, flags, FlagP2PPeers, DefaultConfig().P2P.Peers)
-	assertFlagValue(t, flags, FlagP2PBlockedPeers, DefaultConfig().P2P.BlockedPeers)
-	assertFlagValue(t, flags, FlagP2PAllowedPeers, DefaultConfig().P2P.AllowedPeers)
+	assertFlagValue(t, flags, FlagP2PListenAddress, DefaultConfig.P2P.ListenAddress)
+	assertFlagValue(t, flags, FlagP2PPeers, DefaultConfig.P2P.Peers)
+	assertFlagValue(t, flags, FlagP2PBlockedPeers, DefaultConfig.P2P.BlockedPeers)
+	assertFlagValue(t, flags, FlagP2PAllowedPeers, DefaultConfig.P2P.AllowedPeers)
 
 	// Instrumentation flags
 	instrDef := DefaultInstrumentationConfig()
@@ -90,20 +87,20 @@ func TestAddFlags(t *testing.T) {
 	assertFlagValue(t, flags, FlagPprofListenAddr, instrDef.PprofListenAddr)
 
 	// Logging flags (in persistent flags)
-	assertFlagValue(t, persistentFlags, FlagLogLevel, DefaultConfig().Log.Level)
+	assertFlagValue(t, persistentFlags, FlagLogLevel, DefaultConfig.Log.Level)
 	assertFlagValue(t, persistentFlags, FlagLogFormat, "text")
 	assertFlagValue(t, persistentFlags, FlagLogTrace, false)
 
 	// Signer flags
 	assertFlagValue(t, flags, FlagSignerPassphrase, "")
 	assertFlagValue(t, flags, FlagSignerType, "file")
-	assertFlagValue(t, flags, FlagSignerPath, DefaultConfig().Signer.SignerPath)
+	assertFlagValue(t, flags, FlagSignerPath, DefaultConfig.Signer.SignerPath)
 
 	// RPC flags
-	assertFlagValue(t, flags, FlagRPCAddress, DefaultConfig().RPC.Address)
+	assertFlagValue(t, flags, FlagRPCAddress, DefaultConfig.RPC.Address)
 
 	// Count the number of flags we're explicitly checking
-	expectedFlagCount := 38 // Update this number if you add more flag checks above
+	expectedFlagCount := 35 // Update this number if you add more flag checks above
 
 	// Get the actual number of flags (both regular and persistent)
 	actualFlagCount := 0
@@ -173,7 +170,6 @@ signer:
 		"--rollkit.da.address", "http://flag-da:26657",
 		"--rollkit.node.light", "true", // This is not in YAML, should be set from flag
 		"--rollkit.rpc.address", "127.0.0.1:7332",
-		"--evnode.signer.signer_path", "/path/to/signer",
 	}
 	cmd.SetArgs(flagArgs)
 	err = cmd.ParseFlags(flagArgs)
@@ -196,11 +192,11 @@ signer:
 	assert.Equal(t, true, config.Node.Light, "Light should be set from flag")
 
 	// 4. Values not in flags or YAML should remain as default
-	assert.Equal(t, DefaultConfig().DA.BlockTime.Duration, config.DA.BlockTime.Duration, "DABlockTime should remain as default")
+	assert.Equal(t, DefaultConfig.DA.BlockTime.Duration, config.DA.BlockTime.Duration, "DABlockTime should remain as default")
 
 	// 5. Signer values should be set from flags
-	assert.Equal(t, "file", config.Signer.SignerType, "SignerType should be gotten from config")
-	assert.Equal(t, "/path/to/signer", config.Signer.SignerPath, "SignerPath should be set from flag")
+	assert.Equal(t, "file", config.Signer.SignerType, "SignerType should be set from flag")
+	assert.Equal(t, "something/config", config.Signer.SignerPath, "SignerPath should be set from flag")
 
 	assert.Equal(t, "127.0.0.1:7332", config.RPC.Address, "RPCAddress should be set from flag")
 }
@@ -278,81 +274,6 @@ signer:
 	require.Equal(t, "http://yaml-da:26657", cfgFromViper.DA.Address, "DA.Address should match YAML")
 	require.Equal(t, "file", cfgFromViper.Signer.SignerType, "Signer.SignerType should match YAML")
 	require.Equal(t, "something/config", cfgFromViper.Signer.SignerPath, "Signer.SignerPath should match YAML")
-
-	// Test that default flag values don't override config values when not explicitly set
-	t.Run("default flag values don't override config when not explicitly set", func(t *testing.T) {
-		// Create a viper instance that simulates having default values but IsSet() returns false
-		flagViper := viper.New()
-		flagViper.Set(FlagRootDir, tempDir)
-
-		// Create a command and parse empty args to simulate flags with defaults but not explicitly set
-		cmd = &cobra.Command{Use: "test"}
-		AddFlags(cmd)
-		AddGlobalFlags(cmd, "test")
-
-		// Bind the flags to viper - this populates viper with default values
-		// but since no args were provided, IsSet() will return false for these flags
-		err = flagViper.BindPFlags(cmd.Flags())
-		require.NoError(t, err)
-		err = flagViper.BindPFlags(cmd.PersistentFlags())
-		require.NoError(t, err)
-
-		// Parse empty command line - this means all flags have default values but IsSet() = false
-		err = cmd.ParseFlags([]string{})
-		require.NoError(t, err)
-
-		// Sanity check.
-		// Verify that IsSet returns false for flag values (this is the key behavior we're testing)
-		require.False(t, flagViper.IsSet("rollkit.node.aggregator"), "Flag should not be considered 'set' when using default")
-		require.False(t, flagViper.IsSet("rollkit.node.block_time"), "Flag should not be considered 'set' when using default")
-		require.False(t, flagViper.IsSet("rollkit.da.address"), "Flag should not be considered 'set' when using default")
-
-		cfgFromViper, err = LoadFromViper(flagViper)
-		require.NoError(t, err)
-
-		// These values should come from YAML, not be overridden by flag defaults
-		require.True(t, cfgFromViper.Node.Aggregator, "Node.Aggregator should remain true from YAML, not overridden by flag default")
-		require.Equal(t, "5s", cfgFromViper.Node.BlockTime.String(), "Node.BlockTime should remain 5s from YAML, not overridden by flag default")
-		require.Equal(t, "http://yaml-da:26657", cfgFromViper.DA.Address, "DA.Address should remain from YAML, not overridden by flag default")
-		require.Equal(t, "something/config", cfgFromViper.Signer.SignerPath, "Signer.SignerPath should remain from YAML, not overridden by flag default")
-	})
-}
-
-func TestDAConfig_GetDataNamespace(t *testing.T) {
-	tests := []struct {
-		name              string
-		defaultNamespace  string
-		dataNamespace     string
-		expectedNamespace string
-	}{
-		{
-			name:              "DataNamespace set",
-			dataNamespace:     "custom-data",
-			defaultNamespace:  "namespace",
-			expectedNamespace: "custom-data",
-		},
-		{
-			name:              "DataNamespace empty, fallback to default namespace",
-			dataNamespace:     "",
-			defaultNamespace:  "namespace",
-			expectedNamespace: "namespace",
-		},
-		{
-			name: "Both empty",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			daConfig := &DAConfig{
-				DataNamespace: tt.dataNamespace,
-				Namespace:     tt.defaultNamespace,
-			}
-
-			result := daConfig.GetDataNamespace()
-			assert.Equal(t, tt.expectedNamespace, result)
-		})
-	}
 }
 
 func assertFlagValue(t *testing.T, flags *pflag.FlagSet, name string, expectedValue any) {

@@ -25,8 +25,6 @@ func main() {
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 
-			cmd.Env = append(os.Environ(), "GOTOOLCHAIN=local")
-
 			if err := cmd.Run(); err != nil {
 				return fmt.Errorf("failed to run go mod tidy in %s: %w", dir, err)
 			}

@@ -1,7 +1,10 @@
 package types
 
 import (
+	"errors"
 	"time"
+
+	"github.com/rollkit/rollkit/pkg/genesis"
 )
 
 // InitStateVersion sets the Consensus.Block and Software versions,
@@ -25,7 +28,7 @@ type State struct {
 	LastBlockHeight uint64
 	LastBlockTime   time.Time
 
-	// DAHeight identifies DA block containing the latest applied Evolve block.
+	// DAHeight identifies DA block containing the latest applied Rollkit block.
 	DAHeight uint64
 
 	// Merkle root of the results from executing prev block
@@ -33,6 +36,25 @@ type State struct {
 
 	// the latest AppHash we've received from calling abci.Commit()
 	AppHash []byte
+}
+
+// NewFromGenesisDoc reads blockchain State from genesis.
+func NewFromGenesisDoc(genDoc genesis.Genesis) (State, error) {
+	if genDoc.InitialHeight == 0 {
+		return State{}, errors.New("initial height must be 1 when starting a new app")
+	}
+	s := State{
+		Version:       InitStateVersion,
+		ChainID:       genDoc.ChainID,
+		InitialHeight: genDoc.InitialHeight,
+
+		DAHeight: 1,
+
+		LastBlockHeight: genDoc.InitialHeight - 1,
+		LastBlockTime:   genDoc.GenesisDAStartTime,
+	}
+
+	return s, nil
 }
 
 func (s *State) NextState(header Header, stateRoot []byte) (State, error) {

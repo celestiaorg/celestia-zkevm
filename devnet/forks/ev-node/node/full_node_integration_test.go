@@ -9,7 +9,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	evconfig "github.com/evstack/ev-node/pkg/config"
+	coreexecutor "github.com/rollkit/rollkit/core/execution"
+	rollkitconfig "github.com/rollkit/rollkit/pkg/config"
 )
 
 // TestTxGossipingMultipleNodesNoDA tests that transactions are gossiped and blocks are sequenced and synced across multiple nodes without the DA layer over P2P.
@@ -18,7 +19,7 @@ func TestTxGossipingMultipleNodesNoDA(t *testing.T) {
 	require := require.New(t)
 	config := getTestConfig(t, 1)
 	// Set the DA block time to a very large value to ensure that the DA layer is not used
-	config.DA.BlockTime = evconfig.DurationWrapper{Duration: 100 * time.Second}
+	config.DA.BlockTime = rollkitconfig.DurationWrapper{Duration: 100 * time.Second}
 	numNodes := 3
 	nodes, cleanups := createNodesWithCleanup(t, numNodes, config)
 	for _, cleanup := range cleanups {
@@ -35,33 +36,22 @@ func TestTxGossipingMultipleNodesNoDA(t *testing.T) {
 	err := waitForFirstBlock(nodes[0], Header)
 	require.NoError(err)
 
-	// Add a small delay to ensure P2P services are fully ready
-	time.Sleep(500 * time.Millisecond)
+	// Verify block manager is properly initialized
+	require.NotNil(nodes[0].blockManager, "Block manager should be initialized")
 
 	// Start the other nodes
 	for i := 1; i < numNodes; i++ {
 		startNodeInBackground(t, nodes, ctxs, &runningWg, i)
-		// Add a small delay between starting nodes to avoid connection race
-		if i < numNodes-1 {
-			time.Sleep(100 * time.Millisecond)
-		}
 	}
 
 	// Inject a transaction into the sequencer's executor
-	if nodes[0].blockComponents != nil && nodes[0].blockComponents.Executor != nil {
-		// Access the core executor from the block executor
-		coreExec := nodes[0].blockComponents.Executor.GetCoreExecutor()
-		if dummyExec, ok := coreExec.(interface{ InjectTx([]byte) }); ok {
-			dummyExec.InjectTx([]byte("test tx"))
-		} else {
-			t.Logf("Warning: Could not cast core executor to DummyExecutor, skipping transaction injection")
-		}
-	}
+	executor := nodes[0].blockManager.GetExecutor().(*coreexecutor.DummyExecutor)
+	executor.InjectTx([]byte("test tx"))
 
 	blocksToWaitFor := uint64(3)
 	// Wait for all nodes to reach at least blocksToWaitFor blocks
-	for _, nodeItem := range nodes {
-		require.NoError(waitForAtLeastNBlocks(nodeItem, blocksToWaitFor, Store))
+	for _, node := range nodes {
+		require.NoError(waitForAtLeastNBlocks(node, blocksToWaitFor, Store))
 	}
 
 	// Shutdown all nodes and wait
@@ -95,38 +85,24 @@ func TestTxGossipingMultipleNodesDAIncluded(t *testing.T) {
 	err := waitForFirstBlock(nodes[0], Header)
 	require.NoError(err)
 
-	// Verify block components are properly initialized
-	require.True(nodes[0].IsRunning(), "Block components should be initialized")
-
-	// Add a small delay to ensure P2P services are fully ready
-	time.Sleep(500 * time.Millisecond)
+	// Verify block manager is properly initialized
+	require.NotNil(nodes[0].blockManager, "Block manager should be initialized")
 
 	// Start the other nodes
 	for i := 1; i < numNodes; i++ {
 		startNodeInBackground(t, nodes, ctxs, &runningWg, i)
-		// Add a small delay between starting nodes to avoid connection race
-		if i < numNodes-1 {
-			time.Sleep(100 * time.Millisecond)
-		}
 	}
 
-	// Inject transactions into the sequencer's executor
-	if nodes[0].blockComponents != nil && nodes[0].blockComponents.Executor != nil {
-		// Access the core executor from the block executor
-		coreExec := nodes[0].blockComponents.Executor.GetCoreExecutor()
-		if dummyExec, ok := coreExec.(interface{ InjectTx([]byte) }); ok {
-			dummyExec.InjectTx([]byte("test tx 1"))
-			dummyExec.InjectTx([]byte("test tx 2"))
-			dummyExec.InjectTx([]byte("test tx 3"))
-		} else {
-			t.Logf("Warning: Could not cast core executor to DummyExecutor, skipping transaction injection")
-		}
-	}
+	// Inject a transaction into the sequencer's executor
+	executor := nodes[0].blockManager.GetExecutor().(*coreexecutor.DummyExecutor)
+	executor.InjectTx([]byte("test tx 1"))
+	executor.InjectTx([]byte("test tx 2"))
+	executor.InjectTx([]byte("test tx 3"))
 
 	blocksToWaitFor := uint64(5)
 	// Wait for all nodes to reach at least blocksToWaitFor blocks with DA inclusion
-	for _, nodeItem := range nodes {
-		require.NoError(waitForAtLeastNDAIncludedHeight(nodeItem, blocksToWaitFor))
+	for _, node := range nodes {
+		require.NoError(waitForAtLeastNDAIncludedHeight(node, blocksToWaitFor))
 	}
 
 	// Shutdown all nodes and wait
@@ -144,12 +120,12 @@ func TestTxGossipingMultipleNodesDAIncluded(t *testing.T) {
 func TestFastDASync(t *testing.T) {
 	require := require.New(t)
 
-	// Set up two nodes where DA is faster than block production
+	// Set up two nodes with different block and DA block times
 	config := getTestConfig(t, 1)
-	// Slow block production (sequencer takes 1s per block)
-	config.Node.BlockTime = evconfig.DurationWrapper{Duration: 1 * time.Second}
-	// Fast DA availability (DA makes blocks available every 200ms)
-	config.DA.BlockTime = evconfig.DurationWrapper{Duration: 200 * time.Millisecond}
+	// Set the block time to 2 seconds and the DA block time to 1 second
+	// Note: these are large values to avoid test failures due to slow CI machines
+	config.Node.BlockTime = rollkitconfig.DurationWrapper{Duration: 2 * time.Second}
+	config.DA.BlockTime = rollkitconfig.DurationWrapper{Duration: 1 * time.Second}
 
 	nodes, cleanups := createNodesWithCleanup(t, 2, config)
 	for _, cleanup := range cleanups {
@@ -166,24 +142,16 @@ func TestFastDASync(t *testing.T) {
 	blocksToWaitFor := uint64(2)
 	require.NoError(waitForAtLeastNDAIncludedHeight(nodes[0], blocksToWaitFor))
 
-	// Add a small delay to ensure P2P services are fully ready
-	time.Sleep(500 * time.Millisecond)
-
 	// Now start the second node and time its sync
 	startNodeInBackground(t, nodes, ctxs, &runningWg, 1)
 	start := time.Now()
 	// Wait for the second node to catch up to the first node
 	require.NoError(waitForAtLeastNBlocks(nodes[1], blocksToWaitFor, Store))
 	syncDuration := time.Since(start)
-	// The key test: sync should be much faster than sequential block production time
-	// Since DA provides blocks faster than sequencer block time, sync should complete
-	// in significantly less time than it took the sequencer to produce them sequentially
-	expectedSequentialTime := time.Duration(blocksToWaitFor) * config.Node.BlockTime.Duration
-	maxReasonableSyncTime := expectedSequentialTime / 3 // Should be at least 3x faster than sequential
 
-	require.Less(syncDuration, maxReasonableSyncTime,
-		"DA fast sync took %v, should be much faster than sequential block time %v (max reasonable: %v). ",
-		syncDuration, expectedSequentialTime, maxReasonableSyncTime)
+	// Ensure node syncs within a small delta of DA block time
+	delta := 250 * time.Millisecond
+	require.Less(syncDuration, config.DA.BlockTime.Duration+delta, "Block sync should be faster than DA block time")
 
 	// Verify both nodes are synced and that the synced block is DA-included
 	assertAllNodesSynced(t, nodes, blocksToWaitFor)
@@ -200,8 +168,8 @@ func TestSingleSequencerTwoFullNodesBlockSyncSpeed(t *testing.T) {
 
 	// Set up three nodes: 1 sequencer, 2 full nodes
 	config := getTestConfig(t, 1)
-	config.Node.BlockTime = evconfig.DurationWrapper{Duration: 100 * time.Millisecond} // fast block time
-	config.DA.BlockTime = evconfig.DurationWrapper{Duration: 10 * time.Second}         // slow DA block time
+	config.Node.BlockTime = rollkitconfig.DurationWrapper{Duration: 100 * time.Millisecond} // fast block time
+	config.DA.BlockTime = rollkitconfig.DurationWrapper{Duration: 10 * time.Second}         // slow DA block time
 
 	numNodes := 3
 	nodes, cleanups := createNodesWithCleanup(t, numNodes, config)
@@ -218,24 +186,17 @@ func TestSingleSequencerTwoFullNodesBlockSyncSpeed(t *testing.T) {
 	// Wait for the sequencer to produce at first block
 	require.NoError(waitForFirstBlock(nodes[0], Store))
 
-	// Add a small delay to ensure P2P services are fully ready
-	time.Sleep(500 * time.Millisecond)
-
 	// Now start the other nodes
 	for i := 1; i < numNodes; i++ {
 		startNodeInBackground(t, nodes, ctxs, &runningWg, i)
-		// Add a small delay between starting nodes to avoid connection race
-		if i < numNodes-1 {
-			time.Sleep(100 * time.Millisecond)
-		}
 	}
 
 	blocksToWaitFor := uint64(10)
 	start := time.Now()
 
 	// Wait for all nodes to reach the target block height
-	for _, nodeItem := range nodes {
-		require.NoError(waitForAtLeastNBlocks(nodeItem, blocksToWaitFor, Store))
+	for _, node := range nodes {
+		require.NoError(waitForAtLeastNBlocks(node, blocksToWaitFor, Store))
 	}
 	totalDuration := time.Since(start)
 
@@ -254,7 +215,7 @@ func TestSingleSequencerTwoFullNodesBlockSyncSpeed(t *testing.T) {
 // TestDataExchange verifies data exchange and synchronization between nodes in various network topologies.
 //
 // This test runs three sub-tests:
-//  1. Single sequencer and single full
+//  1. Single sequencer and single full node.
 //  2. Single sequencer and two full nodes.
 //  3. Single sequencer and single full node with trusted hash.
 //
@@ -274,7 +235,7 @@ func TestDataExchange(t *testing.T) {
 // TestHeaderExchange verifies header exchange and synchronization between nodes in various network topologies.
 //
 // This test runs three sub-tests:
-//  1. Single sequencer and single full
+//  1. Single sequencer and single full node.
 //  2. Single sequencer and two full nodes.
 //  3. Single sequencer and single full node with trusted hash.
 //
@@ -291,7 +252,7 @@ func TestHeaderExchange(t *testing.T) {
 	})
 }
 
-// testSingleSequencerSingleFullNode sets up a single sequencer and a single full node, starts the sequencer, waits for it to produce a block, then starts the full
+// testSingleSequencerSingleFullNode sets up a single sequencer and a single full node, starts the sequencer, waits for it to produce a block, then starts the full node.
 // It waits for both nodes to reach a target block height (using the provided 'source' to determine block inclusion), verifies that both nodes are fully synced, and then shuts them down.
 func testSingleSequencerSingleFullNode(t *testing.T, source Source) {
 	require := require.New(t)
@@ -313,16 +274,13 @@ func testSingleSequencerSingleFullNode(t *testing.T, source Source) {
 	// Wait for the sequencer to produce at first block
 	require.NoError(waitForFirstBlock(nodes[0], source))
 
-	// Add a small delay to ensure P2P services are fully ready
-	time.Sleep(500 * time.Millisecond)
-
 	// Start the full node
 	startNodeInBackground(t, nodes, ctxs, &runningWg, 1)
 
 	blocksToWaitFor := uint64(3)
 	// Wait for both nodes to reach at least blocksToWaitFor blocks
-	for _, nodeItem := range nodes {
-		require.NoError(waitForAtLeastNBlocks(nodeItem, blocksToWaitFor, source))
+	for _, node := range nodes {
+		require.NoError(waitForAtLeastNBlocks(node, blocksToWaitFor, source))
 	}
 
 	// Verify both nodes are synced using the helper
@@ -354,22 +312,15 @@ func testSingleSequencerTwoFullNodes(t *testing.T, source Source) {
 	// Wait for the sequencer to produce at first block
 	require.NoError(waitForFirstBlock(nodes[0], source))
 
-	// Add a small delay to ensure P2P services are fully ready
-	time.Sleep(500 * time.Millisecond)
-
 	// Start the full nodes
 	for i := 1; i < numNodes; i++ {
 		startNodeInBackground(t, nodes, ctxs, &runningWg, i)
-		// Add a small delay between starting nodes to avoid connection race
-		if i < numNodes-1 {
-			time.Sleep(100 * time.Millisecond)
-		}
 	}
 
 	blocksToWaitFor := uint64(3)
 	// Wait for all nodes to reach at least blocksToWaitFor blocks
-	for _, nodeItem := range nodes {
-		require.NoError(waitForAtLeastNBlocks(nodeItem, blocksToWaitFor, source))
+	for _, node := range nodes {
+		require.NoError(waitForAtLeastNBlocks(node, blocksToWaitFor, source))
 	}
 
 	// Verify all nodes are synced using the helper
@@ -419,19 +370,15 @@ func testSingleSequencerSingleFullNodeTrustedHash(t *testing.T, source Source) {
 	}
 
 	// Set the trusted hash in the full node
-	nodeConfig := nodes[1].nodeConfig
-	nodeConfig.Node.TrustedHash = trustedHash
-
-	// Add a small delay to ensure P2P services are fully ready
-	time.Sleep(500 * time.Millisecond)
+	nodes[1].nodeConfig.Node.TrustedHash = trustedHash
 
 	// Start the full node
 	startNodeInBackground(t, nodes, ctxs, &runningWg, 1)
 
 	blocksToWaitFor := uint64(3)
 	// Wait for both nodes to reach at least blocksToWaitFor blocks
-	for _, nodeItem := range nodes {
-		require.NoError(waitForAtLeastNBlocks(nodeItem, blocksToWaitFor, source))
+	for _, node := range nodes {
+		require.NoError(waitForAtLeastNBlocks(node, blocksToWaitFor, source))
 	}
 
 	// Verify both nodes are synced using the helper
@@ -474,6 +421,7 @@ func testTwoChainsInOneNamespace(t *testing.T, chainID1 string, chainID2 string)
 
 	// Set up nodes for the first chain
 	configChain1 := getTestConfig(t, 1)
+	configChain1.ChainID = chainID1
 
 	nodes1, cleanups := createNodesWithCleanup(t, 1, configChain1)
 	for _, cleanup := range cleanups {
@@ -482,6 +430,7 @@ func testTwoChainsInOneNamespace(t *testing.T, chainID1 string, chainID2 string)
 
 	// Set up nodes for the second chain
 	configChain2 := getTestConfig(t, 1000)
+	configChain2.ChainID = chainID2
 
 	nodes2, cleanups := createNodesWithCleanup(t, 1, configChain2)
 	for _, cleanup := range cleanups {
@@ -520,3 +469,5 @@ func testTwoChainsInOneNamespace(t *testing.T, chainID1 string, chainID2 string)
 	shutdownAndWait(t, cancels1, &runningWg1, 5*time.Second)
 	shutdownAndWait(t, cancels2, &runningWg2, 5*time.Second)
 }
+
+

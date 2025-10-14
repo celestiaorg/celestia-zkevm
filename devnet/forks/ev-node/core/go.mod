@@ -1,4 +1,4 @@
-module github.com/evstack/ev-node/core
+module github.com/rollkit/rollkit/core
 
 go 1.24.1
 

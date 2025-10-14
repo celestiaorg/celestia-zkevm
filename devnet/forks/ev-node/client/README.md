@@ -1,14 +1,14 @@
-# Evolve Client Libraries
+# Rollkit Client Libraries
 
-This directory contains client libraries for interacting with Evolve nodes in various programming languages.
+This directory contains client libraries for interacting with Rollkit nodes in various programming languages.
 
 ## Structure
 
-```txt
+```ascii
 client/
 ├── crates/           # Rust client libraries
-│   ├── types/    # Generated protobuf types for Rust
-│   └── client/   # High-level Rust client for gRPC services
+│   ├── rollkit-types/    # Generated protobuf types for Rust
+│   └── rollkit-client/   # High-level Rust client for gRPC services
 └── README.md
 ```
 
@@ -16,11 +16,11 @@ client/
 
 The Rust client consists of two crates:
 
-### ev-types
+### rollkit-types
 
-Contains all the protobuf-generated types and service definitions. This crate is automatically generated from the proto files in `/proto/evnode/v1/`.
+Contains all the protobuf-generated types and service definitions. This crate is automatically generated from the proto files in `/proto/rollkit/v1/`.
 
-### ev-client
+### rollkit-client
 
 A high-level client library that provides:
 
@@ -30,7 +30,7 @@ A high-level client library that provides:
 - Comprehensive error handling
 - Example usage code
 
-See the [ev-client README](crates/client/README.md) for detailed usage instructions.
+See the [rollkit-client README](crates/rollkit-client/README.md) for detailed usage instructions.
 
 ## Future Client Libraries
 

@@ -173,7 +173,7 @@ func TestSign(t *testing.T) {
 		require.NoError(t, err)
 
 		// Sign a message
-		message := []byte("Hello, Evolve!")
+		message := []byte("Hello, Rollkit!")
 		signature, err := signer.Sign(message)
 		require.NoError(t, err)
 		require.NotNil(t, signature)

@@ -12,8 +12,8 @@ func TestTranslateAddresses(t *testing.T) {
 	t.Parallel()
 
 	invalidCosmos := "foobar"
-	legactIP := "127.0.0.1:1234"
-	validIP := "/ip4/127.0.0.1/tcp/1234"
+	validCosmos := "127.0.0.1:1234"
+	validRollkit := "/ip4/127.0.0.1/tcp/1234"
 
 	cases := []struct {
 		name        string
@@ -24,14 +24,14 @@ func TestTranslateAddresses(t *testing.T) {
 		{"empty", Config{}, Config{}, ""},
 		{
 			"valid listen address",
-			Config{P2P: P2PConfig{ListenAddress: legactIP}},
-			Config{P2P: P2PConfig{ListenAddress: validIP}},
+			Config{P2P: P2PConfig{ListenAddress: validCosmos}},
+			Config{P2P: P2PConfig{ListenAddress: validRollkit}},
 			"",
 		},
 		{
 			"valid seed address",
-			Config{P2P: P2PConfig{Peers: legactIP + "," + legactIP}},
-			Config{P2P: P2PConfig{Peers: validIP + "," + validIP}},
+			Config{P2P: P2PConfig{Peers: validCosmos + "," + validCosmos}},
+			Config{P2P: P2PConfig{Peers: validRollkit + "," + validRollkit}},
 			"",
 		},
 		{
@@ -42,7 +42,7 @@ func TestTranslateAddresses(t *testing.T) {
 		},
 		{
 			"invalid seed address",
-			Config{P2P: P2PConfig{Peers: legactIP + "," + invalidCosmos}},
+			Config{P2P: P2PConfig{Peers: validCosmos + "," + invalidCosmos}},
 			Config{},
 			errInvalidAddress.Error(),
 		},

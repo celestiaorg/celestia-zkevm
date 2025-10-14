@@ -9,8 +9,8 @@ import (
 	ds "github.com/ipfs/go-datastore"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/evstack/ev-node/types"
-	pb "github.com/evstack/ev-node/types/pb/evnode/v1"
+	"github.com/rollkit/rollkit/types"
+	pb "github.com/rollkit/rollkit/types/pb/rollkit/v1"
 )
 
 // DefaultStore is a default store implementation.
@@ -32,6 +32,20 @@ func (s *DefaultStore) Close() error {
 	return s.db.Close()
 }
 
+// SetHeight sets the height saved in the Store if it is higher than the existing height
+func (s *DefaultStore) SetHeight(ctx context.Context, height uint64) error {
+	currentHeight, err := s.Height(ctx)
+	if err != nil {
+		return err
+	}
+	if height <= currentHeight {
+		return nil
+	}
+
+	heightBytes := encodeHeight(height)
+	return s.db.Put(ctx, ds.NewKey(getHeightKey()), heightBytes)
+}
+
 // Height returns height of the highest block saved in the Store.
 func (s *DefaultStore) Height(ctx context.Context) (uint64, error) {
 	heightBytes, err := s.db.Get(ctx, ds.NewKey(getHeightKey()))
@@ -49,6 +63,45 @@ func (s *DefaultStore) Height(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 	return height, nil
+}
+
+// SaveBlockData adds block header and data to the store along with corresponding signature.
+// Stored height is updated if block height is greater than stored value.
+func (s *DefaultStore) SaveBlockData(ctx context.Context, header *types.SignedHeader, data *types.Data, signature *types.Signature) error {
+	hash := header.Hash()
+	height := header.Height()
+	signatureHash := *signature
+	headerBlob, err := header.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("failed to marshal Header to binary: %w", err)
+	}
+	dataBlob, err := data.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("failed to marshal Data to binary: %w", err)
+	}
+
+	batch, err := s.db.Batch(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create a new batch: %w", err)
+	}
+
+	if err := batch.Put(ctx, ds.NewKey(getHeaderKey(height)), headerBlob); err != nil {
+		return fmt.Errorf("failed to put header blob in batch: %w", err)
+	}
+	if err := batch.Put(ctx, ds.NewKey(getDataKey(height)), dataBlob); err != nil {
+		return fmt.Errorf("failed to put data blob in batch: %w", err)
+	}
+	if err := batch.Put(ctx, ds.NewKey(getSignatureKey(height)), signatureHash[:]); err != nil {
+		return fmt.Errorf("failed to put signature of block blob in batch: %w", err)
+	}
+	if err := batch.Put(ctx, ds.NewKey(getIndexKey(hash)), encodeHeight(height)); err != nil {
+		return fmt.Errorf("failed to put index key in batch: %w", err)
+	}
+	if err := batch.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit batch: %w", err)
+	}
+
+	return nil
 }
 
 // GetBlockData returns block header and data at given height, or error if it's not found in Store.
@@ -123,14 +176,23 @@ func (s *DefaultStore) GetSignature(ctx context.Context, height uint64) (*types.
 	return &signature, nil
 }
 
+// UpdateState updates state saved in Store. Only one State is stored.
+// If there is no State in Store, state will be saved.
+func (s *DefaultStore) UpdateState(ctx context.Context, state types.State) error {
+	pbState, err := state.ToProto()
+	if err != nil {
+		return fmt.Errorf("failed to convert type state to protobuf type: %w", err)
+	}
+	data, err := proto.Marshal(pbState)
+	if err != nil {
+		return fmt.Errorf("failed to marshal state to protobuf: %w", err)
+	}
+	return s.db.Put(ctx, ds.NewKey(getStateKey()), data)
+}
+
 // GetState returns last state saved with UpdateState.
 func (s *DefaultStore) GetState(ctx context.Context) (types.State, error) {
-	currentHeight, err := s.Height(ctx)
-	if err != nil {
-		return types.State{}, fmt.Errorf("failed to get current height: %w", err)
-	}
-
-	blob, err := s.db.Get(ctx, ds.NewKey(getStateAtHeightKey(currentHeight)))
+	blob, err := s.db.Get(ctx, ds.NewKey(getStateKey()))
 	if err != nil {
 		return types.State{}, fmt.Errorf("failed to retrieve state: %w", err)
 	}
@@ -143,30 +205,6 @@ func (s *DefaultStore) GetState(ctx context.Context) (types.State, error) {
 	var state types.State
 	err = state.FromProto(&pbState)
 	return state, err
-}
-
-// GetStateAtHeight returns the state at the given height.
-// If no state is stored at that height, it returns an error.
-func (s *DefaultStore) GetStateAtHeight(ctx context.Context, height uint64) (types.State, error) {
-	blob, err := s.db.Get(ctx, ds.NewKey(getStateAtHeightKey(height)))
-	if err != nil {
-		if errors.Is(err, ds.ErrNotFound) {
-			return types.State{}, fmt.Errorf("no state found at height %d", height)
-		}
-		return types.State{}, fmt.Errorf("failed to retrieve state at height %d: %w", height, err)
-	}
-
-	var pbState pb.State
-	if err := proto.Unmarshal(blob, &pbState); err != nil {
-		return types.State{}, fmt.Errorf("failed to unmarshal state from protobuf at height %d: %w", height, err)
-	}
-
-	var state types.State
-	if err := state.FromProto(&pbState); err != nil {
-		return types.State{}, fmt.Errorf("failed to convert protobuf to state at height %d: %w", height, err)
-	}
-
-	return state, nil
 }
 
 // SetMetadata saves arbitrary value in the store.
@@ -187,88 +225,6 @@ func (s *DefaultStore) GetMetadata(ctx context.Context, key string) ([]byte, err
 		return nil, fmt.Errorf("failed to get metadata for key '%s': %w", key, err)
 	}
 	return data, nil
-}
-
-// Rollback rolls back block data until the given height from the store.
-// When aggregator is true, it will check the latest data included height and prevent rollback further than that.
-// NOTE: this function does not rollback metadata. Those should be handled separately if required.
-// Other stores are not rolled back either.
-func (s *DefaultStore) Rollback(ctx context.Context, height uint64, aggregator bool) error {
-	batch, err := s.db.Batch(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to create a new batch: %w", err)
-	}
-
-	currentHeight, err := s.Height(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get current height: %w", err)
-	}
-
-	if currentHeight <= height {
-		return fmt.Errorf("current height %d is already less than or equal to rollback height %d", currentHeight, height)
-	}
-
-	daIncludedHeightBz, err := s.GetMetadata(ctx, DAIncludedHeightKey)
-	if err != nil && !errors.Is(err, ds.ErrNotFound) {
-		return fmt.Errorf("failed to get DA included height: %w", err)
-	} else if len(daIncludedHeightBz) == 8 { // valid height stored, so able to check
-		daIncludedHeight := binary.LittleEndian.Uint64(daIncludedHeightBz)
-		if daIncludedHeight > height {
-			// an aggregator must not rollback a finalized height, DA is the source of truth
-			if aggregator {
-				return fmt.Errorf("DA included height is greater than the rollback height: cannot rollback a finalized height")
-			} else { // in case of syncing issues, rollback the included height is OK.
-				bz := make([]byte, 8)
-				binary.LittleEndian.PutUint64(bz, height)
-				if err := batch.Put(ctx, ds.NewKey(getMetaKey(DAIncludedHeightKey)), bz); err != nil {
-					return fmt.Errorf("failed to update DA included height: %w", err)
-				}
-			}
-		}
-	}
-
-	for currentHeight > height {
-		header, err := s.GetHeader(ctx, currentHeight)
-		if err != nil {
-			return fmt.Errorf("failed to get header at height %d: %w", currentHeight, err)
-		}
-
-		if err := batch.Delete(ctx, ds.NewKey(getHeaderKey(currentHeight))); err != nil {
-			return fmt.Errorf("failed to delete header blob in batch: %w", err)
-		}
-
-		if err := batch.Delete(ctx, ds.NewKey(getDataKey(currentHeight))); err != nil {
-			return fmt.Errorf("failed to delete data blob in batch: %w", err)
-		}
-
-		if err := batch.Delete(ctx, ds.NewKey(getSignatureKey(currentHeight))); err != nil {
-			return fmt.Errorf("failed to delete signature of block blob in batch: %w", err)
-		}
-
-		hash := header.Hash()
-		if err := batch.Delete(ctx, ds.NewKey(getIndexKey(hash))); err != nil {
-			return fmt.Errorf("failed to delete index key in batch: %w", err)
-		}
-
-		if err := batch.Delete(ctx, ds.NewKey(getStateAtHeightKey(currentHeight))); err != nil {
-			return fmt.Errorf("failed to delete state in batch: %w", err)
-		}
-
-		currentHeight--
-	}
-
-	// set height -- using set height checks the current height
-	// so we cannot use that
-	heightBytes := encodeHeight(height)
-	if err := batch.Put(ctx, ds.NewKey(getHeightKey()), heightBytes); err != nil {
-		return fmt.Errorf("failed to set height: %w", err)
-	}
-
-	if err := batch.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit batch: %w", err)
-	}
-
-	return nil
 }
 
 const heightLength = 8

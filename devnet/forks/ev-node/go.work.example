@@ -3,11 +3,11 @@ go 1.23
 use (
 	.
 	./core
-	./apps/testapp
+	./apps/abci/based
+	./apps/abci/single
+	./apps/evm/based
 	./apps/evm/single
-	./apps/grpc/single
 	./execution/evm
-	./execution/grpc
-	./da/
+	./sequencers/based
 	./sequencers/single
 )

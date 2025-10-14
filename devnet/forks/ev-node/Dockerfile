@@ -16,7 +16,7 @@ ENV GOPROXY=https://proxy.golang.org
 #
 FROM base AS builder
 
-WORKDIR /ev-node
+WORKDIR /rollkit
 
 # Copy all source code first
 COPY . .

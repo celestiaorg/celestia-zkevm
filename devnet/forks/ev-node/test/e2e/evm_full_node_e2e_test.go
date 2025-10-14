@@ -1,7 +1,7 @@
 //go:build evm
 // +build evm
 
-// Package e2e contains end-to-end tests for Evolve's EVM integration.
+// Package e2e contains end-to-end tests for Rollkit's EVM integration.
 //
 // This file specifically tests the EVM full node functionality including:
 // - Full node synchronization via P2P with sequencer
@@ -34,8 +34,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/require"
 
-	"github.com/evstack/ev-node/pkg/rpc/client"
-	"github.com/evstack/ev-node/pkg/store"
+	"github.com/rollkit/rollkit/pkg/rpc/client"
+	"github.com/rollkit/rollkit/pkg/store"
 )
 
 // Note: evmSingleBinaryPath is declared in evm_sequencer_e2e_test.go to avoid duplicate declaration
@@ -210,28 +210,28 @@ func verifyStateRootsMatch(t *testing.T, sequencerURL, fullNodeURL string, block
 // This helper function handles the complex setup required for full node tests.
 //
 // Returns: sequencerClient, fullNodeClient for EVM connections
-func setupSequencerWithFullNode(t *testing.T, sut *SystemUnderTest, sequencerHome, fullNodeHome string) (*ethclient.Client, *ethclient.Client, *TestEndpoints) {
+func setupSequencerWithFullNode(t *testing.T, sut *SystemUnderTest, sequencerHome, fullNodeHome string) (*ethclient.Client, *ethclient.Client) {
 	t.Helper()
 
 	// Common setup for both sequencer and full node
-	jwtSecret, fullNodeJwtSecret, genesisHash, endpoints := setupCommonEVMTest(t, sut, true)
+	jwtSecret, fullNodeJwtSecret, genesisHash := setupCommonEVMTest(t, sut, true)
 
 	// Setup sequencer
-	setupSequencerNode(t, sut, sequencerHome, jwtSecret, genesisHash, endpoints)
+	setupSequencerNode(t, sut, sequencerHome, jwtSecret, genesisHash)
 	t.Log("Sequencer node is up")
 
 	// Get P2P address and setup full node
-	sequencerP2PAddress := getNodeP2PAddress(t, sut, sequencerHome, endpoints.RollkitRPCPort)
+	sequencerP2PAddress := getNodeP2PAddress(t, sut, sequencerHome)
 	t.Logf("Sequencer P2P address: %s", sequencerP2PAddress)
 
-	setupFullNode(t, sut, fullNodeHome, sequencerHome, fullNodeJwtSecret, genesisHash, sequencerP2PAddress, endpoints)
+	setupFullNode(t, sut, fullNodeHome, sequencerHome, fullNodeJwtSecret, genesisHash, sequencerP2PAddress)
 	t.Log("Full node is up")
 
 	// Connect to both EVM instances
-	sequencerClient, err := ethclient.Dial(endpoints.GetSequencerEthURL())
+	sequencerClient, err := ethclient.Dial(SequencerEthURL)
 	require.NoError(t, err, "Should be able to connect to sequencer EVM")
 
-	fullNodeClient, err := ethclient.Dial(endpoints.GetFullNodeEthURL())
+	fullNodeClient, err := ethclient.Dial(FullNodeEthURL)
 	require.NoError(t, err, "Should be able to connect to full node EVM")
 
 	// Wait for P2P connections to establish
@@ -255,7 +255,7 @@ func setupSequencerWithFullNode(t *testing.T, sut *SystemUnderTest, sequencerHom
 	}, DefaultTestTimeout, 250*time.Millisecond, "P2P connections should be established")
 
 	t.Log("P2P connections established")
-	return sequencerClient, fullNodeClient, endpoints
+	return sequencerClient, fullNodeClient
 }
 
 // TestEvmSequencerWithFullNodeE2E tests the full node synchronization functionality
@@ -291,7 +291,7 @@ func setupSequencerWithFullNode(t *testing.T, sut *SystemUnderTest, sequencerHom
 // - Ensures EVM state consistency between sequencer and full node on the Reth side
 //
 // This test demonstrates that full nodes can sync with sequencers in real-time,
-// validates the P2P block propagation mechanism in Evolve, ensures that
+// validates the P2P block propagation mechanism in Rollkit, ensures that
 // the underlying EVM execution state remains consistent across all nodes, and
 // verifies that DA (Data Availability) inclusion processes blocks within expected
 // timeframes after allowing sufficient time for DA layer synchronization.
@@ -303,7 +303,7 @@ func TestEvmSequencerWithFullNodeE2E(t *testing.T) {
 	sut := NewSystemUnderTest(t)
 
 	// Setup both sequencer and full node
-	sequencerClient, fullNodeClient, endpoints := setupSequencerWithFullNode(t, sut, sequencerHome, fullNodeHome)
+	sequencerClient, fullNodeClient := setupSequencerWithFullNode(t, sut, sequencerHome, fullNodeHome)
 	defer sequencerClient.Close()
 	defer fullNodeClient.Close()
 
@@ -396,7 +396,7 @@ func TestEvmSequencerWithFullNodeE2E(t *testing.T) {
 	t.Logf("Checking state roots for blocks %d to %d", startHeight, endHeight)
 
 	for blockHeight := startHeight; blockHeight <= endHeight; blockHeight++ {
-		verifyStateRootsMatch(t, endpoints.GetSequencerEthURL(), endpoints.GetFullNodeEthURL(), blockHeight)
+		verifyStateRootsMatch(t, SequencerEthURL, FullNodeEthURL, blockHeight)
 	}
 
 	// Special focus on the transaction blocks
@@ -404,7 +404,7 @@ func TestEvmSequencerWithFullNodeE2E(t *testing.T) {
 	for i, txBlockNumber := range txBlockNumbers {
 		if txBlockNumber >= startHeight && txBlockNumber <= endHeight {
 			t.Logf("Re-verifying state root for transaction %d block %d", i+1, txBlockNumber)
-			verifyStateRootsMatch(t, endpoints.GetSequencerEthURL(), endpoints.GetFullNodeEthURL(), txBlockNumber)
+			verifyStateRootsMatch(t, SequencerEthURL, FullNodeEthURL, txBlockNumber)
 		}
 	}
 
@@ -416,7 +416,7 @@ func TestEvmSequencerWithFullNodeE2E(t *testing.T) {
 	t.Log("Verifying DA inclusion for latest block height...")
 
 	// Create RPC client for full node
-	fullNodeRPCClient := client.NewClient(endpoints.GetFullNodeRPCAddress())
+	fullNodeRPCClient := client.NewClient("http://127.0.0.1:" + FullNodeRPCPort)
 
 	// Get the full node's current block height before waiting
 	fnHeader, err = fullNodeClient.HeaderByNumber(fnCtx, nil)
@@ -425,9 +425,9 @@ func TestEvmSequencerWithFullNodeE2E(t *testing.T) {
 
 	t.Logf("Full node block height before DA inclusion wait: %d", fnBlockHeightBeforeWait)
 
-	// Wait a few seconds to allow DA inclusion to process
-	waitTime := 4 * time.Second
-	t.Logf("Waiting %v for DA inclusion to process...", waitTime)
+	// Wait for one DA block time to allow DA inclusion to process
+	waitTime := 1 * time.Second
+	t.Logf("Waiting %v (1 DA block time) for DA inclusion to process...", waitTime)
 	time.Sleep(waitTime)
 
 	// Get the DA included height from full node after the wait
@@ -461,6 +461,8 @@ func TestEvmSequencerWithFullNodeE2E(t *testing.T) {
 	t.Logf("      • Final sequencer height: %d", seqHeight)
 	t.Logf("      • Final full node height: %d", fnHeight)
 	t.Logf("      • State root verification range: blocks %d-%d", startHeight, endHeight)
+	t.Logf("      • Full node block height before DA wait: %d", fnBlockHeightBeforeWait)
+	t.Logf("      • DA wait time: %v (1 DA block time)", waitTime)
 	t.Logf("      • Full node DA included height after wait: %d", fnDAIncludedHeight)
 	t.Logf("")
 	t.Logf("   ✅ Verified Components:")
@@ -472,7 +474,7 @@ func TestEvmSequencerWithFullNodeE2E(t *testing.T) {
 	t.Logf("      • DA (Data Availability) inclusion processing within expected timeframes")
 	t.Logf("      • EVM execution state consistency")
 	t.Logf("")
-	t.Logf("   🏆 All validation criteria met - distributed evolve network is functioning correctly!")
+	t.Logf("   🏆 All validation criteria met - distributed rollkit network is functioning correctly!")
 }
 
 // TestEvmFullNodeBlockPropagationE2E tests that blocks produced by the aggregator
@@ -504,7 +506,7 @@ func TestEvmFullNodeBlockPropagationE2E(t *testing.T) {
 	sut := NewSystemUnderTest(t)
 
 	// Setup both sequencer and full node
-	sequencerClient, fullNodeClient, endpoints := setupSequencerWithFullNode(t, sut, sequencerHome, fullNodeHome)
+	sequencerClient, fullNodeClient := setupSequencerWithFullNode(t, sut, sequencerHome, fullNodeHome)
 	defer sequencerClient.Close()
 	defer fullNodeClient.Close()
 
@@ -541,8 +543,8 @@ func TestEvmFullNodeBlockPropagationE2E(t *testing.T) {
 	// === VERIFICATION PHASE ===
 
 	nodeURLs := []string{
-		endpoints.GetSequencerEthURL(), // Sequencer
-		endpoints.GetFullNodeEthURL(),  // Full Node
+		SequencerEthURL, // Sequencer
+		FullNodeEthURL,  // Full Node
 	}
 
 	nodeNames := []string{
@@ -647,31 +649,28 @@ func TestEvmFullNodeBlockPropagationE2E(t *testing.T) {
 // produced when transactions are available, not on a regular timer.
 //
 // Returns: sequencerClient, fullNodeClient for EVM connections
-func setupSequencerWithFullNodeLazy(t *testing.T, sut *SystemUnderTest, sequencerHome, fullNodeHome string) (*ethclient.Client, *ethclient.Client, *TestEndpoints) {
+func setupSequencerWithFullNodeLazy(t *testing.T, sut *SystemUnderTest, sequencerHome, fullNodeHome string) (*ethclient.Client, *ethclient.Client) {
 	t.Helper()
 
 	// Common setup for both sequencer and full node
-	jwtSecret, fullNodeJwtSecret, genesisHash, endpoints := setupCommonEVMTest(t, sut, true)
-
-	t.Logf("Generated test endpoints - Rollkit RPC: %s, P2P: %s, Full Node RPC: %s, P2P: %s, DA Port: %s",
-		endpoints.RollkitRPCPort, endpoints.RollkitP2PPort, endpoints.FullNodeRPCPort, endpoints.FullNodeP2PPort, endpoints.DAPort)
+	jwtSecret, fullNodeJwtSecret, genesisHash := setupCommonEVMTest(t, sut, true)
 
 	// Setup sequencer in lazy mode
-	setupSequencerNodeLazy(t, sut, sequencerHome, jwtSecret, genesisHash, endpoints)
+	setupSequencerNodeLazy(t, sut, sequencerHome, jwtSecret, genesisHash)
 	t.Log("Sequencer node (lazy mode) is up")
 
 	// Get P2P address and setup full node
-	sequencerP2PAddress := getNodeP2PAddress(t, sut, sequencerHome, endpoints.RollkitRPCPort)
+	sequencerP2PAddress := getNodeP2PAddress(t, sut, sequencerHome)
 	t.Logf("Sequencer P2P address: %s", sequencerP2PAddress)
 
-	setupFullNode(t, sut, fullNodeHome, sequencerHome, fullNodeJwtSecret, genesisHash, sequencerP2PAddress, endpoints)
+	setupFullNode(t, sut, fullNodeHome, sequencerHome, fullNodeJwtSecret, genesisHash, sequencerP2PAddress)
 	t.Log("Full node is up")
 
 	// Connect to both EVM instances
-	sequencerClient, err := ethclient.Dial(endpoints.GetSequencerEthURL())
+	sequencerClient, err := ethclient.Dial(SequencerEthURL)
 	require.NoError(t, err, "Should be able to connect to sequencer EVM")
 
-	fullNodeClient, err := ethclient.Dial(endpoints.GetFullNodeEthURL())
+	fullNodeClient, err := ethclient.Dial(FullNodeEthURL)
 	require.NoError(t, err, "Should be able to connect to full node EVM")
 
 	// Wait for P2P connections to establish
@@ -699,7 +698,7 @@ func setupSequencerWithFullNodeLazy(t *testing.T, sut *SystemUnderTest, sequence
 	}, DefaultTestTimeout, 250*time.Millisecond, "P2P connections should be established")
 
 	t.Log("P2P connections established")
-	return sequencerClient, fullNodeClient, endpoints
+	return sequencerClient, fullNodeClient
 }
 
 // TestEvmLazyModeSequencerE2E tests the lazy mode functionality where blocks are only
@@ -743,7 +742,7 @@ func TestEvmLazyModeSequencerE2E(t *testing.T) {
 	sut := NewSystemUnderTest(t)
 
 	// Setup sequencer in lazy mode and full node
-	sequencerClient, fullNodeClient, endpoints := setupSequencerWithFullNodeLazy(t, sut, sequencerHome, fullNodeHome)
+	sequencerClient, fullNodeClient := setupSequencerWithFullNodeLazy(t, sut, sequencerHome, fullNodeHome)
 	defer sequencerClient.Close()
 	defer fullNodeClient.Close()
 
@@ -860,7 +859,7 @@ func TestEvmLazyModeSequencerE2E(t *testing.T) {
 	if seqHeight > 0 {
 		t.Logf("Verifying state roots for blocks %d to %d...", startHeight, seqHeight)
 		for blockHeight := startHeight; blockHeight <= seqHeight; blockHeight++ {
-			verifyStateRootsMatch(t, endpoints.GetSequencerEthURL(), endpoints.GetFullNodeEthURL(), blockHeight)
+			verifyStateRootsMatch(t, SequencerEthURL, FullNodeEthURL, blockHeight)
 		}
 	} else {
 		t.Log("No blocks to verify (sequencer at genesis)")
@@ -931,18 +930,18 @@ func TestEvmLazyModeSequencerE2E(t *testing.T) {
 //
 // This function ensures both nodes are properly restarted and P2P connections are re-established.
 // The DA restart is handled by the shared restartDAAndSequencer/restartDAAndSequencerLazy functions.
-func restartSequencerAndFullNode(t *testing.T, sut *SystemUnderTest, sequencerHome, fullNodeHome, jwtSecret, fullNodeJwtSecret, genesisHash string, useLazyMode bool, endpoints *TestEndpoints) {
+func restartSequencerAndFullNode(t *testing.T, sut *SystemUnderTest, sequencerHome, fullNodeHome, jwtSecret, fullNodeJwtSecret, genesisHash string, useLazyMode bool) {
 	t.Helper()
 
 	// Restart DA and sequencer first (following the pattern from TestEvmSequencerRestartRecoveryE2E)
 	if useLazyMode {
-		restartDAAndSequencerLazy(t, sut, sequencerHome, jwtSecret, genesisHash, endpoints)
+		restartDAAndSequencerLazy(t, sut, sequencerHome, jwtSecret, genesisHash)
 	} else {
-		restartDAAndSequencer(t, sut, sequencerHome, jwtSecret, genesisHash, endpoints)
+		restartDAAndSequencer(t, sut, sequencerHome, jwtSecret, genesisHash)
 	}
 
 	// Get the P2P address of the restarted sequencer using net-info command
-	sequencerP2PAddress := getNodeP2PAddress(t, sut, sequencerHome, endpoints.RollkitRPCPort)
+	sequencerP2PAddress := getNodeP2PAddress(t, sut, sequencerHome)
 	t.Logf("Sequencer P2P address after restart: %s", sequencerP2PAddress)
 
 	// Now restart the full node (without init - node already exists)
@@ -951,18 +950,18 @@ func restartSequencerAndFullNode(t *testing.T, sut *SystemUnderTest, sequencerHo
 		"--home", fullNodeHome,
 		"--evm.jwt-secret", fullNodeJwtSecret,
 		"--evm.genesis-hash", genesisHash,
-		"--rollkit.rpc.address", endpoints.GetFullNodeRPCListen(),
-		"--rollkit.p2p.listen_address", endpoints.GetFullNodeP2PAddress(),
+		"--rollkit.rpc.address", "127.0.0.1:"+FullNodeRPCPort,
+		"--rollkit.p2p.listen_address", "/ip4/127.0.0.1/tcp/"+FullNodeP2PPort,
 		"--rollkit.p2p.peers", sequencerP2PAddress,
-		"--evm.engine-url", endpoints.GetFullNodeEngineURL(),
-		"--evm.eth-url", endpoints.GetFullNodeEthURL(),
-		"--rollkit.da.address", endpoints.GetDAAddress(),
+		"--evm.engine-url", FullNodeEngineURL,
+		"--evm.eth-url", FullNodeEthURL,
+		"--rollkit.da.address", DAAddress,
 		"--rollkit.da.block_time", DefaultDABlockTime,
 	)
 
 	// Give both nodes time to establish P2P connections
 	time.Sleep(1 * time.Second)
-	sut.AwaitNodeUp(t, endpoints.GetFullNodeRPCAddress(), 10*time.Second)
+	sut.AwaitNodeUp(t, "http://127.0.0.1:"+FullNodeRPCPort, 10*time.Second)
 	t.Log("Full node restarted successfully")
 }
 
@@ -1010,7 +1009,7 @@ func restartSequencerAndFullNode(t *testing.T, sut *SystemUnderTest, sequencerHo
 // - Comprehensive state synchronization validation between nodes
 // - Tests lazy mode behavior during initial setup and after restart
 //
-// This test demonstrates that the distributed evolve network maintains
+// This test demonstrates that the distributed rollkit network maintains
 // consistency and continues to function correctly even when all nodes
 // are restarted simultaneously, including mode changes.
 func TestEvmSequencerFullNodeRestartE2E(t *testing.T) {
@@ -1041,30 +1040,30 @@ func testSequencerFullNodeRestart(t *testing.T, initialLazyMode, restartLazyMode
 	t.Logf("Test mode: initial_lazy=%t, restart_lazy=%t", initialLazyMode, restartLazyMode)
 
 	// Get JWT secrets and setup common components first
-	jwtSecret, fullNodeJwtSecret, genesisHash, endpoints := setupCommonEVMTest(t, sut, true)
+	jwtSecret, fullNodeJwtSecret, genesisHash := setupCommonEVMTest(t, sut, true)
 
 	// Setup sequencer based on initial mode
 	if initialLazyMode {
-		setupSequencerNodeLazy(t, sut, sequencerHome, jwtSecret, genesisHash, endpoints)
+		setupSequencerNodeLazy(t, sut, sequencerHome, jwtSecret, genesisHash)
 		t.Log("Sequencer node (lazy mode) is up")
 	} else {
-		setupSequencerNode(t, sut, sequencerHome, jwtSecret, genesisHash, endpoints)
+		setupSequencerNode(t, sut, sequencerHome, jwtSecret, genesisHash)
 		t.Log("Sequencer node is up")
 	}
 
 	// Get P2P address and setup full node
-	sequencerP2PAddress := getNodeP2PAddress(t, sut, sequencerHome, endpoints.RollkitRPCPort)
+	sequencerP2PAddress := getNodeP2PAddress(t, sut, sequencerHome)
 	t.Logf("Sequencer P2P address: %s", sequencerP2PAddress)
 
-	setupFullNode(t, sut, fullNodeHome, sequencerHome, fullNodeJwtSecret, genesisHash, sequencerP2PAddress, endpoints)
+	setupFullNode(t, sut, fullNodeHome, sequencerHome, fullNodeJwtSecret, genesisHash, sequencerP2PAddress)
 	t.Log("Full node is up")
 
 	// Connect to both EVM instances
-	sequencerClient, err := ethclient.Dial(endpoints.GetSequencerEthURL())
+	sequencerClient, err := ethclient.Dial(SequencerEthURL)
 	require.NoError(t, err, "Should be able to connect to sequencer EVM")
 	defer sequencerClient.Close()
 
-	fullNodeClient, err := ethclient.Dial(endpoints.GetFullNodeEthURL())
+	fullNodeClient, err := ethclient.Dial(FullNodeEthURL)
 	require.NoError(t, err, "Should be able to connect to full node EVM")
 	defer fullNodeClient.Close()
 
@@ -1171,14 +1170,14 @@ func testSequencerFullNodeRestart(t *testing.T, initialLazyMode, restartLazyMode
 	t.Log("Phase 3: Restarting both sequencer and full node...")
 
 	// Restart both nodes with specified restart mode
-	restartSequencerAndFullNode(t, sut, sequencerHome, fullNodeHome, jwtSecret, fullNodeJwtSecret, genesisHash, restartLazyMode, endpoints)
+	restartSequencerAndFullNode(t, sut, sequencerHome, fullNodeHome, jwtSecret, fullNodeJwtSecret, genesisHash, restartLazyMode)
 
 	// Reconnect to both EVM instances (connections lost during restart)
-	sequencerClient, err = ethclient.Dial(endpoints.GetSequencerEthURL())
+	sequencerClient, err = ethclient.Dial(SequencerEthURL)
 	require.NoError(t, err, "Should be able to reconnect to sequencer EVM")
 	defer sequencerClient.Close()
 
-	fullNodeClient, err = ethclient.Dial(endpoints.GetFullNodeEthURL())
+	fullNodeClient, err = ethclient.Dial(FullNodeEthURL)
 	require.NoError(t, err, "Should be able to reconnect to full node EVM")
 	defer fullNodeClient.Close()
 
@@ -1380,7 +1379,7 @@ func testSequencerFullNodeRestart(t *testing.T, initialLazyMode, restartLazyMode
 	}
 
 	for _, blockHeight := range blocksToCheck {
-		verifyStateRootsMatch(t, endpoints.GetSequencerEthURL(), endpoints.GetFullNodeEthURL(), blockHeight)
+		verifyStateRootsMatch(t, SequencerEthURL, FullNodeEthURL, blockHeight)
 	}
 
 	// === PHASE 7: Final transaction verification ===

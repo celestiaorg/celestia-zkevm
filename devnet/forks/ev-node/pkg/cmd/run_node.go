@@ -7,26 +7,23 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/ipfs/go-datastore"
-	"github.com/rs/zerolog"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/spf13/cobra"
 
-	coreda "github.com/evstack/ev-node/core/da"
-	coreexecutor "github.com/evstack/ev-node/core/execution"
-	coresequencer "github.com/evstack/ev-node/core/sequencer"
-	"github.com/evstack/ev-node/node"
-	rollconf "github.com/evstack/ev-node/pkg/config"
-	genesispkg "github.com/evstack/ev-node/pkg/genesis"
-	"github.com/evstack/ev-node/pkg/p2p"
-	"github.com/evstack/ev-node/pkg/signer"
-	"github.com/evstack/ev-node/pkg/signer/file"
+	coreda "github.com/rollkit/rollkit/core/da"
+	coreexecutor "github.com/rollkit/rollkit/core/execution"
+	coresequencer "github.com/rollkit/rollkit/core/sequencer"
+	"github.com/rollkit/rollkit/node"
+	rollconf "github.com/rollkit/rollkit/pkg/config"
+	genesispkg "github.com/rollkit/rollkit/pkg/genesis"
+	"github.com/rollkit/rollkit/pkg/p2p"
+	"github.com/rollkit/rollkit/pkg/signer"
+	"github.com/rollkit/rollkit/pkg/signer/file"
 )
-
-const DefaultMaxBlobSize = 1.5 * 1024 * 1024 // 1.5MB
 
 // ParseConfig is an helpers that loads the node configuration and validates it.
 func ParseConfig(cmd *cobra.Command) (rollconf.Config, error) {
@@ -49,35 +46,34 @@ func ParseConfig(cmd *cobra.Command) (rollconf.Config, error) {
 //   - Stack traces for error logs
 //
 // The returned logger is already configured with the "module" field set to "main".
-func SetupLogger(config rollconf.LogConfig) zerolog.Logger {
-	// Configure output
-	var output = os.Stderr
+func SetupLogger(config rollconf.LogConfig) logging.EventLogger {
+	logCfg := logging.Config{
+		Stderr: true, // Default to stderr
+	}
 
 	// Configure logger format
-	var logger zerolog.Logger
 	if config.Format == "json" {
-		logger = zerolog.New(output)
-	} else {
-		logger = zerolog.New(zerolog.ConsoleWriter{Out: output})
+		logCfg.Format = logging.JSONOutput
 	}
 
 	// Configure logger level
-	level, err := zerolog.ParseLevel(config.Level)
-	if err != nil {
+	level, err := logging.LevelFromString(config.Level)
+	if err == nil {
+		logCfg.Level = level
+	} else {
 		// Default to info if parsing fails
-		level = zerolog.InfoLevel
+		logCfg.Level = logging.LevelInfo
 	}
-	zerolog.SetGlobalLevel(level)
 
-	// Add timestamp and set up logger with component
-	logger = logger.With().Timestamp().Str("component", "main").Logger()
+	logging.SetupLogging(logCfg)
 
-	return logger
+	// Return a logger instance for the "main" subsystem
+	return logging.Logger("main")
 }
 
 // StartNode handles the node startup logic
 func StartNode(
-	logger zerolog.Logger,
+	logger logging.EventLogger,
 	cmd *cobra.Command,
 	executor coreexecutor.Executor,
 	sequencer coresequencer.Sequencer,
@@ -85,7 +81,6 @@ func StartNode(
 	p2pClient *p2p.Client,
 	datastore datastore.Batching,
 	nodeConfig rollconf.Config,
-	genesis genesispkg.Genesis,
 	nodeOptions node.NodeOptions,
 ) error {
 	ctx, cancel := context.WithCancel(cmd.Context())
@@ -99,24 +94,27 @@ func StartNode(
 			return err
 		}
 
-		// Resolve signer path; allow absolute, relative to node root, or relative to CWD if resolution fails
-		signerPath, err := filepath.Abs(strings.TrimSuffix(nodeConfig.Signer.SignerPath, "signer.json"))
+		signer, err = file.LoadFileSystemSigner(nodeConfig.Signer.SignerPath, []byte(passphrase))
 		if err != nil {
 			return err
 		}
-
-		signer, err = file.LoadFileSystemSigner(signerPath, []byte(passphrase))
-		if err != nil {
-			return err
-		}
-	} else if nodeConfig.Node.Aggregator && nodeConfig.Signer.SignerType != "file" {
-		return fmt.Errorf("unknown signer type: %s", nodeConfig.Signer.SignerType)
+	} else if nodeConfig.Signer.SignerType == "grpc" {
+		panic("grpc remote signer not implemented")
+	} else if nodeConfig.Node.Aggregator {
+		return fmt.Errorf("unknown remote signer type: %s", nodeConfig.Signer.SignerType)
 	}
 
 	metrics := node.DefaultMetricsProvider(nodeConfig.Instrumentation)
 
+	genesisPath := filepath.Join(filepath.Dir(nodeConfig.ConfigPath()), "genesis.json")
+	genesis, err := genesispkg.LoadGenesis(genesisPath)
+	if err != nil {
+		return fmt.Errorf("failed to load genesis: %w", err)
+	}
+
 	// Create and start the node
 	rollnode, err := node.NewNode(
+		ctx,
 		nodeConfig,
 		executor,
 		sequencer,
@@ -140,11 +138,11 @@ func StartNode(
 		defer func() {
 			if r := recover(); r != nil {
 				err := fmt.Errorf("node panicked: %v", r)
-				logger.Error().Interface("panic", r).Msg("Recovered from panic in node")
+				logger.Error("Recovered from panic in node", "panic", r)
 				select {
 				case errCh <- err:
 				default:
-					logger.Error().Err(err).Msg("Error channel full")
+					logger.Error("Error channel full", "error", err)
 				}
 			}
 		}()
@@ -153,7 +151,7 @@ func StartNode(
 		select {
 		case errCh <- err:
 		default:
-			logger.Error().Err(err).Msg("Error channel full")
+			logger.Error("Error channel full", "error", err)
 		}
 	}()
 
@@ -163,10 +161,10 @@ func StartNode(
 
 	select {
 	case <-quit:
-		logger.Info().Msg("shutting down node...")
+		logger.Info("shutting down node...")
 		cancel()
 	case err := <-errCh:
-		logger.Error().Err(err).Msg("node error")
+		logger.Error("node error", "error", err)
 		cancel()
 		return err
 	}
@@ -174,10 +172,10 @@ func StartNode(
 	// Wait for node to finish shutting down
 	select {
 	case <-time.After(5 * time.Second):
-		logger.Info().Msg("Node shutdown timed out")
+		logger.Info("Node shutdown timed out")
 	case err := <-errCh:
 		if err != nil && !errors.Is(err, context.Canceled) {
-			logger.Error().Err(err).Msg("Error during shutdown")
+			logger.Error("Error during shutdown", "error", err)
 			return err
 		}
 	}

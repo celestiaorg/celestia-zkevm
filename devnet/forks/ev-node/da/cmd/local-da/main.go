@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/rs/zerolog"
+	logging "github.com/ipfs/go-log/v2"
 
-	proxy "github.com/evstack/ev-node/da/jsonrpc"
+	proxy "github.com/rollkit/rollkit/da/jsonrpc"
 )
 
 const (
@@ -36,8 +36,8 @@ func main() {
 	}
 
 	// create logger
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).With().Timestamp().Str("component", "da").Logger()
+	logging.SetupLogging(logging.Config{Stderr: true, Level: logging.LevelInfo}) // Basic setup
+	logger := logging.Logger("da")
 
 	// Create LocalDA instance with custom maxBlobSize if provided
 	var opts []func(*LocalDA) *LocalDA
@@ -47,9 +47,9 @@ func main() {
 	da := NewLocalDA(logger, opts...)
 
 	srv := proxy.NewServer(logger, host, port, da)
-	logger.Info().Str("host", host).Str("port", port).Uint64("maxBlobSize", maxBlobSize).Msg("Listening on")
+	logger.Info("Listening on", "host", host, "port", port, "maxBlobSize", maxBlobSize)
 	if err := srv.Start(context.Background()); err != nil {
-		logger.Error().Err(err).Msg("error while serving")
+		logger.Error("error while serving", "error", err)
 	}
 
 	interrupt := make(chan os.Signal, 1)

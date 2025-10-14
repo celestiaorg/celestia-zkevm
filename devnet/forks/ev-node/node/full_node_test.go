@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/evstack/ev-node/pkg/service"
+	"github.com/rollkit/rollkit/pkg/service"
 )
 
 func TestStartInstrumentationServer(t *testing.T) {
@@ -30,7 +30,7 @@ func TestStartInstrumentationServer(t *testing.T) {
 
 	node := &FullNode{
 		nodeConfig:  config,
-		BaseService: *service.NewBaseService(zerolog.Nop(), "TestNode", nil),
+		BaseService: *service.NewBaseService(logging.Logger("test"), "TestNode", nil),
 	}
 
 	prometheusSrv, pprofSrv := node.startInstrumentationServer()

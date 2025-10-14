@@ -7,14 +7,14 @@ import (
 
 	ds "github.com/ipfs/go-datastore"
 	ds_sync "github.com/ipfs/go-datastore/sync"
-	"github.com/rs/zerolog"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/evstack/ev-node/pkg/config"
-	"github.com/evstack/ev-node/pkg/genesis"
-	"github.com/evstack/ev-node/pkg/p2p"
-	p2p_key "github.com/evstack/ev-node/pkg/p2p/key"
+	"github.com/rollkit/rollkit/pkg/config"
+	"github.com/rollkit/rollkit/pkg/genesis"
+	"github.com/rollkit/rollkit/pkg/p2p"
+	p2p_key "github.com/rollkit/rollkit/pkg/p2p/key"
 )
 
 // TestLightNodeLifecycle tests the light node's lifecycle.
@@ -37,12 +37,13 @@ func TestLightNodeLifecycle(t *testing.T) {
 	p2pKey, err := p2p_key.GenerateNodeKey()
 	require.NoError(err)
 
-	logger := zerolog.Nop()
+	logger := logging.Logger("test")
+	_ = logging.SetLogLevel("test", "FATAL")
 	p2pMetrics := p2p.NopMetrics()
 
 	db := ds_sync.MutexWrap(ds.NewMapDatastore())
 
-	p2pClient, err := p2p.NewClient(conf.P2P, p2pKey.PrivKey, db, gen.ChainID, logger, p2pMetrics)
+	p2pClient, err := p2p.NewClient(conf, p2pKey, db, logger, p2pMetrics)
 	require.NoError(err)
 
 	ln, err := newLightNode(conf, gen, p2pClient, db, logger)

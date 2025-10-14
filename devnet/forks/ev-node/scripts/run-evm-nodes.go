@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -242,11 +241,8 @@ func (nm *nodeManager) startEVMExecutionLayer(node *nodeConfig) error {
 		return fmt.Errorf("failed to start EVM: %w", err)
 	}
 
-	// Wait for EVM layer to be ready with health check
-	if err := nm.waitForEVMReady(node.evmEngine); err != nil {
-		return fmt.Errorf("EVM execution layer failed to become ready: %w", err)
-	}
-
+	// Wait for EVM layer to initialize
+	time.Sleep(3 * time.Second)
 	return nil
 }
 
@@ -263,7 +259,7 @@ func (nm *nodeManager) startEVMDocker(name string, rpcPort, enginePort, wsPort i
 	// Get chain genesis path
 	chainPath := filepath.Join(nm.projectRoot, "execution", "evm", "docker", "chain", "genesis.json")
 
-	// Run new container with updated configuration
+	// Run new container
 	args := []string{
 		"run", "-d",
 		"--name", containerName,
@@ -272,10 +268,9 @@ func (nm *nodeManager) startEVMDocker(name string, rpcPort, enginePort, wsPort i
 		"-p", fmt.Sprintf("%d:8546", wsPort),
 		"-v", fmt.Sprintf("%s:/jwt/jwt.hex:ro", nm.jwtPath),
 		"-v", fmt.Sprintf("%s:/chain/genesis.json:ro", chainPath),
-		"ghcr.io/evstack/ev-reth:latest",
+		"ghcr.io/rollkit/lumen:latest",
 		"node",
 		"--chain", "/chain/genesis.json",
-		"--datadir", "/home/reth/eth-home",
 		"--authrpc.addr", "0.0.0.0",
 		"--authrpc.port", "8551",
 		"--authrpc.jwtsecret", "/jwt/jwt.hex",
@@ -286,15 +281,7 @@ func (nm *nodeManager) startEVMDocker(name string, rpcPort, enginePort, wsPort i
 		"--engine.persistence-threshold", "0",
 		"--engine.memory-block-buffer-target", "0",
 		"--disable-discovery",
-		"--txpool.pending-max-count", "200000",
-		"--txpool.pending-max-size", "200",
-		"--txpool.queued-max-count", "200000",
-		"--txpool.queued-max-size", "200",
-		"--txpool.max-account-slots", "2048",
-		"--txpool.max-new-txns", "2048",
-		"--txpool.additional-validation-tasks", "16",
-		"--engine.always-process-payload-attributes-on-canonical-head",
-		"--ev-reth.enable",
+		"--rollkit.enable",
 	}
 
 	cmd := exec.Command("docker", args...)
@@ -307,32 +294,6 @@ func (nm *nodeManager) startEVMDocker(name string, rpcPort, enginePort, wsPort i
 	log.Printf("Started EVM container: %s", containerName)
 
 	return nil
-}
-
-func (nm *nodeManager) waitForEVMReady(enginePort int) error {
-	log.Printf("Waiting for EVM execution layer to be ready on port %d...", enginePort)
-
-	maxRetries := 30 // 30 seconds total with 1 second intervals
-	retryInterval := 1 * time.Second
-
-	for i := 0; i < maxRetries; i++ {
-		// Try to connect to the Engine API port
-		conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", enginePort), 2*time.Second)
-		if err == nil {
-			conn.Close()
-			log.Printf("EVM execution layer is ready on port %d", enginePort)
-			// Additional wait to ensure the service is fully initialized
-			time.Sleep(2 * time.Second)
-			return nil
-		}
-
-		if i < maxRetries-1 {
-			log.Printf("EVM execution layer not ready yet (attempt %d/%d), retrying in %v...", i+1, maxRetries, retryInterval)
-			time.Sleep(retryInterval)
-		}
-	}
-
-	return fmt.Errorf("EVM execution layer failed to become ready after %d attempts", maxRetries)
 }
 
 func (nm *nodeManager) startNode(node *nodeConfig, sequencerP2PAddr string) (string, error) {
