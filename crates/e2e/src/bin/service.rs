@@ -14,10 +14,13 @@ use sp1_sdk::{EnvProver, ProverClient};
 use std::{str::FromStr, sync::Arc, time::Duration};
 use storage::hyperlane::snapshot::HyperlaneSnapshotStore;
 use tokio::time::sleep;
+use tracing::{info, warn};
+use tracing_subscriber::EnvFilter;
 use url::Url;
 
 // prove once every 10 blocks
 const PROVER_INTERVAL: u64 = 2;
+const EXPECTED_LAG: u64 = 5;
 
 #[tokio::main]
 async fn main() {
@@ -25,6 +28,14 @@ async fn main() {
         .install_default()
         .expect("Failed to set default crypto provider");
     dotenvy::dotenv().ok();
+
+    let mut filter = EnvFilter::new("e2e=debug,sp1_core=warn,sp1_runtime=warn,sp1_sdk=warn,sp1_vm=warn");
+    if let Ok(env_filter) = std::env::var("RUST_LOG") {
+        if let Ok(parsed) = env_filter.parse() {
+            filter = filter.add_directive(parsed);
+        }
+    }
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 
     // instantiate ISM client for submitting payloads and querying state
     let ism_client = CelestiaIsmClient::from_env().await.unwrap();
@@ -50,7 +61,7 @@ async fn main() {
                 break;
             }
             Err(_) => {
-                println!("ISM not yet deployed, waiting for 10 seconds");
+                warn!("ISM not yet deployed, waiting for 10 seconds");
                 sleep(Duration::from_secs(10)).await;
                 continue;
             }
@@ -61,7 +72,16 @@ async fn main() {
         // get trustd state from ISM
         let (trusted_root_hex, trusted_height) = query_ism(&ism_client).await.unwrap();
         let latest_celestia_height = celestia_height("http://localhost:26657").unwrap();
-        if latest_celestia_height < inclusion_height(trusted_height).await.unwrap() + PROVER_INTERVAL {
+
+        let maybe_inclusion_height = match inclusion_height(trusted_height).await {
+            Ok(height) => height,
+            Err(_) => {
+                warn!("Trusted Block not yet included, waiting for 30 seconds");
+                sleep(Duration::from_secs(30)).await;
+                continue;
+            }
+        };
+        if latest_celestia_height < maybe_inclusion_height + PROVER_INTERVAL {
             continue;
         }
 
@@ -79,17 +99,20 @@ async fn main() {
         // prove at most PROVER_INTERVAL blocks at a time
         let num_blocks = (latest_celestia_height - celestia_start_height).min(PROVER_INTERVAL);
 
-        println!(
+        info!(
             "ISM at height {} Proving block {} up to {}",
             trusted_height,
             celestia_start_height,
             celestia_start_height + num_blocks
         );
 
-        println!(
-            "Lagging behind by {} blocks",
-            latest_celestia_height - celestia_start_height
-        );
+        // warn the user if lag is too high
+        let lag = latest_celestia_height - celestia_start_height;
+        if lag > EXPECTED_LAG {
+            warn!("Lagging behind by {} blocks", lag);
+        } else {
+            info!("Lagging behind by {} blocks", lag);
+        }
 
         let block_proof = prove_blocks(
             celestia_start_height,
