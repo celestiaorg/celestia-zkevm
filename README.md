@@ -1,5 +1,18 @@
 # ZK EVM Hyperlane
 
+
+## Testing
+Run the full end-to-end flow locally to see how ZK proofs are generated for EVM blocks and Hyperlane transfers. This demonstrates permissionless asset bridging powered by zero-knowledge proofs.
+
+[![Run the End to End](https://img.shields.io/badge/🚀%20End%20To%20End-blueviolet?style=for-the-badge)](crates/e2e/README.md)
+
+
+## Testnet
+Deploy a complete local testnet using your CPU or GPU to prove blocks and bridge transfers in Zero Knowledge.
+
+[![Deploy](https://img.shields.io/badge/🚀%20Deploy%20a%20Testnet-blueviolet?style=for-the-badge)](crates/e2e/DEVNET.md)
+
+
 > [!WARNING]
 > This repository is a work in progress and under active development.
 
@@ -16,6 +29,7 @@ SP1 supports generating proofs in mock mode or network mode. By default, mock mo
 SP1_PROVER=network
 NETWORK_PRIVATE_KEY="PRIVATE_KEY" to the SP1 prover network private key from Celestia 1Password
 ```
+
 
 ### Prerequisites
 
