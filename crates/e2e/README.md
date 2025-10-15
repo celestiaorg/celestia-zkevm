@@ -35,12 +35,3 @@ If you want to see all the details about block proving and other background proc
 ```bash
 RUST_LOG="e2e=debug" make e2e
 ```
-
-## Configuration
-All default parameters for interacting with Hyperlane contracts are located in `e2e/src/config.rs`. The private key used for signing Celestia messages is derived from the environment:
-
-`.env`:
-```bash
-...
-CELESTIA_PRIVATE_KEY="6e30efb1d3ebd30d1ba08c8d5fc9b190e08394009dc1dd787a69e60c33288a8c"
-```
