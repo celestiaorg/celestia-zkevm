@@ -32,6 +32,7 @@ check-dependencies:
 
 ## start: Start all Docker containers for the demo.
 start:
+	@./build-local.sh
 	@echo "--> Starting all Docker containers"
 	@docker compose up --detach
 .PHONY: start
@@ -92,3 +93,7 @@ spamoor:
 	@chmod +x scripts/run-spamoor.sh
 	@scripts/run-spamoor.sh $(ARGS)
 .PHONY: spamoor
+
+e2e:
+	cargo run --bin e2e -p e2e --release
+.PHONY: e2e

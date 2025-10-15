@@ -3,7 +3,7 @@
         "rethlocal": {
             "blocks": {
                 "confirmations": 1,
-                "estimateBlockTime": 3,
+                "estimateBlockTime": 60,
                 "reorgPeriod": 0
             },
             "chainId": 1234,
@@ -43,7 +43,7 @@
             "bech32Prefix": "celestia",
             "blocks": {
                 "confirmations": 1,
-                "estimateBlockTime": 6,
+                "estimateBlockTime": 300,
                 "reorgPeriod": 1
             },
             "canonicalAsset": "utia",

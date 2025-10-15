@@ -15,12 +15,17 @@ path = "src/bin/message.rs"
 name = "block-prover"
 path = "src/bin/block.rs"
 
+[[bin]]
+name = "service"
+path = "src/bin/service.rs"
+
 [dependencies]
 alloy = { workspace = true }
 alloy-genesis = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 alloy-rpc-types = { workspace = true }
+alloy-signer-local = { version = "1.0.32" }
 alloy-sol-types = { workspace = true }
 anyhow = { workspace = true }
 bincode = { workspace = true }
@@ -36,6 +41,7 @@ ev-types = { workspace = true, features = ["grpc"] }
 ev-zkevm-types = { workspace = true }
 eyre = { workspace = true }
 prost = { workspace = true }
+reqwest = { workspace = true, features = ["blocking"] }
 reth-chainspec = { workspace = true }
 rsp-client-executor = { workspace = true }
 rsp-host-executor = { workspace = true }
@@ -52,4 +58,7 @@ storage = { workspace = true }
 tempfile = { workspace = true }
 tendermint-proto = { workspace = true }
 tokio = { workspace = true }
+
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 url = { workspace = true }

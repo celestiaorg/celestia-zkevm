@@ -12,21 +12,25 @@ use ev_state_queries::{DefaultProvider, StateQueryProvider};
 use ev_zkevm_types::{
     events::{Dispatch, DispatchEvent},
     hyperlane::decode_hyperlane_message,
-    programs::hyperlane::types::{
-        HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof, HyperlaneBranchProofInputs, HyperlaneMessageInputs,
+    programs::hyperlane::{
+        tree::MerkleTree,
+        types::{HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof, HyperlaneBranchProofInputs, HyperlaneMessageInputs},
     },
 };
 use sp1_sdk::{EnvProver, SP1ProofWithPublicValues, SP1Stdin};
-use storage::hyperlane::{StoredHyperlaneMessage, message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
+use storage::hyperlane::{StoredHyperlaneMessage, message::HyperlaneMessageStore};
 use tempfile::TempDir;
+use tracing::{debug, error};
 
-use crate::config::other::{MAILBOX_ADDRESS, MERKLE_TREE_ADDRESS};
+use crate::config::debug::{MAILBOX_ADDRESS, MERKLE_TREE_ADDRESS};
 
 pub async fn prove_messages(
+    start_height: u64,
     target_height: u64,
     evm_provider: &DefaultProvider,
     state_query_provider: &dyn StateQueryProvider,
     client: Arc<EnvProver>,
+    snapshot: MerkleTree,
 ) -> Result<(SP1ProofWithPublicValues, Vec<StoredHyperlaneMessage>)> {
     let tmp = TempDir::new().expect("cannot create temp directory");
     let state_root = state_query_provider
@@ -59,7 +63,7 @@ pub async fn prove_messages(
     let filter = Filter::new()
         .address(Address::from_str(MAILBOX_ADDRESS).unwrap())
         .event(&Dispatch::id())
-        .from_block(0)
+        .from_block(start_height)
         .to_block(target_height);
 
     // run the indexer to get all messages that occurred since the last trusted height and insert them as if they all occurred at target_height
@@ -75,10 +79,10 @@ pub async fn prove_messages(
                 hyperlane_message_store
                     .insert_message(current_index, stored_message)
                     .unwrap();
-                println!("Inserted Hyperlane Message at index: {current_index}");
+                debug!("Inserted Hyperlane Message at index: {current_index}");
             }
             Err(e) => {
-                eprintln!("Failed to decode Dispatch Event: {e:?}");
+                error!("Failed to decode Dispatch Event: {e:?}");
             }
         }
     }
@@ -89,16 +93,6 @@ pub async fn prove_messages(
     let messages = hyperlane_message_store
         .get_by_block(target_height)
         .expect("Failed to get messages");
-
-    // initialize and prune the snapshot store that will return the empty tree
-    let snapshot_storage_path = dirs::home_dir()
-        .expect("cannot find home directory")
-        .join(&tmp)
-        .join("data")
-        .join("snapshots.db");
-    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
-    hyperlane_snapshot_store.reset_db().unwrap();
-    let snapshot = hyperlane_snapshot_store.get_snapshot(0).unwrap();
 
     // Construct program inputs from values
     let input = HyperlaneMessageInputs::new(

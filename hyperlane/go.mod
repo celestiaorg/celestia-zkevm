@@ -5,7 +5,7 @@ go 1.24.6
 replace (
 	cosmossdk.io/x/upgrade => github.com/celestiaorg/cosmos-sdk/x/upgrade v0.2.0
 	// celestia-app:feature/zk-execution-ism
-	github.com/celestiaorg/celestia-app/v6 => github.com/celestiaorg/celestia-app/v6 v6.0.0-rc0.0.20250923135249-6c3c7c610070
+	github.com/celestiaorg/celestia-app/v6 => github.com/celestiaorg/celestia-app/v6 v6.0.0-rc0.0.20251013131020-bde1c38d1f18
 	github.com/cometbft/cometbft => github.com/celestiaorg/celestia-core v0.39.3
 	github.com/cosmos/cosmos-sdk => github.com/celestiaorg/cosmos-sdk v0.51.1
 	github.com/cosmos/ibc-go/v8 => github.com/celestiaorg/ibc-go/v8 v8.7.2

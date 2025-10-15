@@ -26,6 +26,7 @@ use std::fs;
 use std::sync::Arc;
 use storage::proofs::{ProofStorage, RocksDbProofStorage};
 use tokio::task::JoinHandle;
+use tracing::debug;
 
 mod config {
     pub const CELESTIA_RPC_URL: &str = "http://localhost:26658";
@@ -65,15 +66,15 @@ async fn generate_client_executor_input(
 }
 
 async fn get_sequencer_pubkey() -> Result<Vec<u8>, Box<dyn Error>> {
-    println!("Connecting to sequencer url: {}", config::SEQUENCER_URL);
+    debug!("Connecting to sequencer url: {}", config::SEQUENCER_URL);
     let mut sequencer_client = StoreServiceClient::connect(config::SEQUENCER_URL).await?;
-    println!("Connected to sequencer url: {}", config::SEQUENCER_URL);
+    debug!("Connected to sequencer url: {}", config::SEQUENCER_URL);
     let block_req = GetBlockRequest {
         identifier: Some(Identifier::Height(1)),
     };
-    println!("Getting block from sequencer url: {}", config::SEQUENCER_URL);
+    debug!("Getting block from sequencer url: {}", config::SEQUENCER_URL);
     let resp = sequencer_client.get_block(block_req).await?;
-    println!("Got block from sequencer url: {}", config::SEQUENCER_URL);
+    debug!("Got block from sequencer url: {}", config::SEQUENCER_URL);
     let pub_key = resp.into_inner().block.unwrap().header.unwrap().signer.unwrap().pub_key;
 
     Ok(pub_key[4..].to_vec())
@@ -148,13 +149,13 @@ pub async fn parallel_prover(
     // before we generate proofs in parallel mode, we execute all blocks to
     // collect the trusted height and root to then supply them optimistically to the prover
     for block_number in start_height..=(start_height + num_blocks) {
-        println!("\nProcessing block: {block_number}");
+        debug!("\nProcessing block: {block_number}");
         let blobs: Vec<Blob> = celestia_client
             .blob_get_all(block_number, &[namespace])
             .await
             .expect("Failed to get blobs")
             .unwrap_or_default();
-        println!("Got {} blobs for block: {}", blobs.len(), block_number);
+        debug!("Got {} blobs for block: {}", blobs.len(), block_number);
 
         let extended_header = celestia_client
             .header_get_by_height(block_number)
@@ -168,16 +169,30 @@ pub async fn parallel_prover(
         for row in namespace_data.rows {
             proofs.push(row.proof);
         }
-        println!("Got NamespaceProofs, total: {}", proofs.len());
+        debug!("Got NamespaceProofs, total: {}", proofs.len());
 
         let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
         for blob in blobs.as_slice() {
             let data = match SignedData::decode(blob.data.as_slice()) {
-                Ok(data) => data.data.unwrap(),
+                Ok(data) => {
+                    let data = data.data.unwrap();
+                    if data.txs.is_empty() {
+                        debug!(
+                            "No transactions found in EV Block: {:?}, which was included in Celestia block {}",
+                            data.clone().metadata.unwrap().height,
+                            block_number
+                        );
+                    } else {
+                        debug!(
+                            "Transaction found in Data: {data:?}, which was included in Celestia block {block_number}",
+                        );
+                    }
+                    data
+                }
                 Err(_) => continue,
             };
             let height = data.metadata.unwrap().height;
-            println!("Got SignedData for EVM block {height}");
+            debug!("Got SignedData for EVM block {height}");
 
             let client_executor_input =
                 generate_client_executor_input(config::EVM_RPC_URL, height, chain_spec.clone(), genesis.clone())
@@ -200,7 +215,7 @@ pub async fn parallel_prover(
         };
 
         stdin.write(&input);
-        println!("Generating proof for block: {block_number}, trusted height: {current_trusted_height}");
+        debug!("Generating proof for block: {block_number}, trusted height: {current_trusted_height}");
         let outputs = client
             .execute(&block_prover_elf, &stdin)
             .run()
@@ -236,7 +251,7 @@ pub async fn parallel_prover(
             // wrapping them in groth16
             let client_clone = client.clone();
             async move {
-                println!("\nProcessing block: {block_number}");
+                debug!("\nProcessing block: {block_number}");
                 write_inputs(
                     &mut stdin,
                     &celestia_client,
@@ -250,7 +265,7 @@ pub async fn parallel_prover(
                 )
                 .await
                 .expect("Failed to write inputs");
-                println!("Generating proof for block: {block_number}");
+                debug!("Generating proof for block: {block_number}");
                 let proof = client_clone
                     .prove(&pk, &stdin)
                     .compressed()
@@ -268,7 +283,7 @@ pub async fn parallel_prover(
                     )
                     .await
                     .expect("Failed to store proof");
-                println!("Proof stored successfully!");
+                debug!("Proof stored successfully!");
             }
         });
 
@@ -287,11 +302,11 @@ pub async fn parallel_prover(
     let (pk, _) = client.clone().setup(&range_prover_elf);
 
     // load all proofs from storage for range proof
-    println!("Loading block proofs from storage for range proof");
+    debug!("Loading block proofs from storage for range proof");
     let block_proofs = proof_storage
         .get_block_proofs_in_range(start_height, start_height + num_blocks - 1)
         .await?;
-    println!(
+    debug!(
         "Loaded {} block proofs from storage for range proof",
         block_proofs.len()
     );
@@ -309,7 +324,7 @@ pub async fn parallel_prover(
     };
     stdin.write(&input);
 
-    println!("Writing block proofs to stdin for range proof");
+    debug!("Writing block proofs to stdin for range proof");
     for block_proof in &block_proofs {
         let proof_deserialized: SP1Proof = bincode::deserialize(block_proof.proof_data.as_slice())?;
         let SP1Proof::Compressed(ref proof) = proof_deserialized else {
@@ -317,7 +332,7 @@ pub async fn parallel_prover(
         };
         stdin.write_proof(*proof.clone(), vk.vk.clone());
     }
-    println!("Wrote block proofs to stdin for range proof");
+    debug!("Wrote block proofs to stdin for range proof");
 
     // finally generate the range proof and return it
     let proof = client
@@ -328,7 +343,7 @@ pub async fn parallel_prover(
         .expect("failed to generate proof");
 
     let public_values: BlockRangeExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
-    println!(
+    debug!(
         "Final EVM state height: {:?} and root: {:?}, which should be used for proving messages using ./message.rs",
         public_values.new_height, public_values.new_state_root
     );
@@ -376,7 +391,7 @@ pub async fn synchronous_prover(
             pub_key.clone(),
         )
         .await?;
-        println!("Generating proof for block: {block_number}, trusted height: {trusted_height}");
+        debug!("Generating proof for block: {block_number}, trusted height: {trusted_height}");
         let proof = client
             .clone()
             .prove(&pk, &stdin)
@@ -384,13 +399,13 @@ pub async fn synchronous_prover(
             .run()
             .expect("failed to generate proof");
         block_proofs.push(proof.clone());
-        println!("Proof generated successfully!");
+        debug!("Proof generated successfully!");
 
         let public_values: BlockExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
         // update trusted root and height
         *trusted_root = public_values.new_state_root.into();
         *trusted_height = public_values.new_height;
-        println!("New state root: {:?}", *trusted_root);
+        debug!("New state root: {:?}", *trusted_root);
     }
 
     // reinitialize the prover client
@@ -426,7 +441,7 @@ pub async fn synchronous_prover(
         .expect("failed to generate proof");
 
     let public_values: BlockRangeExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
-    println!("Target state root: {:?}", public_values.new_state_root);
+    debug!("Target state root: {:?}", public_values.new_state_root);
 
     Ok(proof)
 }
@@ -447,7 +462,7 @@ async fn write_inputs(
         .blob_get_all(block_number, &[namespace])
         .await?
         .unwrap_or_default();
-    println!("Got {} blobs for block: {}", blobs.len(), block_number);
+    debug!("Got {} blobs for block: {}", blobs.len(), block_number);
 
     let extended_header = celestia_client.header_get_by_height(block_number).await?;
     let namespace_data = celestia_client
@@ -457,16 +472,33 @@ async fn write_inputs(
     for row in namespace_data.rows {
         proofs.push(row.proof);
     }
-    println!("Got NamespaceProofs, total: {}", proofs.len());
+    debug!("Got NamespaceProofs, total: {}", proofs.len());
 
     let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
+    println!("Processing {} blobs for block: {}", blobs.len(), block_number);
     for blob in blobs.as_slice() {
         let data = match SignedData::decode(blob.data.as_slice()) {
-            Ok(data) => data.data.unwrap(),
-            Err(_) => continue,
+            Ok(data) => {
+                let data = data.data.unwrap();
+                if data.txs.is_empty() {
+                    println!(
+                        "No transactions found in EV Block: {:?}, which was included in Celestia block {}",
+                        data.clone().metadata.unwrap().height,
+                        block_number
+                    );
+                } else {
+                    println!(
+                        "Transaction found in Data: {data:?}, which was included in Celestia block {block_number}",
+                    );
+                }
+                data
+            }
+            Err(_) => {
+                continue;
+            }
         };
         let height = data.metadata.unwrap().height;
-        println!("Got SignedData for EVM block {height}");
+        debug!("Got SignedData for EVM block {height}");
 
         let client_executor_input =
             generate_client_executor_input(config::EVM_RPC_URL, height, chain_spec.clone(), genesis.clone()).await?;

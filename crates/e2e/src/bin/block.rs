@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use alloy_primitives::{FixedBytes, hex::FromHex};
 use e2e::{
-    config::other::{TARGET_HEIGHT, TRUSTED_HEIGHT, TRUSTED_ROOT},
+    config::debug::{TARGET_HEIGHT, TRUSTED_HEIGHT, TRUSTED_ROOT},
     prover::block::prove_blocks,
 };
 use ev_types::v1::{GetMetadataRequest, store_service_client::StoreServiceClient};
@@ -28,7 +28,7 @@ async fn main() {
 
 // todo: find a place for this function and remove it from the binaries
 async fn inclusion_height(block_number: u64) -> anyhow::Result<u64> {
-    let mut client = StoreServiceClient::connect(e2e::config::other::SEQUENCER_URL).await?;
+    let mut client = StoreServiceClient::connect(e2e::config::debug::SEQUENCER_URL).await?;
     let req = GetMetadataRequest {
         key: format!("rhb/{block_number}/d"),
     };

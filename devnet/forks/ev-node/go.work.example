@@ -1,0 +1,13 @@
+go 1.23
+
+use (
+	.
+	./core
+	./apps/testapp
+	./apps/evm/single
+	./apps/grpc/single
+	./execution/evm
+	./execution/grpc
+	./da/
+	./sequencers/single
+)

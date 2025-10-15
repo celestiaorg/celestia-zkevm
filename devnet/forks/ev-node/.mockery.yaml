@@ -1,0 +1,72 @@
+template: testify
+template-data:
+  unroll-variadic: true
+packages:
+  github.com/evstack/ev-node/core/da:
+    interfaces:
+      DA:
+        config:
+          pkgname: mocks
+          filename: da.go
+        configs:
+          - dir: ./da/internal/mocks
+          - dir: ./test/mocks
+  github.com/evstack/ev-node/core/execution:
+    interfaces:
+      Executor:
+        config:
+          dir: ./test/mocks
+          pkgname: mocks
+          filename: execution.go
+  github.com/evstack/ev-node/core/sequencer:
+    interfaces:
+      Sequencer:
+        config:
+          dir: ./test/mocks
+          pkgname: mocks
+          filename: sequencer.go
+  github.com/evstack/ev-node/pkg/p2p:
+    interfaces:
+      P2PRPC:
+        config:
+          dir: ./test/mocks
+          pkgname: mocks
+          filename: p2p.go
+  github.com/evstack/ev-node/pkg/store:
+    interfaces:
+      Store:
+        config:
+          dir: ./test/mocks
+          pkgname: mocks
+          filename: store.go
+  github.com/celestiaorg/go-header:
+    interfaces:
+      Store:
+        config:
+          dir: ./test/mocks
+          pkgname: mocks
+          filename: external/hstore.go
+  github.com/evstack/ev-node/block/internal/syncing:
+    interfaces:
+      daRetriever:
+        config:
+          dir: ./block/internal/syncing
+          pkgname: syncing
+          filename: syncer_mock.go
+      p2pHandler:
+        config:
+          dir: ./block/internal/syncing
+          pkgname: syncing
+          filename: syncer_mock.go
+  github.com/evstack/ev-node/block/internal/common:
+    interfaces:
+      Broadcaster:
+        config:
+          dir: ./block/internal/common
+          pkgname: common
+          filename: broadcaster_mock.go
+      p2pHandler:
+        config:
+          dir: ./block/internal/syncing
+          pkgname: syncing
+          filename: syncer_mock.go

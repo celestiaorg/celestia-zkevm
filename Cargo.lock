@@ -3030,6 +3030,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-provider",
  "alloy-rpc-types",
+ "alloy-signer-local",
  "alloy-sol-types",
  "anyhow",
  "bincode",
@@ -3045,6 +3046,7 @@ dependencies = [
  "ev-zkevm-types",
  "eyre",
  "prost 0.12.6",
+ "reqwest",
  "reth-chainspec",
  "rsp-client-executor",
  "rsp-host-executor",
@@ -3059,6 +3061,8 @@ dependencies = [
  "tempfile",
  "tendermint-proto",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
  "url",
 ]
 
@@ -6726,6 +6730,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "encoding_rs",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "h2 0.4.12",

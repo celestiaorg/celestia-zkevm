@@ -1,5 +1,18 @@
 # ZK EVM Hyperlane
 
+
+## Testing
+Run the full end-to-end flow locally to see how ZK proofs are generated for EVM blocks and Hyperlane transfers. This demonstrates permissionless asset bridging powered by zero-knowledge proofs.
+
+[![Run the End to End](https://img.shields.io/badge/🚀%20End%20To%20End-blueviolet?style=for-the-badge)](crates/e2e/README.md)
+
+
+## Testnet
+Deploy a complete local testnet using your CPU or GPU to prove blocks and bridge transfers in Zero Knowledge.
+
+[![Deploy](https://img.shields.io/badge/🚀%20Deploy%20a%20Testnet-blueviolet?style=for-the-badge)](crates/e2e/DEVNET.md)
+
+
 > [!WARNING]
 > This repository is a work in progress and under active development.
 
@@ -16,6 +29,7 @@ SP1 supports generating proofs in mock mode or network mode. By default, mock mo
 SP1_PROVER=network
 NETWORK_PRIVATE_KEY="PRIVATE_KEY" to the SP1 prover network private key from Celestia 1Password
 ```
+
 
 ### Prerequisites
 
@@ -79,6 +93,56 @@ NETWORK_PRIVATE_KEY="PRIVATE_KEY" to the SP1 prover network private key from Cel
     ```shell
     make stop
     ```
+
+## Running the E2E test
+1. Clone this repository.
+
+    ```shell
+    git clone git@github.com:celestiaorg/celestia-zkevm-hl-testnet.git
+    ```
+
+2. Source the provided `.env` file in this repository.
+
+    ```shell
+    cp .env.example .env
+
+    set -a
+    source .env
+    set +a
+    ```
+
+3. Select a prover mode other than `mock`. Valid choices are `network`, `cuda`, `cpu`.
+    in `.env`:
+    ```shell
+    SP1_PROVER=cpu #network, cuda
+    ```
+
+5. Use the prover service binary to generate config files locally.
+    ```
+    cargo run --bin ev-prover init
+    ```
+    Alternatively, install the client binary and run init:
+    ```
+    cargo install --path ./crates/ev-prover
+    ev-prover init
+    ```
+
+6. Start the docker compose services.
+
+    ```shell
+    # Run `make start` or `docker compose up` from the root of the repository
+    make start 
+    ```
+
+    Wait for all containers to finish their initialization sequence.
+
+7. Run the e2e
+    ```shell
+    RUST_LOG="e2e=info" make e2e
+    ```
+
+    Note that depending on your hardware it can take a while for the e2e to run,
+    as it will prove a series of EVM blocks leading up to a target height, as well as state inclusion of a Hyperlane deposit message at the target height.
 
 ## Architecture
 
