@@ -41,6 +41,7 @@ ev-types = { workspace = true, features = ["grpc"] }
 ev-zkevm-types = { workspace = true }
 eyre = { workspace = true }
 prost = { workspace = true }
+reqwest = { workspace = true, features = ["blocking"] }
 reth-chainspec = { workspace = true }
 rsp-client-executor = { workspace = true }
 rsp-host-executor = { workspace = true }
@@ -61,4 +62,3 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
-reqwest = { workspace = true, features = ["blocking"] }

@@ -184,8 +184,7 @@ pub async fn parallel_prover(
                         );
                     } else {
                         println!(
-                            "Transaction found in Data: {:?}, which was included in Celestia block {}",
-                            data, block_number
+                            "Transaction found in Data: {data:?}, which was included in Celestia block {block_number}",
                         );
                     }
                     data
@@ -489,8 +488,7 @@ async fn write_inputs(
                     );
                 } else {
                     println!(
-                        "Transaction found in Data: {:?}, which was included in Celestia block {}",
-                        data, block_number
+                        "Transaction found in Data: {data:?}, which was included in Celestia block {block_number}",
                     );
                 }
                 data
