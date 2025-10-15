@@ -146,7 +146,7 @@ services:
       - celestia-zkevm-net
 
   relayer:
-    image: gcr.io/abacus-labs-dev/hyperlane-agent:main
+    image: gcr.io/abacus-labs-dev/hyperlane-agent@sha256:e083f9c5fca4795a60a277677935d6238984946c1ec18efd5c0d5cf5c9efa2a7
     platform: linux/amd64
     container_name: relayer
     environment:
