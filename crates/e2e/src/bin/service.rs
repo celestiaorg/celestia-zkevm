@@ -2,6 +2,7 @@ use alloy_primitives::{FixedBytes, hex::FromHex};
 use alloy_provider::ProviderBuilder;
 use celestia_grpc_client::{
     MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm, QueryIsmRequest, client::CelestiaIsmClient,
+    types::ClientConfig,
 };
 use e2e::config::debug::EV_RPC;
 use e2e::config::e2e::ISM_ID;
@@ -38,7 +39,8 @@ async fn main() {
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     // instantiate ISM client for submitting payloads and querying state
-    let ism_client = CelestiaIsmClient::from_env().await.unwrap();
+    let config = ClientConfig::from_env().expect("failed to create celestia client config");
+    let ism_client = CelestiaIsmClient::new(config).await.unwrap();
     let client: Arc<EnvProver> = Arc::new(ProverClient::from_env());
     let mut snapshot_index = 0;
 

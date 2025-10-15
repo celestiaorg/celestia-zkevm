@@ -1,5 +1,6 @@
 use alloy_primitives::{FixedBytes, hex::FromHex};
 use alloy_provider::ProviderBuilder;
+use celestia_grpc_client::MsgRemoteTransfer;
 use celestia_grpc_client::types::ClientConfig;
 use celestia_grpc_client::{
     MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm, QueryIsmRequest, client::CelestiaIsmClient,
