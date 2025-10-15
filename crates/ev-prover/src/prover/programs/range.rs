@@ -8,8 +8,7 @@ use anyhow::{anyhow, Ok, Result};
 use async_trait::async_trait;
 use ev_zkevm_types::programs::block::{BlockRangeExecInput, BlockRangeExecOutput};
 use sp1_sdk::{
-    include_elf, EnvProver, HashableKey, ProverClient, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin,
-    SP1VerifyingKey,
+    include_elf, EnvProver, ProverClient, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
 };
 use storage::proofs::ProofStorage;
 use tokio::sync::mpsc::Receiver;
@@ -153,10 +152,11 @@ impl BlockRangeExecProver {
         while let Some(event) = self.rx.recv().await {
             info!("ProofCommitted for height: {}", event);
             self.pending.insert(event);
-            debug!("size pending: {}", self.pending.len());
+            debug!("Block execution proofs pending: {}", self.pending.len());
 
             // Drain as many batches as are ready from the set.
             while let Some((start, end)) = self.next_provable_range()? {
+                // TODO: consider handing off to a separate task
                 info!("Ready to aggregate complete batch in range: ({start}-{end})");
                 self.aggregate_range(start, end).await?;
             }
@@ -170,7 +170,7 @@ impl BlockRangeExecProver {
     /// Note: the start and end range indices are inclusive.
     fn next_provable_range(&mut self) -> Result<Option<(u64, u64)>> {
         // TODO: this initialisation code using the Option<u64> is just for testing.
-        // ideally we can persist this somewhere, this just allows me to test locally quickly
+        // ideally we can persist this somewhere (db), this just allows me to test locally quickly
         let start;
         if self.next_expected.is_none() {
             start = self
@@ -219,25 +219,21 @@ impl BlockRangeExecProver {
     /// Aggregates a range of block proofs, start and end inclusive.
     async fn aggregate_range(&mut self, start: u64, end: u64) -> Result<()> {
         let block_proofs = self.storage.get_block_proofs_in_range(start, end).await?;
-
-        let throw_away = ProverClient::from_env();
-        let (_, vkey) = throw_away.setup(EV_EXEC_ELF);
-
-        // let vkey = self.storage.get_vkey().await?;
+        let inner = self.cfg().inner.get("block-exec").unwrap();
 
         let mut public_values = Vec::with_capacity(block_proofs.len());
         let mut proofs = Vec::with_capacity(block_proofs.len());
-        let vkeys = vec![vkey.vk.hash_u32(); block_proofs.len()];
-
         for stored_proof in block_proofs {
             let proof: SP1Proof = bincode::deserialize(&stored_proof.proof_data)?;
 
             public_values.push(stored_proof.public_values);
-            proofs.push(ProofInput::new(proof, vkey.clone()));
+            proofs.push(ProofInput::new(proof, (*inner.vk).clone()));
         }
 
+        let vkeys = vec![inner.digest; block_proofs.len()];
         let input = (BlockRangeExecInput { vkeys, public_values }, proofs);
 
+        // NOTE: temporarily to allow local testing in mock mode
         let prover = ProverClient::builder().mock().build();
         let res = prover
             .prove(&self.cfg().pk(), &self.build_stdin(input)?)
@@ -248,7 +244,6 @@ impl BlockRangeExecProver {
         info!("Successfully run range prover with result: {output}");
 
         // let (res, output) = self.prove(input).await?;
-
         // self.storage.store_range_proof(start, end, &res, &output).await?;
 
         Ok(())
