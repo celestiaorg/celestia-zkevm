@@ -177,13 +177,13 @@ pub async fn parallel_prover(
                 Ok(data) => {
                     let data = data.data.unwrap();
                     if data.txs.is_empty() {
-                        println!(
+                        debug!(
                             "No transactions found in EV Block: {:?}, which was included in Celestia block {}",
                             data.clone().metadata.unwrap().height,
                             block_number
                         );
                     } else {
-                        println!(
+                        debug!(
                             "Transaction found in Data: {data:?}, which was included in Celestia block {block_number}",
                         );
                     }
