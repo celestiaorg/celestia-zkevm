@@ -22,14 +22,8 @@ pub struct CelestiaIsmClient {
 
 impl CelestiaIsmClient {
     /// Create a new Celestia proof client
-    pub async fn new(mut config: ClientConfig) -> Result<Self> {
+    pub async fn new(config: ClientConfig) -> Result<Self> {
         debug!("Creating Celestia proof client with endpoint: {}", config.grpc_endpoint);
-
-        // Derive and cache the signer address if not already set
-        if config.signer_address.is_empty() {
-            config.signer_address = ClientConfig::derive_signer_address(&config.private_key_hex)?;
-            debug!("Derived signer address: {}", config.signer_address);
-        }
 
         // optional: set timeouts, concurrency limits, TLS, etc.
         let endpoint = Endpoint::from_shared(config.grpc_endpoint.clone())?
@@ -51,33 +45,6 @@ impl CelestiaIsmClient {
             channel,
             tx_client,
         })
-    }
-
-    /// Create a client from environment variables
-    pub async fn from_env() -> Result<Self> {
-        let config = ClientConfig {
-            grpc_endpoint: std::env::var("CELESTIA_GRPC_ENDPOINT")
-                .unwrap_or_else(|_| "http://localhost:9090".to_string()),
-            private_key_hex: std::env::var("CELESTIA_PRIVATE_KEY").map_err(|_| {
-                IsmClientError::Configuration("CELESTIA_PRIVATE_KEY environment variable not set".to_string())
-            })?,
-            signer_address: String::new(), // Will be derived in new()
-            chain_id: std::env::var("CELESTIA_CHAIN_ID").unwrap_or_else(|_| "celestia-zkevm-testnet".to_string()),
-            gas_price: std::env::var("CELESTIA_GAS_PRICE")
-                .unwrap_or_else(|_| "1000".to_string())
-                .parse()
-                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_GAS_PRICE".to_string()))?,
-            max_gas: std::env::var("CELESTIA_MAX_GAS")
-                .unwrap_or_else(|_| "200000".to_string())
-                .parse()
-                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_MAX_GAS".to_string()))?,
-            confirmation_timeout: std::env::var("CELESTIA_CONFIRMATION_TIMEOUT")
-                .unwrap_or_else(|_| "60".to_string())
-                .parse()
-                .map_err(|_| IsmClientError::Configuration("Invalid CELESTIA_CONFIRMATION_TIMEOUT".to_string()))?,
-        };
-
-        Self::new(config).await
     }
 
     /// Get the gRPC tx client reference for direct access to Lumina functionality
@@ -154,7 +121,7 @@ impl CelestiaIsmClient {
             }
             Err(e) => {
                 warn!("Failed to submit {} message: {}", message_type, e);
-                Err(IsmClientError::SubmissionFailed(format!(
+                Err(IsmClientError::TxFailed(format!(
                     "Failed to submit {message_type}: {e}"
                 )))
             }
