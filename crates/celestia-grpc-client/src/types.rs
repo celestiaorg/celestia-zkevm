@@ -1,4 +1,6 @@
+use crate::error::{IsmClientError, Result};
 use serde::{Deserialize, Serialize};
+use std::env;
 
 /// Response from proof submission
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,7 +38,7 @@ pub struct ClientConfig {
 
 impl ClientConfig {
     /// Derive the bech32-encoded signer address from the private key
-    pub fn derive_signer_address(private_key_hex: &str) -> Result<String, anyhow::Error> {
+    pub fn derive_signer_address(private_key_hex: &str) -> anyhow::Result<String> {
         use anyhow::Context;
         use bech32::{self, Bech32, Hrp};
         use k256::ecdsa::SigningKey;
@@ -55,6 +57,34 @@ impl ClientConfig {
         let addr = bech32::encode::<Bech32>(hrp, ripemd.as_slice()).context("Failed to encode bech32 address")?;
 
         Ok(addr)
+    }
+
+    #[allow(clippy::result_large_err)]
+    pub fn from_env() -> Result<Self> {
+        let private_key_hex = env::var("CELESTIA_PRIVATE_KEY")
+            .map_err(|_| IsmClientError::Configuration("CELESTIA_PRIVATE_KEY not set".to_string()))?;
+        let signer_address = Self::derive_signer_address(&private_key_hex)?;
+
+        let config = ClientConfig {
+            grpc_endpoint: env::var("CELESTIA_GRPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:9090".to_string()),
+            private_key_hex,
+            signer_address,
+            chain_id: env::var("CELESTIA_CHAIN_ID").unwrap_or_else(|_| "celestia-zkevm-testnet".to_string()),
+            gas_price: env::var("CELESTIA_GAS_PRICE")
+                .unwrap_or_else(|_| "1000".to_string())
+                .parse()
+                .unwrap(),
+            max_gas: env::var("CELESTIA_MAX_GAS")
+                .unwrap_or_else(|_| "200000".to_string())
+                .parse()
+                .unwrap(),
+            confirmation_timeout: env::var("CELESTIA_CONFIRMATION_TIMEOUT")
+                .unwrap_or_else(|_| "60".to_string())
+                .parse()
+                .unwrap(),
+        };
+
+        Ok(config)
     }
 }
 
