@@ -220,6 +220,7 @@ impl BlockRangeExecProver {
     async fn aggregate_range(&mut self, start: u64, end: u64) -> Result<()> {
         let block_proofs = self.storage.get_block_proofs_in_range(start, end).await?;
         let inner = self.cfg().inner.get("block-exec").unwrap();
+        let vkeys = vec![inner.digest; block_proofs.len()];
 
         let mut public_values = Vec::with_capacity(block_proofs.len());
         let mut proofs = Vec::with_capacity(block_proofs.len());
@@ -230,7 +231,6 @@ impl BlockRangeExecProver {
             proofs.push(ProofInput::new(proof, (*inner.vk).clone()));
         }
 
-        let vkeys = vec![inner.digest; block_proofs.len()];
         let input = (BlockRangeExecInput { vkeys, public_values }, proofs);
 
         // NOTE: temporarily to allow local testing in mock mode
