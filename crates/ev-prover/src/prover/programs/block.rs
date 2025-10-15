@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 use celestia_types::ExtendedHeader;
+use sp1_prover::components::CpuProverComponents;
+use sp1_sdk::network::NetworkMode;
 use std::collections::BTreeMap;
 use std::fs;
 use std::result::Result::{Err, Ok};
@@ -24,7 +26,7 @@ use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
-use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
+use sp1_sdk::{include_elf, NetworkProver, Prover, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 use tokio::{
     sync::{mpsc, mpsc::Sender, RwLock, Semaphore},
     task::JoinSet,
@@ -115,7 +117,7 @@ impl AppContext {
 pub struct BlockExecProver {
     pub app: AppContext,
     pub config: ProverConfig,
-    pub prover: EnvProver,
+    pub prover: Arc<dyn Prover<CpuProverComponents> + Send + Sync>,
     pub tx: Sender<ProofCommitted>,
     pub storage: Arc<dyn ProofStorage>,
     pub queue_capacity: usize,
@@ -156,8 +158,8 @@ impl ProgramProver for BlockExecProver {
     }
 
     /// Returns the SP1 Prover.
-    fn prover(&self) -> &EnvProver {
-        &self.prover
+    fn prover(&self) -> Arc<dyn Prover<CpuProverComponents> + Send + Sync> {
+        Arc::clone(&self.prover)
     }
 }
 
@@ -196,13 +198,16 @@ impl BlockExecProver {
         queue_capacity: usize,
         concurrency: usize,
     ) -> Arc<Self> {
-        let prover = ProverClient::from_env();
+        let prover = ProverClient::builder()
+            .network_for(NetworkMode::Mainnet)
+            .rpc_url("https://rpc.mainnet.succinct.xyz")
+            .build();
         let config = BlockExecProver::default_config(&prover);
 
         Arc::new(Self {
             app,
             config,
-            prover,
+            prover: Arc::new(prover),
             tx,
             storage,
             queue_capacity,
@@ -211,7 +216,7 @@ impl BlockExecProver {
     }
 
     /// Returns the default prover configuration for the block execution program.
-    pub fn default_config(prover: &EnvProver) -> ProverConfig {
+    pub fn default_config(prover: &NetworkProver) -> ProverConfig {
         let (pk, vk) = prover.setup(EV_EXEC_ELF);
         ProverConfig::new(pk, vk, SP1ProofMode::Compressed)
     }

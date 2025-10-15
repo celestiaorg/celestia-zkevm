@@ -1,8 +1,10 @@
+use std::sync::Arc;
 use std::{fmt::Display, result::Result::Ok};
 
 use anyhow::Result;
 use async_trait::async_trait;
-use sp1_sdk::{EnvProver, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
+use sp1_prover::components::CpuProverComponents;
+use sp1_sdk::{Prover, SP1ProofWithPublicValues, SP1Stdin};
 
 #[allow(clippy::module_inception)]
 pub mod config;
@@ -35,19 +37,14 @@ pub trait ProgramProver {
         let cfg = self.cfg();
         let stdin = self.build_stdin(input)?;
 
-        let proof: SP1ProofWithPublicValues = match cfg.proof_mode() {
-            SP1ProofMode::Core => self.prover().prove(&cfg.pk(), &stdin).core().run()?,
-            SP1ProofMode::Compressed => self.prover().prove(&cfg.pk(), &stdin).compressed().run()?,
-            SP1ProofMode::Groth16 => self.prover().prove(&cfg.pk(), &stdin).groth16().run()?,
-            SP1ProofMode::Plonk => self.prover().prove(&cfg.pk(), &stdin).plonk().run()?,
-        };
+        let proof = self.prover().prove(&cfg.pk(), &stdin, cfg.proof_mode())?;
 
         let output = self.post_process(proof.clone())?;
         Ok((proof, output))
     }
 
     /// Returns the SP1 Prover.
-    fn prover(&self) -> &EnvProver;
+    fn prover(&self) -> Arc<dyn Prover<CpuProverComponents> + Send + Sync>;
 
     /// Parse or convert program outputs.
     fn post_process(&self, proof: SP1ProofWithPublicValues) -> Result<Self::Output>;

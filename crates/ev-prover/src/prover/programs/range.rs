@@ -7,16 +7,18 @@ use std::{
 use anyhow::{anyhow, Ok, Result};
 use async_trait::async_trait;
 use ev_zkevm_types::programs::block::{BlockRangeExecInput, BlockRangeExecOutput};
+use sp1_prover::components::CpuProverComponents;
+use sp1_sdk::network::NetworkMode;
 use sp1_sdk::{
-    include_elf, EnvProver, ProverClient, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
+    include_elf, NetworkProver, Prover, ProverClient, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin,
+    SP1VerifyingKey,
 };
 use storage::proofs::ProofStorage;
 use tokio::sync::mpsc::Receiver;
 use tracing::{debug, info};
 
 use crate::prover::{
-    programs::block::EV_EXEC_ELF, BaseProverConfig, ProgramProver, ProgramVerifyingKey, ProofCommitted,
-    RecursiveProverConfig,
+    programs::block::EV_EXEC_ELF, ProgramProver, ProgramVerifyingKey, ProofCommitted, RecursiveProverConfig,
 };
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
@@ -34,7 +36,7 @@ pub const EV_RANGE_EXEC_ELF: &[u8] = include_elf!("ev-range-exec-program");
 /// - The number of `vkeys` must exactly match the number of `proofs`.
 pub struct BlockRangeExecProver {
     config: RecursiveProverConfig,
-    prover: EnvProver,
+    prover: Arc<dyn Prover<CpuProverComponents> + Send + Sync>,
     pending: BTreeSet<ProofCommitted>,
     rx: Receiver<ProofCommitted>,
     storage: Arc<dyn ProofStorage>,
@@ -112,20 +114,23 @@ impl ProgramProver for BlockRangeExecProver {
     }
 
     /// Returns the SP1 Prover.
-    fn prover(&self) -> &EnvProver {
-        &self.prover
+    fn prover(&self) -> Arc<dyn Prover<CpuProverComponents> + Send + Sync> {
+        Arc::clone(&self.prover)
     }
 }
 
 impl BlockRangeExecProver {
     pub fn new(rx: Receiver<ProofCommitted>, storage: Arc<dyn ProofStorage>) -> Result<Self> {
-        let prover = ProverClient::from_env();
+        let prover = ProverClient::builder()
+            .network_for(NetworkMode::Mainnet)
+            .rpc_url("https://rpc.mainnet.succinct.xyz")
+            .build();
         let config = BlockRangeExecProver::default_config(&prover);
         let pending = BTreeSet::new();
 
         Ok(Self {
             config,
-            prover,
+            prover: Arc::new(prover),
             pending,
             rx,
             storage,
@@ -135,7 +140,7 @@ impl BlockRangeExecProver {
     }
 
     /// Returns the default prover configuration for the block execution program.
-    pub fn default_config(prover: &EnvProver) -> RecursiveProverConfig {
+    pub fn default_config(prover: &NetworkProver) -> RecursiveProverConfig {
         let (pk, vk) = prover.setup(EV_RANGE_EXEC_ELF);
         let (_, inner_vk) = prover.setup(EV_EXEC_ELF);
 
@@ -234,17 +239,17 @@ impl BlockRangeExecProver {
         let input = (BlockRangeExecInput { vkeys, public_values }, proofs);
 
         // NOTE: temporarily to allow local testing in mock mode
-        let prover = ProverClient::builder().mock().build();
-        let res = prover
-            .prove(&self.cfg().pk(), &self.build_stdin(input)?)
-            .deferred_proof_verification(false)
-            .run()?;
+        // let prover = ProverClient::builder().mock().build();
+        // let res = prover
+        //     .prove(&self.cfg().pk(), &self.build_stdin(input)?)
+        //     .deferred_proof_verification(false)
+        //     .run()?;
 
-        let output = self.post_process(res)?;
+        // let output = self.post_process(res)?;
+
+        let (res, output) = self.prove(input).await?;
+        self.storage.store_range_proof(start, end, &res, &output).await?;
         info!("Successfully run range prover with result: {output}");
-
-        // let (res, output) = self.prove(input).await?;
-        // self.storage.store_range_proof(start, end, &res, &output).await?;
 
         Ok(())
     }
