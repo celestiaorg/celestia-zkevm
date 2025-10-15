@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 use celestia_types::ExtendedHeader;
-use sp1_prover::components::CpuProverComponents;
-use sp1_sdk::network::NetworkMode;
 use std::collections::BTreeMap;
 use std::fs;
 use std::result::Result::{Err, Ok};
@@ -26,6 +24,8 @@ use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
+use sp1_prover::components::CpuProverComponents;
+use sp1_sdk::network::NetworkMode;
 use sp1_sdk::{include_elf, NetworkProver, Prover, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 use tokio::{
     sync::{mpsc, mpsc::Sender, RwLock, Semaphore},
