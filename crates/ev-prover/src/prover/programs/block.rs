@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use celestia_types::ExtendedHeader;
 use std::collections::BTreeMap;
+use std::env;
 use std::fs;
 use std::result::Result::{Err, Ok};
 use std::sync::Arc;
@@ -25,8 +26,7 @@ use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
 use sp1_prover::components::CpuProverComponents;
-use sp1_sdk::network::NetworkMode;
-use sp1_sdk::{include_elf, NetworkProver, Prover, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
+use sp1_sdk::{include_elf, Prover, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 use tokio::{
     sync::{mpsc, mpsc::Sender, RwLock, Semaphore},
     task::JoinSet,
@@ -34,6 +34,7 @@ use tokio::{
 use tracing::{debug, error, info};
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
+use crate::prover::prover_from_env;
 use crate::prover::{ProgramProver, ProofCommitted, ProverConfig};
 use storage::proofs::ProofStorage;
 
@@ -198,16 +199,13 @@ impl BlockExecProver {
         queue_capacity: usize,
         concurrency: usize,
     ) -> Arc<Self> {
-        let prover = ProverClient::builder()
-            .network_for(NetworkMode::Mainnet)
-            .rpc_url("https://rpc.mainnet.succinct.xyz")
-            .build();
-        let config = BlockExecProver::default_config(&prover);
+        let prover = prover_from_env().expect("failed to create prover");
+        let config = BlockExecProver::default_config(prover.as_ref());
 
         Arc::new(Self {
             app,
             config,
-            prover: Arc::new(prover),
+            prover,
             tx,
             storage,
             queue_capacity,
@@ -216,7 +214,7 @@ impl BlockExecProver {
     }
 
     /// Returns the default prover configuration for the block execution program.
-    pub fn default_config(prover: &NetworkProver) -> ProverConfig {
+    pub fn default_config(prover: &(dyn Prover<CpuProverComponents> + Send + Sync)) -> ProverConfig {
         let (pk, vk) = prover.setup(EV_EXEC_ELF);
         ProverConfig::new(pk, vk, SP1ProofMode::Compressed)
     }

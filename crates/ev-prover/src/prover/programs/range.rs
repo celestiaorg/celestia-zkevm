@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use std::{
     collections::{BTreeSet, HashMap},
+    env,
     sync::Arc,
 };
 
@@ -8,17 +9,17 @@ use anyhow::{anyhow, Ok, Result};
 use async_trait::async_trait;
 use ev_zkevm_types::programs::block::{BlockRangeExecInput, BlockRangeExecOutput};
 use sp1_prover::components::CpuProverComponents;
-use sp1_sdk::network::NetworkMode;
 use sp1_sdk::{
-    include_elf, NetworkProver, Prover, ProverClient, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin,
-    SP1VerifyingKey,
+    include_elf, Prover, ProverClient, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
 };
 use storage::proofs::ProofStorage;
 use tokio::sync::mpsc::Receiver;
 use tracing::{debug, info};
 
+use crate::prover::prover_from_env;
 use crate::prover::{
-    programs::block::EV_EXEC_ELF, ProgramProver, ProgramVerifyingKey, ProofCommitted, RecursiveProverConfig,
+    programs::block::EV_EXEC_ELF, BaseProverConfig, ProgramProver, ProgramVerifyingKey, ProofCommitted,
+    RecursiveProverConfig,
 };
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
@@ -121,26 +122,23 @@ impl ProgramProver for BlockRangeExecProver {
 
 impl BlockRangeExecProver {
     pub fn new(rx: Receiver<ProofCommitted>, storage: Arc<dyn ProofStorage>) -> Result<Self> {
-        let prover = ProverClient::builder()
-            .network_for(NetworkMode::Mainnet)
-            .rpc_url("https://rpc.mainnet.succinct.xyz")
-            .build();
-        let config = BlockRangeExecProver::default_config(&prover);
+        let prover = prover_from_env().expect("failed to create prover");
+        let config = BlockRangeExecProver::default_config(prover.as_ref());
         let pending = BTreeSet::new();
 
         Ok(Self {
             config,
-            prover: Arc::new(prover),
+            prover,
             pending,
             rx,
             storage,
-            batch_size: 10,
+            batch_size: 3,
             next_expected: None, // TODO: initialise
         })
     }
 
     /// Returns the default prover configuration for the block execution program.
-    pub fn default_config(prover: &NetworkProver) -> RecursiveProverConfig {
+    pub fn default_config(prover: &(dyn Prover<CpuProverComponents> + Send + Sync)) -> RecursiveProverConfig {
         let (pk, vk) = prover.setup(EV_RANGE_EXEC_ELF);
         let (_, inner_vk) = prover.setup(EV_EXEC_ELF);
 
@@ -174,32 +172,38 @@ impl BlockRangeExecProver {
     /// If a complete batch exists then remove those entries from `pending`, advance the cursor, and return the range.
     /// Note: the start and end range indices are inclusive.
     fn next_provable_range(&mut self) -> Result<Option<(u64, u64)>> {
+        info!("NEXT provable range");
+        if self.batch_size == 0 {
+            return Ok(None);
+        }
+
         // TODO: this initialisation code using the Option<u64> is just for testing.
         // ideally we can persist this somewhere (db), this just allows me to test locally quickly
-        let start;
+        // If we don't have a cursor yet, initialize it from the smallest pending height.
         if self.next_expected.is_none() {
-            start = self
-                .pending
-                .first()
-                .expect("expected first element but got none")
-                .height();
-        } else {
-            start = self.next_expected.unwrap();
+            match self.pending.first() {
+                Some(h) => self.next_expected = Some(h.height()),
+                None => return Ok(None), // nothing pending yet
+            }
         }
+
+        let start = self.next_expected.expect("set above");
 
         let end = start + self.batch_size - 1;
 
         let Some(min) = self.pending.first() else {
+            info!("no min available returning none; EMPTY SET");
             return Ok(None); // empty set
         };
 
         if min.height() > start {
+            info!("min is greater than start. MISSING START ELM");
             return Ok(None); // missing start element
         }
 
         // Walk the ordered set from `start` and ensure we have exactly `batch_size` elements.
         let mut cursor = start;
-        let iter = self.pending.range(ProofCommitted(start)..).peekable();
+        let iter = self.pending.range(ProofCommitted(start)..);
         for proof in iter.take(self.batch_size as usize) {
             if proof.height() != cursor {
                 return Ok(None); // missing contiguous element, incomplete batch
@@ -239,16 +243,16 @@ impl BlockRangeExecProver {
         let input = (BlockRangeExecInput { vkeys, public_values }, proofs);
 
         // NOTE: temporarily to allow local testing in mock mode
-        // let prover = ProverClient::builder().mock().build();
-        // let res = prover
-        //     .prove(&self.cfg().pk(), &self.build_stdin(input)?)
-        //     .deferred_proof_verification(false)
-        //     .run()?;
+        let prover = ProverClient::builder().mock().build();
+        let res = prover
+            .prove(&self.cfg().pk(), &self.build_stdin(input)?)
+            .deferred_proof_verification(false)
+            .run()?;
 
-        // let output = self.post_process(res)?;
+        let output = self.post_process(res)?;
 
-        let (res, output) = self.prove(input).await?;
-        self.storage.store_range_proof(start, end, &res, &output).await?;
+        // let (res, output) = self.prove(input).await?;
+        // self.storage.store_range_proof(start, end, &res, &output).await?;
         info!("Successfully run range prover with result: {output}");
 
         Ok(())

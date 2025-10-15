@@ -2,6 +2,7 @@
 //! two given heights against a given EVM block height.
 
 #![allow(dead_code)]
+use crate::prover::prover_from_env;
 use crate::prover::{ProgramProver, ProverConfig};
 use alloy_primitives::{hex::FromHex, Address, FixedBytes};
 use alloy_provider::{Provider, ProviderBuilder, WsConnect};
@@ -14,9 +15,9 @@ use ev_zkevm_types::programs::hyperlane::types::{
 use ev_zkevm_types::{events::Dispatch, programs::hyperlane::types::HYPERLANE_MERKLE_TREE_KEYS};
 use reqwest::Url;
 use sp1_prover::components::CpuProverComponents;
-use sp1_sdk::network::NetworkMode;
-use sp1_sdk::{include_elf, NetworkProver, Prover, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
+use sp1_sdk::{include_elf, Prover, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 use std::{
+    env,
     str::FromStr,
     sync::{Arc, RwLock},
     time::Duration,
@@ -105,16 +106,13 @@ impl HyperlaneMessageProver {
         proof_store: Arc<dyn ProofStorage>,
         state_query_provider: Arc<dyn StateQueryProvider>,
     ) -> Result<Arc<Self>> {
-        let prover = ProverClient::builder()
-            .network_for(NetworkMode::Mainnet)
-            .rpc_url("https://rpc.mainnet.succinct.xyz")
-            .build();
-        let config = HyperlaneMessageProver::default_config(&prover);
+        let prover = prover_from_env().expect("failed to create prover");
+        let config = HyperlaneMessageProver::default_config(prover.as_ref());
 
         Ok(Arc::new(Self {
             app,
             config,
-            prover: Arc::new(prover),
+            prover,
             message_store,
             snapshot_store,
             proof_store,
@@ -123,7 +121,7 @@ impl HyperlaneMessageProver {
     }
 
     /// Returns the default prover configuration for the block execution program.
-    pub fn default_config(prover: &NetworkProver) -> ProverConfig {
+    pub fn default_config(prover: &(dyn Prover<CpuProverComponents> + Send + Sync)) -> ProverConfig {
         let (pk, vk) = prover.setup(EV_HYPERLANE_ELF);
         ProverConfig::new(pk, vk, SP1ProofMode::Groth16)
     }

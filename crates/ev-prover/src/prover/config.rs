@@ -1,7 +1,31 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 
+use anyhow::anyhow;
 use sp1_sdk::{HashableKey, SP1ProofMode, SP1ProvingKey, SP1VerifyingKey};
+
+#[derive(Debug, Clone, Copy)]
+pub enum ProverMode {
+    Mock,
+    Cpu,
+    Cuda,
+    Network,
+}
+
+impl FromStr for ProverMode {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> anyhow::Result<Self> {
+        match s.trim().to_ascii_uppercase().as_str() {
+            "MOCK" => Ok(ProverMode::Mock),
+            "CPU" => Ok(ProverMode::Cpu),
+            "CUDA" => Ok(ProverMode::Cuda),
+            "NETWORK" => Ok(ProverMode::Network),
+            other => Err(anyhow!("Invalid SP1_PROVER mode: {other}")),
+        }
+    }
+}
 
 // BaseProverConfig defines a core capability trait for configs used by a ProgramProver.
 pub trait BaseProverConfig {

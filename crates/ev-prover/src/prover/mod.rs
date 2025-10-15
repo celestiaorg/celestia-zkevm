@@ -1,17 +1,20 @@
+use std::env;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::{fmt::Display, result::Result::Ok};
 
 use anyhow::Result;
 use async_trait::async_trait;
 use sp1_prover::components::CpuProverComponents;
-use sp1_sdk::{Prover, SP1ProofWithPublicValues, SP1Stdin};
+use sp1_sdk::{network::NetworkMode, Prover, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
+use tracing::debug;
 
 #[allow(clippy::module_inception)]
 pub mod config;
 pub mod programs;
 pub mod service;
 
-pub use config::{BaseProverConfig, ProgramId, ProgramVerifyingKey, ProverConfig, RecursiveProverConfig};
+pub use config::{BaseProverConfig, ProgramId, ProgramVerifyingKey, ProverConfig, ProverMode, RecursiveProverConfig};
 
 /// ProgramProver is a trait implemented per SP1 program*.
 ///
@@ -48,6 +51,40 @@ pub trait ProgramProver {
 
     /// Parse or convert program outputs.
     fn post_process(&self, proof: SP1ProofWithPublicValues) -> Result<Self::Output>;
+}
+
+pub type ProverDyn = dyn Prover<CpuProverComponents> + Send + Sync;
+
+/// Construct a prover based on the SP1_PROVER environment variable.
+pub fn prover_from_env() -> Result<Arc<ProverDyn>> {
+    let mode_str = env::var("SP1_PROVER").unwrap_or_else(|_| "MOCK".to_string());
+    let mode: ProverMode = ProverMode::from_str(&mode_str).unwrap();
+
+    let prover: Arc<ProverDyn> = match mode {
+        ProverMode::Mock => {
+            debug!("Using mock prover backend");
+            Arc::new(ProverClient::builder().mock().build())
+        }
+        ProverMode::Cpu => {
+            debug!("Using CPU prover backend");
+            Arc::new(ProverClient::builder().cpu().build())
+        }
+        ProverMode::Cuda => {
+            debug!("Using CUDA prover backend");
+            Arc::new(ProverClient::builder().cuda().build())
+        }
+        ProverMode::Network => {
+            debug!("Using network prover backend");
+            Arc::new(
+                ProverClient::builder()
+                    .network_for(NetworkMode::Mainnet)
+                    .rpc_url("https://rpc.mainnet.succinct.xyz")
+                    .build(),
+            )
+        }
+    };
+
+    Ok(prover)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
