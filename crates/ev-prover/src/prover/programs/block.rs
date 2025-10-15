@@ -124,11 +124,12 @@ pub struct BlockExecProver {
 
 #[async_trait]
 impl ProgramProver for BlockExecProver {
+    type Config = ProverConfig;
     type Input = BlockExecInput;
     type Output = BlockExecOutput;
 
     /// Returns the program configuration containing the ELF and proof mode.
-    fn cfg(&self) -> &ProverConfig {
+    fn cfg(&self) -> &Self::Config {
         &self.config
     }
 
@@ -195,8 +196,8 @@ impl BlockExecProver {
         queue_capacity: usize,
         concurrency: usize,
     ) -> Arc<Self> {
-        let config = BlockExecProver::default_config();
         let prover = ProverClient::from_env();
+        let config = BlockExecProver::default_config(&prover);
 
         Arc::new(Self {
             app,
@@ -210,11 +211,9 @@ impl BlockExecProver {
     }
 
     /// Returns the default prover configuration for the block execution program.
-    pub fn default_config() -> ProverConfig {
-        ProverConfig {
-            elf: EV_EXEC_ELF,
-            proof_mode: SP1ProofMode::Compressed,
-        }
+    pub fn default_config(prover: &EnvProver) -> ProverConfig {
+        let (pk, vk) = prover.setup(EV_EXEC_ELF);
+        ProverConfig::new(pk, vk, SP1ProofMode::Compressed)
     }
 
     async fn connect_and_subscribe(&self) -> Result<(Arc<Client>, Subscription<BlobsAtHeight>)> {

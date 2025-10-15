@@ -70,10 +70,11 @@ pub struct HyperlaneMessageProver {
 }
 
 impl ProgramProver for HyperlaneMessageProver {
+    type Config = ProverConfig;
     type Input = HyperlaneMessageInputs;
     type Output = HyperlaneMessageOutputs;
 
-    fn cfg(&self) -> &ProverConfig {
+    fn cfg(&self) -> &Self::Config {
         &self.config
     }
 
@@ -102,8 +103,8 @@ impl HyperlaneMessageProver {
         proof_store: Arc<dyn ProofStorage>,
         state_query_provider: Arc<dyn StateQueryProvider>,
     ) -> Result<Arc<Self>> {
-        let config = HyperlaneMessageProver::default_config();
         let prover = ProverClient::from_env();
+        let config = HyperlaneMessageProver::default_config(&prover);
 
         Ok(Arc::new(Self {
             app,
@@ -117,11 +118,9 @@ impl HyperlaneMessageProver {
     }
 
     /// Returns the default prover configuration for the block execution program.
-    pub fn default_config() -> ProverConfig {
-        ProverConfig {
-            elf: EV_HYPERLANE_ELF,
-            proof_mode: SP1ProofMode::Groth16,
-        }
+    pub fn default_config(prover: &EnvProver) -> ProverConfig {
+        let (pk, vk) = prover.setup(EV_HYPERLANE_ELF);
+        ProverConfig::new(pk, vk, SP1ProofMode::Groth16)
     }
 
     /// Run the message prover with indexer

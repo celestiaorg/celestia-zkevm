@@ -1,17 +1,24 @@
 #![allow(dead_code)]
-use std::{collections::BTreeSet, sync::Arc};
+use std::{
+    collections::{BTreeSet, HashMap},
+    sync::Arc,
+};
 
 use anyhow::{anyhow, Ok, Result};
 use async_trait::async_trait;
 use ev_zkevm_types::programs::block::{BlockRangeExecInput, BlockRangeExecOutput};
 use sp1_sdk::{
-    include_elf, EnvProver, ProverClient, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
+    include_elf, EnvProver, HashableKey, ProverClient, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin,
+    SP1VerifyingKey,
 };
 use storage::proofs::ProofStorage;
 use tokio::sync::mpsc::Receiver;
 use tracing::{debug, info};
 
-use crate::prover::{ProgramProver, ProofCommitted, ProverConfig};
+use crate::prover::{
+    programs::block::EV_EXEC_ELF, BaseProverConfig, ProgramProver, ProgramVerifyingKey, ProofCommitted,
+    RecursiveProverConfig,
+};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_RANGE_EXEC_ELF: &[u8] = include_elf!("ev-range-exec-program");
@@ -27,7 +34,7 @@ pub const EV_RANGE_EXEC_ELF: &[u8] = include_elf!("ev-range-exec-program");
 /// - All SP1 proofs must be in compressed format (`SP1Proof::Compressed`).
 /// - The number of `vkeys` must exactly match the number of `proofs`.
 pub struct BlockRangeExecProver {
-    config: ProverConfig,
+    config: RecursiveProverConfig,
     prover: EnvProver,
     pending: BTreeSet<ProofCommitted>,
     rx: Receiver<ProofCommitted>,
@@ -50,11 +57,12 @@ impl ProofInput {
 
 #[async_trait]
 impl ProgramProver for BlockRangeExecProver {
+    type Config = RecursiveProverConfig;
     type Input = (BlockRangeExecInput, Vec<ProofInput>);
     type Output = BlockRangeExecOutput;
 
     /// Returns the program configuration containing the ELF and proof mode.
-    fn cfg(&self) -> &ProverConfig {
+    fn cfg(&self) -> &Self::Config {
         &self.config
     }
 
@@ -112,8 +120,8 @@ impl ProgramProver for BlockRangeExecProver {
 
 impl BlockRangeExecProver {
     pub fn new(rx: Receiver<ProofCommitted>, storage: Arc<dyn ProofStorage>) -> Result<Self> {
-        let config = BlockRangeExecProver::default_config();
         let prover = ProverClient::from_env();
+        let config = BlockRangeExecProver::default_config(&prover);
         let pending = BTreeSet::new();
 
         Ok(Self {
@@ -128,11 +136,16 @@ impl BlockRangeExecProver {
     }
 
     /// Returns the default prover configuration for the block execution program.
-    pub fn default_config() -> ProverConfig {
-        ProverConfig {
-            elf: EV_RANGE_EXEC_ELF,
-            proof_mode: SP1ProofMode::Groth16,
-        }
+    pub fn default_config(prover: &EnvProver) -> RecursiveProverConfig {
+        let (pk, vk) = prover.setup(EV_RANGE_EXEC_ELF);
+        let (_, inner_vk) = prover.setup(EV_EXEC_ELF);
+
+        RecursiveProverConfig::new(
+            pk,
+            vk,
+            SP1ProofMode::Groth16,
+            HashMap::from([("block-exec", ProgramVerifyingKey::new(Arc::new(inner_vk)))]),
+        )
     }
 
     /// Starts the range prover loop.
@@ -140,10 +153,9 @@ impl BlockRangeExecProver {
         while let Some(event) = self.rx.recv().await {
             info!("ProofCommitted for height: {}", event);
             self.pending.insert(event);
-
             debug!("size pending: {}", self.pending.len());
 
-            // Drain as many back-to-back batches as are ready now.
+            // Drain as many batches as are ready from the set.
             while let Some((start, end)) = self.next_provable_range()? {
                 info!("Ready to aggregate complete batch in range: ({start}-{end})");
                 self.aggregate_range(start, end).await?;
@@ -205,7 +217,40 @@ impl BlockRangeExecProver {
     }
 
     /// Aggregates a range of block proofs, start and end inclusive.
-    async fn aggregate_range(&mut self, _start: u64, _end: u64) -> Result<()> {
+    async fn aggregate_range(&mut self, start: u64, end: u64) -> Result<()> {
+        let block_proofs = self.storage.get_block_proofs_in_range(start, end).await?;
+
+        let throw_away = ProverClient::from_env();
+        let (_, vkey) = throw_away.setup(EV_EXEC_ELF);
+
+        // let vkey = self.storage.get_vkey().await?;
+
+        let mut public_values = Vec::with_capacity(block_proofs.len());
+        let mut proofs = Vec::with_capacity(block_proofs.len());
+        let vkeys = vec![vkey.vk.hash_u32(); block_proofs.len()];
+
+        for stored_proof in block_proofs {
+            let proof: SP1Proof = bincode::deserialize(&stored_proof.proof_data)?;
+
+            public_values.push(stored_proof.public_values);
+            proofs.push(ProofInput::new(proof, vkey.clone()));
+        }
+
+        let input = (BlockRangeExecInput { vkeys, public_values }, proofs);
+
+        let prover = ProverClient::builder().mock().build();
+        let res = prover
+            .prove(&self.cfg().pk(), &self.build_stdin(input)?)
+            .deferred_proof_verification(false)
+            .run()?;
+
+        let output = self.post_process(res)?;
+        info!("Successfully run range prover with result: {output}");
+
+        // let (res, output) = self.prove(input).await?;
+
+        // self.storage.store_range_proof(start, end, &res, &output).await?;
+
         Ok(())
     }
 }
