@@ -18,7 +18,7 @@ use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
 use storage::hyperlane::snapshot::HyperlaneSnapshotStore;
 use tokio::time::sleep;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 use url::Url;
 
@@ -69,12 +69,13 @@ async fn main() {
     // we can choose this as our start heihgt, because the state root has not changed in between the hyperlane deployments
     // and this transfer.
     let celestia_start_height = ism.celestia_height + 1;
-    debug!("Celestia start height: {}", celestia_start_height);
+    info!("Celestia start height: {}", celestia_start_height);
     info!("Waiting for Evolve balance to be updated...");
 
     // next trigger make transfer-back
     info!("Submitting Hyperlane deposit message on Evolve...");
     let target_height = retry_async(transfer_back, "transfer_back").await;
+    info!("Target height: {}", target_height);
     let client: Arc<EnvProver> = Arc::new(ProverClient::from_env());
     let target_inclusion_height = retry_async(|| inclusion_height(target_height), "inclusion_height").await;
     let num_blocks = target_inclusion_height - celestia_start_height;

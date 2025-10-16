@@ -70,6 +70,19 @@ pub fn main() {
     // 4. Verify sequential headers (EVM and Celestia)
     // ------------------------------
     println!("cycle-tracker-report-start: verify sequential headers");
+
+    let anchor_block = outputs.first().expect("No outputs provided");
+    assert_eq!(
+        anchor_block.prev_celestia_height, inputs.trusted_celestia_height,
+        "verify sequential Celestia heights failed at index {}: expected {:?}, got {:?}",
+        0, anchor_block.prev_celestia_height, inputs.trusted_celestia_height
+    );
+    assert_eq!(
+        anchor_block.prev_celestia_header_hash, inputs.trusted_celestia_root,
+        "verify sequential Celestia roots failed at index {}: expected {:?}, got {:?}",
+        0, anchor_block.prev_celestia_header_hash, inputs.trusted_celestia_root
+    );
+
     for window in outputs.windows(2).enumerate() {
         let (i, pair) = window;
         let (prev, curr) = (&pair[0], &pair[1]);
@@ -90,28 +103,6 @@ pub fn main() {
             prev.new_state_root,
             curr.prev_state_root
         );
-
-        // the previous height and root of the first block that we prove must match that of the trusted Celestia block in the ISM.
-        // this is necessary to ensure that no DA blocks are skipped.
-        if window.0 == 0 {
-            assert_eq!(
-                curr.prev_celestia_height,
-                inputs.trusted_celestia_height,
-                "verify sequential Celestia heights failed at index {}: expected {:?}, got {:?}",
-                i + 1,
-                curr.prev_celestia_height,
-                inputs.trusted_celestia_height
-            );
-
-            assert_eq!(
-                curr.prev_celestia_header_hash,
-                inputs.trusted_celestia_root,
-                "verify sequential Celestia roots failed at index {}: expected {:?}, got {:?}",
-                i + 1,
-                curr.prev_celestia_header_hash,
-                inputs.trusted_celestia_root
-            );
-        }
 
         assert_eq!(
             curr.prev_celestia_header_hash,
