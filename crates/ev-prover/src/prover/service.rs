@@ -2,23 +2,17 @@
 use anyhow::Result;
 use tonic::{Request, Response, Status};
 
-use crate::config::config::Config;
 use crate::proto::celestia::prover::v1::prover_server::Prover;
 use crate::proto::celestia::prover::v1::{
     InfoRequest, InfoResponse, ProveStateMembershipRequest, ProveStateMembershipResponse, ProveStateTransitionRequest,
     ProveStateTransitionResponse,
 };
-use crate::prover::programs::range::BlockRangeExecProver;
 
-pub struct ProverService {
-    block_range_prover: BlockRangeExecProver,
-}
+pub struct ProverService {}
 
 impl ProverService {
-    pub fn new(_config: Config) -> Result<Self> {
-        let block_range_prover = BlockRangeExecProver::default();
-
-        Ok(ProverService { block_range_prover })
+    pub fn new() -> Result<Self> {
+        Ok(ProverService {})
     }
 }
 

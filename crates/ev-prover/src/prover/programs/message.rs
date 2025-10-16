@@ -2,6 +2,7 @@
 //! two given heights against a given EVM block height.
 
 #![allow(dead_code)]
+use crate::prover::{prover_from_env, RangeProofCommitted, SP1Prover};
 use crate::prover::{ProgramProver, ProverConfig};
 use alloy_primitives::{hex::FromHex, Address, FixedBytes};
 use alloy_provider::{Provider, ProviderBuilder, WsConnect};
@@ -13,14 +14,16 @@ use ev_zkevm_types::programs::hyperlane::types::{
 };
 use ev_zkevm_types::{events::Dispatch, programs::hyperlane::types::HYPERLANE_MERKLE_TREE_KEYS};
 use reqwest::Url;
-use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
+use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 use std::{
+    env,
     str::FromStr,
     sync::{Arc, RwLock},
     time::Duration,
 };
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use storage::proofs::ProofStorage;
+use tokio::sync::mpsc::Receiver;
 use tokio::time::sleep;
 use tracing::{debug, error, info};
 
@@ -62,7 +65,8 @@ impl MerkleTreeState {
 pub struct HyperlaneMessageProver {
     pub app: AppContext,
     pub config: ProverConfig,
-    pub prover: EnvProver,
+    pub prover: Arc<SP1Prover>,
+    pub range_rx: Receiver<RangeProofCommitted>,
     pub message_store: Arc<HyperlaneMessageStore>,
     pub snapshot_store: Arc<HyperlaneSnapshotStore>,
     pub proof_store: Arc<dyn ProofStorage>,
@@ -70,10 +74,11 @@ pub struct HyperlaneMessageProver {
 }
 
 impl ProgramProver for HyperlaneMessageProver {
+    type Config = ProverConfig;
     type Input = HyperlaneMessageInputs;
     type Output = HyperlaneMessageOutputs;
 
-    fn cfg(&self) -> &ProverConfig {
+    fn cfg(&self) -> &Self::Config {
         &self.config
     }
 
@@ -89,26 +94,28 @@ impl ProgramProver for HyperlaneMessageProver {
         )?)
     }
 
-    fn prover(&self) -> &EnvProver {
-        &self.prover
+    fn prover(&self) -> Arc<SP1Prover> {
+        Arc::clone(&self.prover)
     }
 }
 
 impl HyperlaneMessageProver {
     pub fn new(
         app: AppContext,
+        range_rx: Receiver<RangeProofCommitted>,
         message_store: Arc<HyperlaneMessageStore>,
         snapshot_store: Arc<HyperlaneSnapshotStore>,
         proof_store: Arc<dyn ProofStorage>,
         state_query_provider: Arc<dyn StateQueryProvider>,
     ) -> Result<Arc<Self>> {
-        let config = HyperlaneMessageProver::default_config();
-        let prover = ProverClient::from_env();
+        let prover = prover_from_env();
+        let config = HyperlaneMessageProver::default_config(prover.as_ref());
 
         Ok(Arc::new(Self {
             app,
             config,
             prover,
+            range_rx,
             message_store,
             snapshot_store,
             proof_store,
@@ -117,11 +124,9 @@ impl HyperlaneMessageProver {
     }
 
     /// Returns the default prover configuration for the block execution program.
-    pub fn default_config() -> ProverConfig {
-        ProverConfig {
-            elf: EV_HYPERLANE_ELF,
-            proof_mode: SP1ProofMode::Groth16,
-        }
+    pub fn default_config(prover: &SP1Prover) -> ProverConfig {
+        let (pk, vk) = prover.setup(EV_HYPERLANE_ELF);
+        ProverConfig::new(pk, vk, SP1ProofMode::Groth16)
     }
 
     /// Run the message prover with indexer

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use celestia_types::ExtendedHeader;
 use std::collections::BTreeMap;
+use std::env;
 use std::fs;
 use std::result::Result::{Err, Ok};
 use std::sync::Arc;
@@ -24,16 +25,18 @@ use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
-use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
+use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 use tokio::{
-    sync::{mpsc, RwLock, Semaphore},
+    sync::{mpsc, mpsc::Sender, RwLock, Semaphore},
     task::JoinSet,
 };
 use tracing::{debug, error, info};
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
-use crate::prover::{ProgramProver, ProverConfig};
-use storage::proofs::{ProofStorage, RocksDbProofStorage};
+use crate::prover::prover_from_env;
+use crate::prover::SP1Prover;
+use crate::prover::{BlockProofCommitted, ProgramProver, ProverConfig};
+use storage::proofs::ProofStorage;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_EXEC_ELF: &[u8] = include_elf!("ev-exec-program");
@@ -115,7 +118,8 @@ impl AppContext {
 pub struct BlockExecProver {
     pub app: AppContext,
     pub config: ProverConfig,
-    pub prover: EnvProver,
+    pub prover: Arc<SP1Prover>,
+    pub tx: Sender<BlockProofCommitted>,
     pub storage: Arc<dyn ProofStorage>,
     pub queue_capacity: usize,
     pub concurrency: usize,
@@ -123,11 +127,12 @@ pub struct BlockExecProver {
 
 #[async_trait]
 impl ProgramProver for BlockExecProver {
+    type Config = ProverConfig;
     type Input = BlockExecInput;
     type Output = BlockExecOutput;
 
     /// Returns the program configuration containing the ELF and proof mode.
-    fn cfg(&self) -> &ProverConfig {
+    fn cfg(&self) -> &Self::Config {
         &self.config
     }
 
@@ -154,8 +159,8 @@ impl ProgramProver for BlockExecProver {
     }
 
     /// Returns the SP1 Prover.
-    fn prover(&self) -> &EnvProver {
-        &self.prover
+    fn prover(&self) -> Arc<SP1Prover> {
+        Arc::clone(&self.prover)
     }
 }
 
@@ -187,43 +192,21 @@ struct ScheduledProofJob {
 impl BlockExecProver {
     /// Creates a new instance of [`BlockExecProver`] for the provided [`AppContext`] using default configuration
     /// and prover environment settings.
-    pub fn new(app: AppContext, queue_capacity: usize, concurrency: usize) -> Result<Arc<Self>> {
-        let config = BlockExecProver::default_config();
-        let prover = ProverClient::from_env();
-
-        // Initialize RocksDB storage in the default data directory
-        let storage_path = dirs::home_dir()
-            .expect("cannot find home directory")
-            .join(APP_HOME)
-            .join("data")
-            .join("proofs.db");
-
-        let storage = Arc::new(RocksDbProofStorage::new(storage_path)?);
-
-        Ok(Arc::new(Self {
-            app,
-            config,
-            prover,
-            storage,
-            queue_capacity,
-            concurrency,
-        }))
-    }
-
-    /// Creates a new instance with custom storage (useful for testing)
-    pub fn with_storage(
+    pub fn new(
         app: AppContext,
+        tx: Sender<BlockProofCommitted>,
         storage: Arc<dyn ProofStorage>,
         queue_capacity: usize,
         concurrency: usize,
     ) -> Arc<Self> {
-        let config = BlockExecProver::default_config();
-        let prover = ProverClient::from_env();
+        let prover = prover_from_env();
+        let config = BlockExecProver::default_config(prover.as_ref());
 
         Arc::new(Self {
             app,
             config,
             prover,
+            tx,
             storage,
             queue_capacity,
             concurrency,
@@ -231,11 +214,9 @@ impl BlockExecProver {
     }
 
     /// Returns the default prover configuration for the block execution program.
-    pub fn default_config() -> ProverConfig {
-        ProverConfig {
-            elf: EV_EXEC_ELF,
-            proof_mode: SP1ProofMode::Compressed,
-        }
+    pub fn default_config(prover: &SP1Prover) -> ProverConfig {
+        let (pk, vk) = prover.setup(EV_EXEC_ELF);
+        ProverConfig::new(pk, vk, SP1ProofMode::Compressed)
     }
 
     async fn connect_and_subscribe(&self) -> Result<(Arc<Client>, Subscription<BlobsAtHeight>)> {
@@ -492,6 +473,8 @@ impl BlockExecProver {
             "Successfully created and stored proof for block {}. Outputs: {}",
             scheduled.job.height, outputs,
         );
+
+        self.tx.send(BlockProofCommitted(scheduled.job.height)).await?;
 
         Ok(())
     }
