@@ -52,7 +52,7 @@ func SetupZKIsm(ctx context.Context, broadcaster *Broadcaster, ethClient *ethcli
 	stateTransitionVkey := readStateTransitionVkey()
 	stateMembershipVkey := readStateMembershipVkey()
 
-	root, height := GetCelestiaRootAndHeight(ctx, "http://localhost:26657")
+	root, height := GetCelestiaRootAndHeight(ctx, "http://celestia-validator:26657")
 
 	fmt.Printf("successfully got celestia root and height: %x, %d\n", root, height)
 
