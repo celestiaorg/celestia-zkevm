@@ -389,7 +389,6 @@ mod tests {
         let service = create_test_service();
         let mock = get_mock_storage(&service);
 
-        // Store multiple proofs
         for height in [30, 31, 32, 33, 34, 35] {
             let stored_proof = StoredBlockProof {
                 celestia_height: height,
@@ -400,7 +399,6 @@ mod tests {
             mock.block_proofs.lock().unwrap().insert(height, stored_proof);
         }
 
-        // Query a range
         let request = Request::new(GetBlockProofsInRangeRequest {
             start_height: 31,
             end_height: 34,
@@ -418,7 +416,6 @@ mod tests {
         let service = create_test_service();
         let mock = get_mock_storage(&service);
 
-        // Store multiple proofs
         for height in [30, 31, 32] {
             let stored_proof = StoredBlockProof {
                 celestia_height: height,
@@ -433,7 +430,6 @@ mod tests {
         let response = service.get_latest_block_proof(request).await.unwrap();
         let proof = response.into_inner().proof.unwrap();
 
-        // Should return the highest height (32)
         assert_eq!(proof.celestia_height, 32);
         assert_eq!(proof.public_values, vec![32]);
     }
@@ -456,7 +452,6 @@ mod tests {
         let service = create_test_service();
         let mock = get_mock_storage(&service);
 
-        // Store a membership proof
         let stored_proof = StoredMembershipProof {
             proof_data: vec![9, 10, 11, 12],
             public_values: vec![13, 14, 15, 16],
@@ -489,7 +484,6 @@ mod tests {
         let service = create_test_service();
         let mock = get_mock_storage(&service);
 
-        // Store multiple membership proofs
         for height in [100, 101, 102] {
             let stored_proof = StoredMembershipProof {
                 proof_data: vec![height as u8],
@@ -503,7 +497,6 @@ mod tests {
         let response = service.get_latest_membership_proof(request).await.unwrap();
         let proof = response.into_inner().proof.unwrap();
 
-        // Should return the highest height (102)
         assert_eq!(proof.proof_data, vec![102]);
     }
 
@@ -525,7 +518,6 @@ mod tests {
         let service = create_test_service();
         let mock = get_mock_storage(&service);
 
-        // Store range proofs
         let ranges = vec![(30, 35), (36, 40), (41, 45)];
         for (start, end) in ranges {
             let stored_proof = StoredRangeProof {
