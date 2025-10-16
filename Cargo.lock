@@ -3030,6 +3030,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-provider",
  "alloy-rpc-types",
+ "alloy-signer-local",
  "alloy-sol-types",
  "anyhow",
  "bincode",
@@ -3059,6 +3060,8 @@ dependencies = [
  "tempfile",
  "tendermint-proto",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
  "url",
 ]
 

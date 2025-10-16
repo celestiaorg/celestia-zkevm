@@ -23,38 +23,24 @@ In order to generate a message proof for submission to the ZK ISM, ensure that t
 make start
 ```
 
-Run `make transfer` to bridge from Celestia to EVM, wait a few seconds and run `make transfer-back` to emit a hyperlane mailbox event on EVM.
-```bash
-make transfer
-make transfer-back
-```
-The output of `make transfer-back` will include the EVM block height at which the event was emitted. This is our `TARGET_HEIGHT` in `e2e/src/config.rs`.
+Wait for all containers to initialize fully.
 
-Find the ZKISM trusted state on Celestia:
+Then set your `SP1_PROVER` in the workspace `.env` to `cpu`, `cuda` or `network` and run:
 ```bash
-docker exec -it celestia-validator /bin/bash
-celestia-appd query zkism isms
-```
-The output will contain the `trusted height`.
-
-Use curl to find the corresponding `trusted root`:
-```bash
-curl -s -X POST http://127.0.0.1:8545 \
-  -H "Content-Type: application/json" \
-  --data '{
-    "jsonrpc":"2.0",
-    "method":"eth_getBlockByNumber",
-    "params":["REPLACE_WITH_HEIGHT_AS_HEX", false],
-    "id":1
-  }' | jq -r '.result.stateRoot'
-
+RUST_LOG="e2e=info" make e2e
 ```
 
-Update `e2e/src/config.rs` TRUSTED_ROOT and TRUSTED_HEIGHT to match the ones in the ZKISM.
+If you want to see all the details about block proving and other background processes, run:
 
-**The corresponding inclusion heights on Celestia are derived from the TRUSTED and TARGET EVM heights in the config.**
-
-Now set your `SP1_PROVER` in the workspace `.env` to `cpu`, `cuda` or `network` and run:
 ```bash
-cargo run --bin e2e -p e2e --release
+RUST_LOG="e2e=debug" make e2e
+```
+
+## Configuration
+All default parameters for interacting with Hyperlane contracts are located in `e2e/src/config.rs`. The private key used for signing Celestia messages is derived from the environment:
+
+`.env`:
+```bash
+...
+CELESTIA_PRIVATE_KEY="6e30efb1d3ebd30d1ba08c8d5fc9b190e08394009dc1dd787a69e60c33288a8c"
 ```
