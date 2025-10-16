@@ -16,8 +16,9 @@ use ev_zkevm_types::hyperlane::encode_hyperlane_message;
 use sp1_sdk::{EnvProver, ProverClient};
 use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
+use storage::hyperlane::snapshot::HyperlaneSnapshotStore;
 use tokio::time::sleep;
-use tracing::info;
+use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 use url::Url;
 
@@ -71,43 +72,9 @@ async fn main() {
 
     // next trigger make transfer-back
     info!("Submitting Hyperlane deposit message on Evolve...");
-    let mut retries = 0;
-    let target_height = {
-        loop {
-            let target_height = match transfer_back().await {
-                Ok(height) => height,
-                Err(_) => {
-                    if retries > MAX_RETRIES {
-                        panic!("Failed to get target height after {MAX_RETRIES} retries");
-                    }
-                    sleep(Duration::from_secs(RETRY_DELAY)).await;
-                    retries += 1;
-                    continue;
-                }
-            };
-            break target_height;
-        }
-    };
-    info!("[Done] submitting transfer Messages");
+    let target_height = retry_async(transfer_back, "transfer_back").await;
     let client: Arc<EnvProver> = Arc::new(ProverClient::from_env());
-
-    let mut retries = 0;
-    let target_inclusion_height = {
-        loop {
-            let target_inclusion_height = match inclusion_height(target_height).await {
-                Ok(height) => height,
-                Err(_) => {
-                    if retries > MAX_RETRIES {
-                        panic!("Failed to get target inclusion height after {MAX_RETRIES} retries");
-                    }
-                    sleep(Duration::from_secs(RETRY_DELAY)).await;
-                    retries += 1;
-                    continue;
-                }
-            };
-            break target_inclusion_height;
-        }
-    };
+    let target_inclusion_height = retry_async(|| inclusion_height(target_height), "inclusion_height").await;
     let num_blocks = target_inclusion_height - celestia_start_height;
 
     info!("Proving Evolve blocks...");
@@ -137,10 +104,20 @@ async fn main() {
 
     let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
     info!("Proving Evolve Hyperlane deposit events...");
+
+    let snapshot_storage_path = dirs::home_dir()
+        .expect("cannot find home directory")
+        .join(".ev-prover")
+        .join("data")
+        .join("snapshots.db");
+    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
+    hyperlane_snapshot_store.reset_db().unwrap();
+    let snapshot = hyperlane_snapshot_store.get_snapshot(0).unwrap();
+
     let message_proof = prove_messages(
         target_height,
-        &evm_provider.clone(),
-        &MockStateQueryProvider::new(evm_provider),
+        &evm_provider,
+        &MockStateQueryProvider::new(evm_provider.clone()),
         client.clone(),
     )
     .await
@@ -186,4 +163,24 @@ async fn inclusion_height(block_number: u64) -> anyhow::Result<u64> {
     let resp = client.get_metadata(req).await?;
     let height = u64::from_le_bytes(resp.into_inner().value[..8].try_into()?);
     Ok(height)
+}
+
+async fn retry_async<F, Fut, T, E>(mut f: F, label: &str) -> T
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<T, E>>,
+    E: std::fmt::Debug,
+{
+    let mut retries = 0;
+    loop {
+        match f().await {
+            Ok(val) => break val,
+            Err(e) if retries < MAX_RETRIES => {
+                warn!("[{label}] failed (attempt {retries}), retrying... ({e:?})");
+                retries += 1;
+                sleep(Duration::from_secs(RETRY_DELAY)).await;
+            }
+            Err(e) => error!("[{label}] failed after {MAX_RETRIES} retries: {e:?}"),
+        }
+    }
 }
