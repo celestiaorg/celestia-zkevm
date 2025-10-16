@@ -332,3 +332,176 @@ impl ProofStorage for RocksDbProofStorage {
         Ok(None)
     }
 }
+
+/// Testing utilities for ProofStorage implementations.
+///
+/// This module provides an in-memory mock implementation of ProofStorage
+/// that can be used in tests across all crates that depend on the storage trait.
+pub mod testing {
+    use super::*;
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    /// In-memory implementation of ProofStorage for testing.
+    ///
+    /// Uses HashMaps and Mutex for thread-safe, deterministic testing
+    /// without requiring a real database.
+    pub struct MockProofStorage {
+        block_proofs: Mutex<HashMap<u64, StoredBlockProof>>,
+        membership_proofs: Mutex<HashMap<u64, StoredMembershipProof>>,
+        range_proofs: Mutex<Vec<StoredRangeProof>>,
+    }
+
+    impl MockProofStorage {
+        pub fn new() -> Self {
+            Self {
+                block_proofs: Mutex::new(HashMap::new()),
+                membership_proofs: Mutex::new(HashMap::new()),
+                range_proofs: Mutex::new(Vec::new()),
+            }
+        }
+
+        /// Insert a block proof directly for testing
+        pub fn insert_block_proof(&self, height: u64, proof: StoredBlockProof) {
+            self.block_proofs.lock().unwrap().insert(height, proof);
+        }
+
+        /// Insert a membership proof directly for testing
+        pub fn insert_membership_proof(&self, height: u64, proof: StoredMembershipProof) {
+            self.membership_proofs.lock().unwrap().insert(height, proof);
+        }
+
+        /// Insert a range proof directly for testing
+        pub fn insert_range_proof(&self, proof: StoredRangeProof) {
+            self.range_proofs.lock().unwrap().push(proof);
+        }
+    }
+
+    impl Default for MockProofStorage {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    #[async_trait]
+    impl ProofStorage for MockProofStorage {
+        async fn store_block_proof(
+            &self,
+            celestia_height: u64,
+            _proof: &SP1ProofWithPublicValues,
+            _output: &BlockExecOutput,
+        ) -> Result<(), ProofStorageError> {
+            let stored_proof = StoredBlockProof {
+                celestia_height,
+                proof_data: vec![1, 2, 3, 4],
+                public_values: vec![5, 6, 7, 8],
+                created_at: 1234567890,
+            };
+
+            self.block_proofs.lock().unwrap().insert(celestia_height, stored_proof);
+            Ok(())
+        }
+
+        async fn store_range_proof(
+            &self,
+            start_height: u64,
+            end_height: u64,
+            _proof: &SP1ProofWithPublicValues,
+            _output: &BlockRangeExecOutput,
+        ) -> Result<(), ProofStorageError> {
+            let stored_proof = StoredRangeProof {
+                start_height,
+                end_height,
+                proof_data: vec![1, 2, 3, 4],
+                public_values: vec![5, 6, 7, 8],
+                created_at: 1234567890,
+            };
+
+            self.range_proofs.lock().unwrap().push(stored_proof);
+            Ok(())
+        }
+
+        async fn get_block_proof(&self, celestia_height: u64) -> Result<StoredBlockProof, ProofStorageError> {
+            self.block_proofs
+                .lock()
+                .unwrap()
+                .get(&celestia_height)
+                .cloned()
+                .ok_or(ProofStorageError::ProofNotFound(celestia_height))
+        }
+
+        async fn get_range_proofs(
+            &self,
+            start_height: u64,
+            end_height: u64,
+        ) -> Result<Vec<StoredRangeProof>, ProofStorageError> {
+            let proofs = self
+                .range_proofs
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|p| p.start_height >= start_height && p.end_height <= end_height)
+                .cloned()
+                .collect();
+            Ok(proofs)
+        }
+
+        async fn get_block_proofs_in_range(
+            &self,
+            start_height: u64,
+            end_height: u64,
+        ) -> Result<Vec<StoredBlockProof>, ProofStorageError> {
+            let mut proofs: Vec<StoredBlockProof> = self
+                .block_proofs
+                .lock()
+                .unwrap()
+                .values()
+                .filter(|p| p.celestia_height >= start_height && p.celestia_height <= end_height)
+                .cloned()
+                .collect();
+            proofs.sort_by_key(|p| p.celestia_height);
+            Ok(proofs)
+        }
+
+        async fn store_membership_proof(
+            &self,
+            height: u64,
+            _proof: &SP1ProofWithPublicValues,
+            _output: &HyperlaneMessageOutputs,
+        ) -> Result<(), ProofStorageError> {
+            let stored_proof = StoredMembershipProof {
+                proof_data: vec![9, 10, 11, 12],
+                public_values: vec![13, 14, 15, 16],
+                created_at: 1234567890,
+            };
+
+            self.membership_proofs.lock().unwrap().insert(height, stored_proof);
+            Ok(())
+        }
+
+        async fn get_membership_proof(&self, height: u64) -> Result<StoredMembershipProof, ProofStorageError> {
+            self.membership_proofs
+                .lock()
+                .unwrap()
+                .get(&height)
+                .cloned()
+                .ok_or(ProofStorageError::ProofNotFound(height))
+        }
+
+        async fn get_latest_membership_proof(&self) -> Result<Option<StoredMembershipProof>, ProofStorageError> {
+            let max_height = self.membership_proofs.lock().unwrap().keys().max().copied();
+            match max_height {
+                Some(height) => Ok(Some(self.membership_proofs.lock().unwrap()[&height].clone())),
+                None => Ok(None),
+            }
+        }
+
+        async fn get_latest_block_proof(&self) -> Result<Option<StoredBlockProof>, ProofStorageError> {
+            let max_height = self.block_proofs.lock().unwrap().keys().max().copied();
+            match max_height {
+                Some(height) => Ok(Some(self.block_proofs.lock().unwrap()[&height].clone())),
+                None => Ok(None),
+            }
+        }
+    }
+}
