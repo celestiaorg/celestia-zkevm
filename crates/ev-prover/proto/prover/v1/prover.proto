@@ -106,8 +106,6 @@ message GetLatestBlockProofRequest {}
 message GetLatestBlockProofResponse {
   // proof is the most recently generated block proof.
   BlockProof proof = 1;
-  // has_proof indicates whether a proof exists.
-  bool has_proof = 2;
 }
 
 // GetMembershipProofRequest is the request type for GetMembershipProof.
@@ -131,8 +129,6 @@ message GetLatestMembershipProofRequest {}
 message GetLatestMembershipProofResponse {
   // proof is the most recently generated membership proof.
   MembershipProof proof = 1;
-  // has_proof indicates whether a proof exists.
-  bool has_proof = 2;
 }
 
 // GetRangeProofsRequest is the request type for GetRangeProofs.

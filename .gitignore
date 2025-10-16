@@ -11,3 +11,6 @@ build
 **/target
 /tmp
 pgo-data.profdata
+proof_storage/
+
+hyperlane/hyp

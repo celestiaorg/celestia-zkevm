@@ -12,17 +12,13 @@ use crate::proto::celestia::prover::v1::{
     GetLatestMembershipProofRequest, GetLatestMembershipProofResponse, GetMembershipProofRequest,
     GetMembershipProofResponse, GetRangeProofsRequest, GetRangeProofsResponse, MembershipProof, RangeProof,
 };
-use crate::prover::programs::range::BlockRangeExecProver;
 
 pub struct ProverService {
-    block_range_prover: BlockRangeExecProver,
     proof_storage: Arc<dyn ProofStorage>,
 }
 
 impl ProverService {
     pub fn new(config: Config) -> Result<Self> {
-        let block_range_prover = BlockRangeExecProver::default();
-
         // Initialize proof storage with the path from config or default
         // Use the same default path as BlockExecProver: ~/.ev-prover/data/proofs.db
         let storage_path = config.proof_storage_path.unwrap_or_else(|| {
@@ -36,21 +32,13 @@ impl ProverService {
         });
         let proof_storage = Arc::new(RocksDbProofStorage::new(storage_path)?);
 
-        Ok(ProverService {
-            block_range_prover,
-            proof_storage,
-        })
+        Ok(ProverService { proof_storage })
     }
 
     /// Creates a new ProverService with an externally provided proof storage instance.
     /// This is useful for sharing the same storage between multiple components.
     pub fn with_storage(_config: Config, proof_storage: Arc<dyn ProofStorage>) -> Result<Self> {
-        let block_range_prover = BlockRangeExecProver::default();
-
-        Ok(ProverService {
-            block_range_prover,
-            proof_storage,
-        })
+        Ok(ProverService { proof_storage })
     }
 }
 
@@ -110,30 +98,21 @@ impl Prover for ProverService {
         &self,
         _request: Request<GetLatestBlockProofRequest>,
     ) -> Result<Response<GetLatestBlockProofResponse>, Status> {
-        let stored_proof_opt = self
+        let stored_proof = self
             .proof_storage
             .get_latest_block_proof()
             .await
-            .map_err(|e| Status::internal(format!("Failed to get latest block proof: {e}")))?;
+            .map_err(|e| Status::internal(format!("Failed to get latest block proof: {e}")))?
+            .ok_or_else(|| Status::not_found("No block proofs found in storage"))?;
 
-        match stored_proof_opt {
-            Some(stored_proof) => {
-                let proof = BlockProof {
-                    celestia_height: stored_proof.celestia_height,
-                    proof_data: stored_proof.proof_data,
-                    public_values: stored_proof.public_values,
-                    created_at: stored_proof.created_at,
-                };
-                Ok(Response::new(GetLatestBlockProofResponse {
-                    proof: Some(proof),
-                    has_proof: true,
-                }))
-            }
-            None => Ok(Response::new(GetLatestBlockProofResponse {
-                proof: None,
-                has_proof: false,
-            })),
-        }
+        let proof = BlockProof {
+            celestia_height: stored_proof.celestia_height,
+            proof_data: stored_proof.proof_data,
+            public_values: stored_proof.public_values,
+            created_at: stored_proof.created_at,
+        };
+
+        Ok(Response::new(GetLatestBlockProofResponse { proof: Some(proof) }))
     }
 
     async fn get_membership_proof(
@@ -162,29 +141,20 @@ impl Prover for ProverService {
         &self,
         _request: Request<GetLatestMembershipProofRequest>,
     ) -> Result<Response<GetLatestMembershipProofResponse>, Status> {
-        let stored_proof_opt = self
+        let stored_proof = self
             .proof_storage
             .get_latest_membership_proof()
             .await
-            .map_err(|e| Status::internal(format!("Failed to get latest membership proof: {e}")))?;
+            .map_err(|e| Status::internal(format!("Failed to get latest membership proof: {e}")))?
+            .ok_or_else(|| Status::not_found("No membership proofs found in storage"))?;
 
-        match stored_proof_opt {
-            Some(stored_proof) => {
-                let proof = MembershipProof {
-                    proof_data: stored_proof.proof_data,
-                    public_values: stored_proof.public_values,
-                    created_at: stored_proof.created_at,
-                };
-                Ok(Response::new(GetLatestMembershipProofResponse {
-                    proof: Some(proof),
-                    has_proof: true,
-                }))
-            }
-            None => Ok(Response::new(GetLatestMembershipProofResponse {
-                proof: None,
-                has_proof: false,
-            })),
-        }
+        let proof = MembershipProof {
+            proof_data: stored_proof.proof_data,
+            public_values: stored_proof.public_values,
+            created_at: stored_proof.created_at,
+        };
+
+        Ok(Response::new(GetLatestMembershipProofResponse { proof: Some(proof) }))
     }
 
     async fn get_range_proofs(
@@ -213,5 +183,384 @@ impl Prover for ProverService {
             .collect();
 
         Ok(Response::new(GetRangeProofsResponse { proofs }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use ev_zkevm_types::programs::{
+        block::{BlockExecOutput, BlockRangeExecOutput},
+        hyperlane::types::HyperlaneMessageOutputs,
+    };
+    use sp1_sdk::SP1ProofWithPublicValues;
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+    use storage::proofs::{ProofStorage, ProofStorageError, StoredBlockProof, StoredMembershipProof, StoredRangeProof};
+
+    /// MockProofStorage is an in-memory implementation of ProofStorage for testing
+    pub struct MockProofStorage {
+        block_proofs: Mutex<HashMap<u64, StoredBlockProof>>,
+        membership_proofs: Mutex<HashMap<u64, StoredMembershipProof>>,
+        range_proofs: Mutex<Vec<StoredRangeProof>>,
+    }
+
+    impl MockProofStorage {
+        pub fn new() -> Self {
+            Self {
+                block_proofs: Mutex::new(HashMap::new()),
+                membership_proofs: Mutex::new(HashMap::new()),
+                range_proofs: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl ProofStorage for MockProofStorage {
+        async fn store_block_proof(
+            &self,
+            celestia_height: u64,
+            _proof: &SP1ProofWithPublicValues,
+            _output: &BlockExecOutput,
+        ) -> Result<(), ProofStorageError> {
+            let stored_proof = StoredBlockProof {
+                celestia_height,
+                proof_data: vec![1, 2, 3, 4],
+                public_values: vec![5, 6, 7, 8],
+                created_at: 1234567890,
+            };
+
+            self.block_proofs.lock().unwrap().insert(celestia_height, stored_proof);
+            Ok(())
+        }
+
+        async fn store_range_proof(
+            &self,
+            start_height: u64,
+            end_height: u64,
+            _proof: &SP1ProofWithPublicValues,
+            _output: &BlockRangeExecOutput,
+        ) -> Result<(), ProofStorageError> {
+            let stored_proof = StoredRangeProof {
+                start_height,
+                end_height,
+                proof_data: vec![1, 2, 3, 4],
+                public_values: vec![5, 6, 7, 8],
+                created_at: 1234567890,
+            };
+
+            self.range_proofs.lock().unwrap().push(stored_proof);
+            Ok(())
+        }
+
+        async fn get_block_proof(&self, celestia_height: u64) -> Result<StoredBlockProof, ProofStorageError> {
+            self.block_proofs
+                .lock()
+                .unwrap()
+                .get(&celestia_height)
+                .cloned()
+                .ok_or(ProofStorageError::ProofNotFound(celestia_height))
+        }
+
+        async fn get_range_proofs(
+            &self,
+            start_height: u64,
+            end_height: u64,
+        ) -> Result<Vec<StoredRangeProof>, ProofStorageError> {
+            let proofs = self
+                .range_proofs
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|p| p.start_height >= start_height && p.end_height <= end_height)
+                .cloned()
+                .collect();
+            Ok(proofs)
+        }
+
+        async fn get_block_proofs_in_range(
+            &self,
+            start_height: u64,
+            end_height: u64,
+        ) -> Result<Vec<StoredBlockProof>, ProofStorageError> {
+            let mut proofs: Vec<StoredBlockProof> = self
+                .block_proofs
+                .lock()
+                .unwrap()
+                .values()
+                .filter(|p| p.celestia_height >= start_height && p.celestia_height <= end_height)
+                .cloned()
+                .collect();
+            proofs.sort_by_key(|p| p.celestia_height);
+            Ok(proofs)
+        }
+
+        async fn store_membership_proof(
+            &self,
+            height: u64,
+            _proof: &SP1ProofWithPublicValues,
+            _output: &HyperlaneMessageOutputs,
+        ) -> Result<(), ProofStorageError> {
+            let stored_proof = StoredMembershipProof {
+                proof_data: vec![9, 10, 11, 12],
+                public_values: vec![13, 14, 15, 16],
+                created_at: 1234567890,
+            };
+
+            self.membership_proofs.lock().unwrap().insert(height, stored_proof);
+            Ok(())
+        }
+
+        async fn get_membership_proof(&self, height: u64) -> Result<StoredMembershipProof, ProofStorageError> {
+            self.membership_proofs
+                .lock()
+                .unwrap()
+                .get(&height)
+                .cloned()
+                .ok_or(ProofStorageError::ProofNotFound(height))
+        }
+
+        async fn get_latest_membership_proof(&self) -> Result<Option<StoredMembershipProof>, ProofStorageError> {
+            let max_height = self.membership_proofs.lock().unwrap().keys().max().copied();
+            match max_height {
+                Some(height) => Ok(Some(self.membership_proofs.lock().unwrap()[&height].clone())),
+                None => Ok(None),
+            }
+        }
+
+        async fn get_latest_block_proof(&self) -> Result<Option<StoredBlockProof>, ProofStorageError> {
+            let max_height = self.block_proofs.lock().unwrap().keys().max().copied();
+            match max_height {
+                Some(height) => Ok(Some(self.block_proofs.lock().unwrap()[&height].clone())),
+                None => Ok(None),
+            }
+        }
+    }
+
+    fn create_test_service() -> ProverService {
+        let mock_storage = Arc::new(MockProofStorage::new());
+        ProverService {
+            proof_storage: mock_storage,
+        }
+    }
+
+    fn get_mock_storage(service: &ProverService) -> &MockProofStorage {
+        // This is safe because we know it's a MockProofStorage in tests
+        unsafe { &*(Arc::as_ptr(&service.proof_storage) as *const MockProofStorage) }
+    }
+
+    #[tokio::test]
+    async fn test_get_block_proof_success() {
+        let service = create_test_service();
+        let mock = get_mock_storage(&service);
+
+        let stored_proof = StoredBlockProof {
+            celestia_height: 100,
+            proof_data: vec![1, 2, 3, 4],
+            public_values: vec![5, 6, 7, 8],
+            created_at: 1234567890,
+        };
+        mock.block_proofs.lock().unwrap().insert(100, stored_proof);
+
+        let request = Request::new(GetBlockProofRequest { celestia_height: 100 });
+        let response = service.get_block_proof(request).await.unwrap();
+        let proof = response.into_inner().proof.unwrap();
+
+        assert_eq!(proof.celestia_height, 100);
+        assert_eq!(proof.proof_data, vec![1, 2, 3, 4]);
+        assert_eq!(proof.public_values, vec![5, 6, 7, 8]);
+    }
+
+    #[tokio::test]
+    async fn test_get_block_proof_not_found() {
+        let service = create_test_service();
+
+        let request = Request::new(GetBlockProofRequest { celestia_height: 999 });
+        let result = service.get_block_proof(request).await;
+
+        assert!(result.is_err());
+        let status = result.unwrap_err();
+        assert_eq!(status.code(), tonic::Code::NotFound);
+    }
+
+    #[tokio::test]
+    async fn test_get_block_proofs_in_range() {
+        let service = create_test_service();
+        let mock = get_mock_storage(&service);
+
+        // Store multiple proofs
+        for height in [30, 31, 32, 33, 34, 35] {
+            let stored_proof = StoredBlockProof {
+                celestia_height: height,
+                proof_data: vec![1, 2, 3, 4],
+                public_values: vec![5, 6, 7, 8],
+                created_at: 1234567890,
+            };
+            mock.block_proofs.lock().unwrap().insert(height, stored_proof);
+        }
+
+        // Query a range
+        let request = Request::new(GetBlockProofsInRangeRequest {
+            start_height: 31,
+            end_height: 34,
+        });
+        let response = service.get_block_proofs_in_range(request).await.unwrap();
+        let proofs = response.into_inner().proofs;
+
+        assert_eq!(proofs.len(), 4);
+        assert_eq!(proofs[0].celestia_height, 31);
+        assert_eq!(proofs[3].celestia_height, 34);
+    }
+
+    #[tokio::test]
+    async fn test_get_latest_block_proof_success() {
+        let service = create_test_service();
+        let mock = get_mock_storage(&service);
+
+        // Store multiple proofs
+        for height in [30, 31, 32] {
+            let stored_proof = StoredBlockProof {
+                celestia_height: height,
+                proof_data: vec![1, 2, 3, 4],
+                public_values: vec![height as u8],
+                created_at: 1234567890,
+            };
+            mock.block_proofs.lock().unwrap().insert(height, stored_proof);
+        }
+
+        let request = Request::new(GetLatestBlockProofRequest {});
+        let response = service.get_latest_block_proof(request).await.unwrap();
+        let proof = response.into_inner().proof.unwrap();
+
+        // Should return the highest height (32)
+        assert_eq!(proof.celestia_height, 32);
+        assert_eq!(proof.public_values, vec![32]);
+    }
+
+    #[tokio::test]
+    async fn test_get_latest_block_proof_empty_storage() {
+        let service = create_test_service();
+
+        let request = Request::new(GetLatestBlockProofRequest {});
+        let result = service.get_latest_block_proof(request).await;
+
+        assert!(result.is_err());
+        let status = result.unwrap_err();
+        assert_eq!(status.code(), tonic::Code::NotFound);
+        assert!(status.message().contains("No block proofs found"));
+    }
+
+    #[tokio::test]
+    async fn test_get_membership_proof_success() {
+        let service = create_test_service();
+        let mock = get_mock_storage(&service);
+
+        // Store a membership proof
+        let stored_proof = StoredMembershipProof {
+            proof_data: vec![9, 10, 11, 12],
+            public_values: vec![13, 14, 15, 16],
+            created_at: 1234567890,
+        };
+        mock.membership_proofs.lock().unwrap().insert(100, stored_proof);
+
+        let request = Request::new(GetMembershipProofRequest { height: 100 });
+        let response = service.get_membership_proof(request).await.unwrap();
+        let proof = response.into_inner().proof.unwrap();
+
+        assert_eq!(proof.proof_data, vec![9, 10, 11, 12]);
+        assert_eq!(proof.public_values, vec![13, 14, 15, 16]);
+    }
+
+    #[tokio::test]
+    async fn test_get_membership_proof_not_found() {
+        let service = create_test_service();
+
+        let request = Request::new(GetMembershipProofRequest { height: 999 });
+        let result = service.get_membership_proof(request).await;
+
+        assert!(result.is_err());
+        let status = result.unwrap_err();
+        assert_eq!(status.code(), tonic::Code::NotFound);
+    }
+
+    #[tokio::test]
+    async fn test_get_latest_membership_proof_success() {
+        let service = create_test_service();
+        let mock = get_mock_storage(&service);
+
+        // Store multiple membership proofs
+        for height in [100, 101, 102] {
+            let stored_proof = StoredMembershipProof {
+                proof_data: vec![height as u8],
+                public_values: vec![13, 14, 15, 16],
+                created_at: 1234567890,
+            };
+            mock.membership_proofs.lock().unwrap().insert(height, stored_proof);
+        }
+
+        let request = Request::new(GetLatestMembershipProofRequest {});
+        let response = service.get_latest_membership_proof(request).await.unwrap();
+        let proof = response.into_inner().proof.unwrap();
+
+        // Should return the highest height (102)
+        assert_eq!(proof.proof_data, vec![102]);
+    }
+
+    #[tokio::test]
+    async fn test_get_latest_membership_proof_empty_storage() {
+        let service = create_test_service();
+
+        let request = Request::new(GetLatestMembershipProofRequest {});
+        let result = service.get_latest_membership_proof(request).await;
+
+        assert!(result.is_err());
+        let status = result.unwrap_err();
+        assert_eq!(status.code(), tonic::Code::NotFound);
+        assert!(status.message().contains("No membership proofs found"));
+    }
+
+    #[tokio::test]
+    async fn test_get_range_proofs() {
+        let service = create_test_service();
+        let mock = get_mock_storage(&service);
+
+        // Store range proofs
+        let ranges = vec![(30, 35), (36, 40), (41, 45)];
+        for (start, end) in ranges {
+            let stored_proof = StoredRangeProof {
+                start_height: start,
+                end_height: end,
+                proof_data: vec![1, 2, 3, 4],
+                public_values: vec![5, 6, 7, 8],
+                created_at: 1234567890,
+            };
+            mock.range_proofs.lock().unwrap().push(stored_proof);
+        }
+
+        let request = Request::new(GetRangeProofsRequest {
+            start_height: 30,
+            end_height: 45,
+        });
+        let response = service.get_range_proofs(request).await.unwrap();
+        let proofs = response.into_inner().proofs;
+
+        assert_eq!(proofs.len(), 3);
+        assert_eq!(proofs[0].start_height, 30);
+        assert_eq!(proofs[0].end_height, 35);
+    }
+
+    #[tokio::test]
+    async fn test_empty_range_query() {
+        let service = create_test_service();
+
+        let request = Request::new(GetBlockProofsInRangeRequest {
+            start_height: 100,
+            end_height: 200,
+        });
+        let response = service.get_block_proofs_in_range(request).await.unwrap();
+        let proofs = response.into_inner().proofs;
+
+        assert_eq!(proofs.len(), 0);
     }
 }

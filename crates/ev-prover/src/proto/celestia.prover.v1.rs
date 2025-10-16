@@ -99,9 +99,6 @@ pub struct GetLatestBlockProofResponse {
     /// proof is the most recently generated block proof.
     #[prost(message, optional, tag="1")]
     pub proof: ::core::option::Option<BlockProof>,
-    /// has_proof indicates whether a proof exists.
-    #[prost(bool, tag="2")]
-    pub has_proof: bool,
 }
 /// GetMembershipProofRequest is the request type for GetMembershipProof.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -133,9 +130,6 @@ pub struct GetLatestMembershipProofResponse {
     /// proof is the most recently generated membership proof.
     #[prost(message, optional, tag="1")]
     pub proof: ::core::option::Option<MembershipProof>,
-    /// has_proof indicates whether a proof exists.
-    #[prost(bool, tag="2")]
-    pub has_proof: bool,
 }
 /// GetRangeProofsRequest is the request type for GetRangeProofs.
 #[allow(clippy::derive_partial_eq_without_eq)]

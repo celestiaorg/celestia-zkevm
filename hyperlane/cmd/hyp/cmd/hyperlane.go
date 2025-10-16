@@ -80,7 +80,7 @@ func SetupWithIsm(ctx context.Context, broadcaster *Broadcaster, ismID util.HexA
 	msgCreateMailBox := coretypes.MsgCreateMailbox{
 		Owner:        broadcaster.address.String(),
 		DefaultIsm:   ismID,
-		LocalDomain:  69420,
+		LocalDomain:  1297040200,
 		DefaultHook:  &hooksID,
 		RequiredHook: &hooksID,
 	}
