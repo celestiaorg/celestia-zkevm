@@ -13,6 +13,7 @@ use storage::{
     proofs::RocksDbProofStorage,
 };
 use tempfile::TempDir;
+use tokio::sync::mpsc;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::test]
@@ -55,8 +56,10 @@ async fn test_run_message_prover() {
     let evm_provider: DefaultProvider =
         ProviderBuilder::new().connect_http(Url::from_str("http://127.0.0.1:8545").unwrap());
 
+    let (_tx, rx) = mpsc::channel(256);
     let prover = HyperlaneMessageProver::new(
         app,
+        rx,
         hyperlane_message_store,
         hyperlane_snapshot_store,
         proof_store,

@@ -1,7 +1,36 @@
 use std::collections::HashMap;
+use std::env;
 use std::sync::Arc;
 
 use sp1_sdk::{HashableKey, SP1ProofMode, SP1ProvingKey, SP1VerifyingKey};
+use tracing::warn;
+
+#[derive(Debug, Clone, Copy)]
+pub enum ProverMode {
+    Mock,
+    Cpu,
+    Cuda,
+    Network,
+}
+
+impl ProverMode {
+    /// Returns the ProverMode by reading the SP1_PROVER environment variable.
+    /// If SP1_PROVER is not set, this method provides a fallback of Mock mode.
+    pub fn from_env() -> ProverMode {
+        let mode_str = env::var("SP1_PROVER").unwrap_or_default();
+
+        match mode_str.trim().to_ascii_lowercase().as_str() {
+            "mock" => Self::Mock,
+            "cpu" => Self::Cpu,
+            "cuda" => Self::Cuda,
+            "network" => Self::Network,
+            _ => {
+                warn!("SP1_PROVER unset or invalid ('{mode_str}'), defaulting to mock mode");
+                Self::Mock
+            }
+        }
+    }
+}
 
 // BaseProverConfig defines a core capability trait for configs used by a ProgramProver.
 pub trait BaseProverConfig {

@@ -2,7 +2,6 @@
 use anyhow::Result;
 use tonic::{Request, Response, Status};
 
-use crate::config::config::Config;
 use crate::proto::celestia::prover::v1::prover_server::Prover;
 use crate::proto::celestia::prover::v1::{
     InfoRequest, InfoResponse, ProveStateMembershipRequest, ProveStateMembershipResponse, ProveStateTransitionRequest,
@@ -12,7 +11,7 @@ use crate::proto::celestia::prover::v1::{
 pub struct ProverService {}
 
 impl ProverService {
-    pub fn new(_config: Config) -> Result<Self> {
+    pub fn new() -> Result<Self> {
         Ok(ProverService {})
     }
 }
