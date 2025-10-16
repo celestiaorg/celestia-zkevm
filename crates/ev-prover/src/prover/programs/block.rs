@@ -395,7 +395,6 @@ impl BlockExecProver {
                             error!("prove failed: {e:#}");
                         }
                     });
-                    info!("prove generated a proof");
                 }
 
                 while tasks.join_next().await.is_some() {}
