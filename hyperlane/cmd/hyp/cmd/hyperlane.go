@@ -252,7 +252,7 @@ func GetCelestiaRootAndHeight(ctx context.Context, rpcAddr string) ([32]byte, ui
 	}
 
 	height := uint64(status.SyncInfo.LatestBlockHeight)
-	rootHash := status.SyncInfo.LatestAppHash
+	rootHash := status.SyncInfo.LatestBlockHash
 
 	var root [32]byte
 	if len(rootHash) != 32 {
