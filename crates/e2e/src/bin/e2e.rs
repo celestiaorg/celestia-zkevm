@@ -112,7 +112,6 @@ async fn main() {
         .join("snapshots.db");
     let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
     hyperlane_snapshot_store.reset_db().unwrap();
-    let snapshot = hyperlane_snapshot_store.get_snapshot(0).unwrap();
 
     let message_proof = prove_messages(
         target_height,
