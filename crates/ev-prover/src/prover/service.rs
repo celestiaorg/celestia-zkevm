@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 use anyhow::Result;
 use std::sync::Arc;
-use storage::proofs::{ProofStorage, RocksDbProofStorage};
+use storage::proofs::ProofStorage;
 use tonic::{Request, Response, Status};
 
-use crate::config::config::{Config, APP_HOME};
+use crate::config::config::Config;
 use crate::proto::celestia::prover::v1::prover_server::Prover;
 use crate::proto::celestia::prover::v1::{
     BlockProof, GetBlockProofRequest, GetBlockProofResponse, GetBlockProofsInRangeRequest,
@@ -18,23 +18,6 @@ pub struct ProverService {
 }
 
 impl ProverService {
-    pub fn new(config: Config) -> Result<Self> {
-        // Initialize proof storage with the path from config or default
-        // Use the same default path as BlockExecProver: ~/.ev-prover/data/proofs.db
-        let storage_path = config.proof_storage_path.unwrap_or_else(|| {
-            dirs::home_dir()
-                .expect("cannot find home directory")
-                .join(APP_HOME)
-                .join("data")
-                .join("proofs.db")
-                .to_string_lossy()
-                .to_string()
-        });
-        let proof_storage = Arc::new(RocksDbProofStorage::new(storage_path)?);
-
-        Ok(ProverService { proof_storage })
-    }
-
     /// Creates a new ProverService with an externally provided proof storage instance.
     /// This is useful for sharing the same storage between multiple components.
     pub fn with_storage(_config: Config, proof_storage: Arc<dyn ProofStorage>) -> Result<Self> {

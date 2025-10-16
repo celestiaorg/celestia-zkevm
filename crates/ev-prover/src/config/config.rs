@@ -18,7 +18,6 @@ pub struct Config {
     pub evm_rpc: String,
     pub namespace_hex: String,
     pub pub_key: String,
-    pub proof_storage_path: Option<String>,
     #[serde(default = "default_queue_capacity")]
     pub queue_capacity: usize,
     #[serde(default = "default_concurrency")]
@@ -41,7 +40,6 @@ impl Default for Config {
             evm_rpc: "http://127.0.0.1:8545".to_string(),
             namespace_hex: DEFAULT_NAMESPACE.to_string(),
             pub_key: DEFAULT_PUB_KEY_HEX.to_string(),
-            proof_storage_path: None,
             queue_capacity: default_queue_capacity(),
             concurrency: default_concurrency(),
         }
