@@ -60,8 +60,8 @@ func SetupZKIsm(ctx context.Context, broadcaster *Broadcaster, ethClient *ethcli
 		Creator:             broadcaster.address.String(),
 		StateRoot:           block.Header().Root.Bytes(),
 		Height:              block.NumberU64(),
-		CelestiaHeight:      height,
 		CelestiaStateRoot:   root[:],
+		CelestiaHeight:      height,
 		Namespace:           namespace,
 		SequencerPublicKey:  pubKey,
 		Groth16Vkey:         groth16Vkey,
@@ -70,6 +70,7 @@ func SetupZKIsm(ctx context.Context, broadcaster *Broadcaster, ethClient *ethcli
 	}
 
 	res := broadcaster.BroadcastTx(ctx, &msgCreateZkExecutionISM)
+
 	ismID := parseIsmIDFromZkISMEvents(res.Events)
 
 	return ismID
