@@ -143,6 +143,8 @@ fn write_proof_inputs(stdin: &mut SP1Stdin) -> Result<usize, Box<dyn Error>> {
     let input = BlockRangeExecInput {
         vkeys,
         public_values: public_inputs,
+        trusted_celestia_height: 0,
+        trusted_celestia_root: [0; 32],
     };
     stdin.write(&input);
 
