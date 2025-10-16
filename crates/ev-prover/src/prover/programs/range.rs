@@ -198,7 +198,7 @@ impl BlockRangeExecProver {
         // Walk the ordered set from `start` and ensure we have exactly `batch_size` elements.
         let mut cursor = start;
         let iter = self.pending.range(BlockProofCommitted(start)..);
-        for proof in iter.take(self.batch_size as usize) {
+        for proof in iter.take(self.batch_size) {
             if proof.height() != cursor {
                 return Ok(None); // missing contiguous element, incomplete batch
             }
