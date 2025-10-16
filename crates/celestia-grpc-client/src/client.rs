@@ -128,7 +128,6 @@ impl CelestiaIsmClient {
         }
     }
 }
-
 #[cfg(test)]
 mod tests {
     use crate::message::{StateInclusionProofMsg, StateTransitionProofMsg};

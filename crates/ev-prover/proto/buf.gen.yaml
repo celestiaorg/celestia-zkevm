@@ -1,0 +1,19 @@
+version: v1
+plugins:
+  # Generates Prost message types (compatible with prost 0.12 and tonic 0.10)
+  - plugin: buf.build/community/neoeinstein-prost:v0.3.1
+    out: ../src/proto
+    opt:
+      - compile_well_known_types
+      - extern_path=.google.protobuf.Any=::prost_types::Any
+      - extern_path=.google.protobuf.Duration=::prost_types::Duration
+      - extern_path=.google.protobuf.Timestamp=::prost_types::Timestamp
+
+  # Generates Tonic client/server stubs (compatible with tonic 0.10)
+  - plugin: buf.build/community/neoeinstein-tonic:v0.3.0
+    out: ../src/proto
+    opt:
+      - compile_well_known_types
+      - extern_path=.google.protobuf.Any=::prost_types::Any
+      - extern_path=.google.protobuf.Duration=::prost_types::Duration
+      - extern_path=.google.protobuf.Timestamp=::prost_types::Timestamp
