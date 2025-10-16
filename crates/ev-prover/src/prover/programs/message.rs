@@ -105,7 +105,7 @@ impl HyperlaneMessageProver {
         proof_store: Arc<dyn ProofStorage>,
         state_query_provider: Arc<dyn StateQueryProvider>,
     ) -> Result<Arc<Self>> {
-        let prover = prover_from_env().expect("failed to create prover");
+        let prover = prover_from_env();
         let config = HyperlaneMessageProver::default_config(prover.as_ref());
 
         Ok(Arc::new(Self {

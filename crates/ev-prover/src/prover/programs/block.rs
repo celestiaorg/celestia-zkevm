@@ -199,7 +199,7 @@ impl BlockExecProver {
         queue_capacity: usize,
         concurrency: usize,
     ) -> Arc<Self> {
-        let prover = prover_from_env().expect("failed to create prover");
+        let prover = prover_from_env();
         let config = BlockExecProver::default_config(prover.as_ref());
 
         Arc::new(Self {

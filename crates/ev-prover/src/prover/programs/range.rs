@@ -119,7 +119,7 @@ impl ProgramProver for BlockRangeExecProver {
 
 impl BlockRangeExecProver {
     pub fn new(rx: Receiver<ProofCommitted>, storage: Arc<dyn ProofStorage>) -> Result<Self> {
-        let prover = prover_from_env().expect("failed to create prover");
+        let prover = prover_from_env();
         let config = BlockRangeExecProver::default_config(prover.as_ref());
         let pending = BTreeSet::new();
 

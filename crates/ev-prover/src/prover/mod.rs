@@ -54,7 +54,7 @@ pub trait ProgramProver {
 }
 
 /// Construct a prover based on the SP1_PROVER environment variable.
-pub fn prover_from_env() -> Result<Arc<SP1Prover>> {
+pub fn prover_from_env() -> Arc<SP1Prover> {
     let mode: ProverMode = ProverMode::from_env();
 
     let prover: Arc<SP1Prover> = match mode {
@@ -81,7 +81,7 @@ pub fn prover_from_env() -> Result<Arc<SP1Prover>> {
         }
     };
 
-    Ok(prover)
+    prover
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
