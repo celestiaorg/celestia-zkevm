@@ -16,6 +16,8 @@ pub mod service;
 
 pub use config::{BaseProverConfig, ProgramId, ProgramVerifyingKey, ProverConfig, ProverMode, RecursiveProverConfig};
 
+pub type SP1Prover = dyn Prover<CpuProverComponents> + Send + Sync;
+
 /// ProgramProver is a trait implemented per SP1 program*.
 ///
 /// Associated types let each program pick its own Input and Output context.
@@ -47,20 +49,18 @@ pub trait ProgramProver {
     }
 
     /// Returns the SP1 Prover.
-    fn prover(&self) -> Arc<dyn Prover<CpuProverComponents> + Send + Sync>;
+    fn prover(&self) -> Arc<SP1Prover>;
 
     /// Parse or convert program outputs.
     fn post_process(&self, proof: SP1ProofWithPublicValues) -> Result<Self::Output>;
 }
 
-pub type ProverDyn = dyn Prover<CpuProverComponents> + Send + Sync;
-
 /// Construct a prover based on the SP1_PROVER environment variable.
-pub fn prover_from_env() -> Result<Arc<ProverDyn>> {
+pub fn prover_from_env() -> Result<Arc<SP1Prover>> {
     let mode_str = env::var("SP1_PROVER").unwrap_or_else(|_| "MOCK".to_string());
     let mode: ProverMode = ProverMode::from_str(&mode_str).unwrap();
 
-    let prover: Arc<ProverDyn> = match mode {
+    let prover: Arc<SP1Prover> = match mode {
         ProverMode::Mock => {
             debug!("Using mock prover backend");
             Arc::new(ProverClient::builder().mock().build())

@@ -35,6 +35,7 @@ use tracing::{debug, error, info};
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
 use crate::prover::prover_from_env;
+use crate::prover::SP1Prover;
 use crate::prover::{ProgramProver, ProofCommitted, ProverConfig};
 use storage::proofs::ProofStorage;
 
@@ -118,7 +119,7 @@ impl AppContext {
 pub struct BlockExecProver {
     pub app: AppContext,
     pub config: ProverConfig,
-    pub prover: Arc<dyn Prover<CpuProverComponents> + Send + Sync>,
+    pub prover: Arc<SP1Prover>,
     pub tx: Sender<ProofCommitted>,
     pub storage: Arc<dyn ProofStorage>,
     pub queue_capacity: usize,
@@ -159,7 +160,7 @@ impl ProgramProver for BlockExecProver {
     }
 
     /// Returns the SP1 Prover.
-    fn prover(&self) -> Arc<dyn Prover<CpuProverComponents> + Send + Sync> {
+    fn prover(&self) -> Arc<SP1Prover> {
         Arc::clone(&self.prover)
     }
 }
@@ -214,7 +215,7 @@ impl BlockExecProver {
     }
 
     /// Returns the default prover configuration for the block execution program.
-    pub fn default_config(prover: &(dyn Prover<CpuProverComponents> + Send + Sync)) -> ProverConfig {
+    pub fn default_config(prover: &SP1Prover) -> ProverConfig {
         let (pk, vk) = prover.setup(EV_EXEC_ELF);
         ProverConfig::new(pk, vk, SP1ProofMode::Compressed)
     }

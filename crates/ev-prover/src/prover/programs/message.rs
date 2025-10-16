@@ -2,7 +2,7 @@
 //! two given heights against a given EVM block height.
 
 #![allow(dead_code)]
-use crate::prover::prover_from_env;
+use crate::prover::{prover_from_env, SP1Prover};
 use crate::prover::{ProgramProver, ProverConfig};
 use alloy_primitives::{hex::FromHex, Address, FixedBytes};
 use alloy_provider::{Provider, ProviderBuilder, WsConnect};
@@ -65,7 +65,7 @@ impl MerkleTreeState {
 pub struct HyperlaneMessageProver {
     pub app: AppContext,
     pub config: ProverConfig,
-    pub prover: Arc<dyn Prover<CpuProverComponents> + Send + Sync>,
+    pub prover: Arc<SP1Prover>,
     pub message_store: Arc<HyperlaneMessageStore>,
     pub snapshot_store: Arc<HyperlaneSnapshotStore>,
     pub proof_store: Arc<dyn ProofStorage>,
@@ -93,7 +93,7 @@ impl ProgramProver for HyperlaneMessageProver {
         )?)
     }
 
-    fn prover(&self) -> Arc<dyn Prover<CpuProverComponents> + Send + Sync> {
+    fn prover(&self) -> Arc<SP1Prover> {
         Arc::clone(&self.prover)
     }
 }
@@ -121,7 +121,7 @@ impl HyperlaneMessageProver {
     }
 
     /// Returns the default prover configuration for the block execution program.
-    pub fn default_config(prover: &(dyn Prover<CpuProverComponents> + Send + Sync)) -> ProverConfig {
+    pub fn default_config(prover: &SP1Prover) -> ProverConfig {
         let (pk, vk) = prover.setup(EV_HYPERLANE_ELF);
         ProverConfig::new(pk, vk, SP1ProofMode::Groth16)
     }

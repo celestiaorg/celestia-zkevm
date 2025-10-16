@@ -16,11 +16,11 @@ use storage::proofs::ProofStorage;
 use tokio::sync::mpsc::Receiver;
 use tracing::{debug, info};
 
-use crate::prover::prover_from_env;
 use crate::prover::{
     programs::block::EV_EXEC_ELF, BaseProverConfig, ProgramProver, ProgramVerifyingKey, ProofCommitted,
     RecursiveProverConfig,
 };
+use crate::prover::{prover_from_env, SP1Prover};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_RANGE_EXEC_ELF: &[u8] = include_elf!("ev-range-exec-program");
@@ -37,7 +37,7 @@ pub const EV_RANGE_EXEC_ELF: &[u8] = include_elf!("ev-range-exec-program");
 /// - The number of `vkeys` must exactly match the number of `proofs`.
 pub struct BlockRangeExecProver {
     config: RecursiveProverConfig,
-    prover: Arc<dyn Prover<CpuProverComponents> + Send + Sync>,
+    prover: Arc<SP1Prover>,
     pending: BTreeSet<ProofCommitted>,
     rx: Receiver<ProofCommitted>,
     storage: Arc<dyn ProofStorage>,
@@ -115,7 +115,7 @@ impl ProgramProver for BlockRangeExecProver {
     }
 
     /// Returns the SP1 Prover.
-    fn prover(&self) -> Arc<dyn Prover<CpuProverComponents> + Send + Sync> {
+    fn prover(&self) -> Arc<SP1Prover> {
         Arc::clone(&self.prover)
     }
 }
@@ -138,7 +138,7 @@ impl BlockRangeExecProver {
     }
 
     /// Returns the default prover configuration for the block execution program.
-    pub fn default_config(prover: &(dyn Prover<CpuProverComponents> + Send + Sync)) -> RecursiveProverConfig {
+    pub fn default_config(prover: &SP1Prover) -> RecursiveProverConfig {
         let (pk, vk) = prover.setup(EV_RANGE_EXEC_ELF);
         let (_, inner_vk) = prover.setup(EV_EXEC_ELF);
 
