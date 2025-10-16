@@ -15,6 +15,7 @@ import (
 	coretypes "github.com/bcp-innovations/hyperlane-cosmos/x/core/types"
 	warptypes "github.com/bcp-innovations/hyperlane-cosmos/x/warp/types"
 	zkismtypes "github.com/celestiaorg/celestia-app/v6/x/zkism/types"
+	rpcclient "github.com/cometbft/cometbft/rpc/client/http"
 	"github.com/ethereum/go-ethereum/ethclient"
 	evclient "github.com/evstack/ev-node/pkg/rpc/client"
 )
@@ -51,10 +52,16 @@ func SetupZKIsm(ctx context.Context, broadcaster *Broadcaster, ethClient *ethcli
 	stateTransitionVkey := readStateTransitionVkey()
 	stateMembershipVkey := readStateMembershipVkey()
 
+	root, height := GetCelestiaRootAndHeight(ctx, "http://localhost:26657")
+
+	fmt.Printf("successfully got celestia root and height: %x, %d\n", root, height)
+
 	msgCreateZkExecutionISM := zkismtypes.MsgCreateZKExecutionISM{
 		Creator:             broadcaster.address.String(),
 		StateRoot:           block.Header().Root.Bytes(),
 		Height:              block.NumberU64(),
+		CelestiaHeight:      height,
+		CelestiaStateRoot:   root[:],
 		Namespace:           namespace,
 		SequencerPublicKey:  pubKey,
 		Groth16Vkey:         groth16Vkey,
@@ -230,4 +237,28 @@ func writeConfig(cfg *HyperlaneConfig) {
 	}
 
 	fmt.Printf("successfully deployed Hyperlane: \n%s\n", string(out))
+}
+
+func GetCelestiaRootAndHeight(ctx context.Context, rpcAddr string) ([32]byte, uint64) {
+	client, err := rpcclient.New(rpcAddr, "/websocket")
+	if err != nil {
+		log.Fatalf("failed to connect to celestia RPC: %v", err)
+	}
+
+	status, err := client.Status(ctx)
+	if err != nil {
+		log.Fatalf("failed to get celestia status: %v", err)
+	}
+
+	height := uint64(status.SyncInfo.LatestBlockHeight)
+	rootHash := status.SyncInfo.LatestAppHash
+
+	var root [32]byte
+	if len(rootHash) != 32 {
+		log.Fatalf("unexpected app hash length: %d", len(rootHash))
+	}
+	copy(root[:], rootHash)
+
+	fmt.Printf("Celestia node height: %d\nAppHash (root): 0x%s\n", height, hex.EncodeToString(root[:]))
+	return root, height
 }
