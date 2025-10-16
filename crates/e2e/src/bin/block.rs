@@ -1,8 +1,12 @@
 use std::sync::Arc;
 
 use alloy_primitives::{FixedBytes, hex::FromHex};
+use celestia_grpc_client::{CelestiaIsmClient, QueryIsmRequest, types::ClientConfig};
 use e2e::{
-    config::debug::{TARGET_HEIGHT, TRUSTED_HEIGHT, TRUSTED_ROOT},
+    config::{
+        debug::{TARGET_HEIGHT, TRUSTED_HEIGHT, TRUSTED_ROOT},
+        e2e::ISM_ID,
+    },
     prover::block::prove_blocks,
 };
 use ev_types::v1::{GetMetadataRequest, store_service_client::StoreServiceClient};
@@ -11,6 +15,17 @@ use sp1_sdk::ProverClient;
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
+    let config = ClientConfig::from_env().expect("failed to create celestia client config");
+    let ism_client = CelestiaIsmClient::new(config).await.unwrap();
+
+    let resp = ism_client
+        .ism(QueryIsmRequest { id: ISM_ID.to_string() })
+        .await
+        .unwrap();
+
+    let ism = resp.ism.expect("ZKISM not found");
+    let trusted_celestia_height = ism.celestia_height;
+    let trusted_celestia_root = ism.celestia_state_root;
     let trusted_inclusion_height = inclusion_height(TRUSTED_HEIGHT).await.unwrap() + 1;
     let target_inclusion_height = inclusion_height(TARGET_HEIGHT).await.unwrap();
     let num_blocks = target_inclusion_height - trusted_inclusion_height + 1;
@@ -18,6 +33,8 @@ async fn main() {
     prove_blocks(
         trusted_inclusion_height,
         TRUSTED_HEIGHT,
+        trusted_celestia_height,
+        trusted_celestia_root.try_into().unwrap(),
         num_blocks,
         &mut FixedBytes::from_hex(TRUSTED_ROOT).unwrap(),
         client,

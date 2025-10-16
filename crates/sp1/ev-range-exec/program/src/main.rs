@@ -91,6 +91,28 @@ pub fn main() {
             curr.prev_state_root
         );
 
+        // the previous height and root of the first block that we prove must match that of the trusted Celestia block in the ISM.
+        // this is necessary to ensure that no DA blocks are skipped.
+        if window.0 == 0 {
+            assert_eq!(
+                curr.prev_celestia_height,
+                inputs.trusted_celestia_height,
+                "verify sequential Celestia heights failed at index {}: expected {:?}, got {:?}",
+                i + 1,
+                curr.prev_celestia_height,
+                inputs.trusted_celestia_height
+            );
+
+            assert_eq!(
+                curr.prev_celestia_header_hash,
+                inputs.trusted_celestia_root,
+                "verify sequential Celestia roots failed at index {}: expected {:?}, got {:?}",
+                i + 1,
+                curr.prev_celestia_header_hash,
+                inputs.trusted_celestia_root
+            );
+        }
+
         assert_eq!(
             curr.prev_celestia_header_hash,
             prev.celestia_header_hash,

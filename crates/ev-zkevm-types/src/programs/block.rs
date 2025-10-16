@@ -70,6 +70,8 @@ impl Display for BlockExecOutput {
 pub struct BlockRangeExecInput {
     pub vkeys: Vec<[u32; 8]>,
     pub public_values: Vec<Vec<u8>>,
+    pub trusted_celestia_height: u64,
+    pub trusted_celestia_root: [u8; 32],
 }
 
 #[derive(Serialize, Deserialize, Debug)]

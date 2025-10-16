@@ -52,6 +52,8 @@ async fn main() {
     let ism = resp.ism.expect("ZKISM not found");
     let trusted_root_hex = alloy::hex::encode(ism.state_root);
     let trusted_height = ism.height;
+    let trusted_celestia_height = ism.celestia_height;
+    let trusted_celestia_root = ism.celestia_state_root;
 
     let transfer_msg = MsgRemoteTransfer::new(
         ism_client.signer_address().to_string(),
@@ -81,6 +83,8 @@ async fn main() {
     let block_proof = prove_blocks(
         celestia_start_height,
         trusted_height,
+        trusted_celestia_height,
+        trusted_celestia_root.try_into().unwrap(),
         num_blocks,
         &mut FixedBytes::from_hex(trusted_root_hex).unwrap(),
         client.clone(),
