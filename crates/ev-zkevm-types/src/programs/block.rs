@@ -27,6 +27,8 @@ pub struct BlockExecInput {
 pub struct BlockExecOutput {
     // celestia_header_hash is the merkle hash of the Celestia block header.
     pub celestia_header_hash: [u8; 32],
+    // prev_celestia_height is the height of the previous Celestia block.
+    pub prev_celestia_height: u64,
     // prev_celestia_header_hash is the merkle hash of the previous Celestia block header.
     pub prev_celestia_header_hash: [u8; 32],
     // new_height is the block number after the state transition function has been applied.
@@ -72,6 +74,10 @@ pub struct BlockRangeExecInput {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlockRangeExecOutput {
+    // prev_celestia_height is the height of the previous Celestia block.
+    pub prev_celestia_height: u64,
+    // prev_celestia_header_hash is the merkle hash of the previous Celestia block header.
+    pub prev_celestia_header_hash: [u8; 32],
     // celestia_header_hash is the hash of the celestia header at which new_height is available.
     pub celestia_header_hash: [u8; 32],
     // trusted_height is the trusted height of the EVM application.
