@@ -33,9 +33,40 @@ Run the following commands from the root of the repository.
 
 ### Build system
 
-This crate contains a custom `build.rs` that instructs the Cargo build system how to handle compile-time build dependencies to be included by the application.
+This crate contains a custom `build.rs` that builds the SP1 programs used for proof generation.
 
-The `build.rs` contains steps to walk the `proto` directory at the root of the repository, collect all relevant files and compile them.
-This outputs generated code to `src/proto` as well as a `descriptor.bin` which is leveraged by the reflection service.
+### Protobuf
 
-TODO: include section about building sp1 programs when added
+Protobuf is used as the canonical encoding format for gRPC messaging. The Protobuf definitions for the prover service are included in this crate under the `proto` directory.
+
+The `buf` toolchain is employed to handle Rust code generation.
+Please refer to the [official installation documentation](https://buf.build/docs/cli/installation/) to get setup with the `buf` CLI.
+
+Rust code-gen is produced from the Protobuf definitions via `buf.gen.yaml` plugins and included in this crate under `src/proto`.
+
+#### Regenerating Protobuf code
+
+When making changes to the Protobuf definitions in `proto/prover/v1/prover.proto`, regenerate the Rust code by running:
+
+```bash
+cd crates/ev-prover/proto
+buf generate
+```
+
+This will generate the prost message types and tonic server/client stubs compatible with prost 0.12 and tonic 0.10.
+
+#### Protobuf development
+
+To update the Protobuf dependencies:
+
+```bash
+cd crates/ev-prover/proto
+buf dep update
+```
+
+To lint the Protobuf definitions:
+
+```bash
+cd crates/ev-prover/proto
+buf lint
+```

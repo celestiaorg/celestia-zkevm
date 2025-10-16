@@ -77,7 +77,7 @@ pub async fn start_server(config: Config) -> Result<()> {
     // We have a service implementation for each prover that can run in isolation, but for our ZK ISM
     // we will want to send both proofs together in a single request.
 
-    let prover_service = ProverService::new()?;
+    let prover_service = ProverService::new(storage)?;
 
     Server::builder()
         .add_service(reflection_service)

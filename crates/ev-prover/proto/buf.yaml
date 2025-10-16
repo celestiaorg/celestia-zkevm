@@ -1,5 +1,5 @@
 version: v1
-name: buf.build/celestiaorg/zk-prover
+name: buf.build/celestiaorg/ev-prover
 lint:
   use:
     - DEFAULT

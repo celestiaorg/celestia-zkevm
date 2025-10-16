@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/celestiaorg/celestia-app/v6/app/encoding"
@@ -21,12 +22,22 @@ import (
 )
 
 const (
-	mnemonic  = "sphere exhibit essay fancy okay tuna leaf culture elbow drum trip exchange scorpion excuse parent sun make spot chunk mouse tenant shoe hurt scale"
-	chainID   = "celestia-zkevm-testnet"
 	denom     = "utia"
 	feeAmount = 800
 	gasLimit  = 200000
 )
+
+var (
+	mnemonic = getEnvOrDefault("HYP_MNEMONIC", "sphere exhibit essay fancy okay tuna leaf culture elbow drum trip exchange scorpion excuse parent sun make spot chunk mouse tenant shoe hurt scale")
+	chainID  = getEnvOrDefault("HYP_CHAIN_ID", "celestia-zkevm-testnet")
+)
+
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
 
 type Broadcaster struct {
 	enc encoding.Config
