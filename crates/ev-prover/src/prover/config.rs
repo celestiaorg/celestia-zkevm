@@ -1,9 +1,9 @@
 use std::collections::HashMap;
-use std::str::FromStr;
+use std::env;
 use std::sync::Arc;
 
-use anyhow::anyhow;
 use sp1_sdk::{HashableKey, SP1ProofMode, SP1ProvingKey, SP1VerifyingKey};
+use tracing::warn;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ProverMode {
@@ -13,16 +13,21 @@ pub enum ProverMode {
     Network,
 }
 
-impl FromStr for ProverMode {
-    type Err = anyhow::Error;
+impl ProverMode {
+    /// Returns the ProverMode by reading the SP1_PROVER environment variable.
+    /// If SP1_PROVER is not set, this method provides a fallback of Mock mode.
+    pub fn from_env() -> ProverMode {
+        let mode_str = env::var("SP1_PROVER").unwrap_or_default();
 
-    fn from_str(s: &str) -> anyhow::Result<Self> {
-        match s.trim().to_ascii_uppercase().as_str() {
-            "MOCK" => Ok(ProverMode::Mock),
-            "CPU" => Ok(ProverMode::Cpu),
-            "CUDA" => Ok(ProverMode::Cuda),
-            "NETWORK" => Ok(ProverMode::Network),
-            other => Err(anyhow!("Invalid SP1_PROVER mode: {other}")),
+        match mode_str.trim().to_ascii_lowercase().as_str() {
+            "mock" => Self::Mock,
+            "cpu" => Self::Cpu,
+            "cuda" => Self::Cuda,
+            "network" => Self::Network,
+            _ => {
+                warn!("SP1_PROVER unset or invalid ('{mode_str}'), defaulting to mock mode");
+                Self::Mock
+            }
         }
     }
 }

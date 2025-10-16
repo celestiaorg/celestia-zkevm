@@ -1,5 +1,3 @@
-use std::env;
-use std::str::FromStr;
 use std::sync::Arc;
 use std::{fmt::Display, result::Result::Ok};
 
@@ -57,8 +55,7 @@ pub trait ProgramProver {
 
 /// Construct a prover based on the SP1_PROVER environment variable.
 pub fn prover_from_env() -> Result<Arc<SP1Prover>> {
-    let mode_str = env::var("SP1_PROVER").unwrap_or_else(|_| "MOCK".to_string());
-    let mode: ProverMode = ProverMode::from_str(&mode_str).unwrap();
+    let mode: ProverMode = ProverMode::from_env();
 
     let prover: Arc<SP1Prover> = match mode {
         ProverMode::Mock => {

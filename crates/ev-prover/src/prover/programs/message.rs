@@ -14,8 +14,7 @@ use ev_zkevm_types::programs::hyperlane::types::{
 };
 use ev_zkevm_types::{events::Dispatch, programs::hyperlane::types::HYPERLANE_MERKLE_TREE_KEYS};
 use reqwest::Url;
-use sp1_prover::components::CpuProverComponents;
-use sp1_sdk::{include_elf, Prover, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
+use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 use std::{
     env,
     str::FromStr,
