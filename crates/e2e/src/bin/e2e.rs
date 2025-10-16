@@ -68,8 +68,7 @@ async fn main() {
     assert!(response.success);
     // we can choose this as our start heihgt, because the state root has not changed in between the hyperlane deployments
     // and this transfer.
-    let celestia_start_height = response.height - 1;
-
+    let celestia_start_height = ism.celestia_height + 1;
     info!("Waiting for Evolve balance to be updated...");
 
     // next trigger make transfer-back
