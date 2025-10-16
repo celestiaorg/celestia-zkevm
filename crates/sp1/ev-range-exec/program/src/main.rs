@@ -146,8 +146,8 @@ pub fn main() {
     let last = outputs.last().expect("No outputs provided");
 
     let output = BlockRangeExecOutput {
-        prev_celestia_height: first.prev_celestia_height,
-        prev_celestia_header_hash: first.prev_celestia_header_hash,
+        prev_celestia_height: inputs.trusted_celestia_height,
+        prev_celestia_header_hash: inputs.trusted_celestia_root,
         celestia_header_hash: last.celestia_header_hash,
         trusted_height: first.prev_height,
         trusted_state_root: first.prev_state_root,
