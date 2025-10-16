@@ -35,7 +35,7 @@ use tracing::{debug, error, info};
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
 use crate::prover::prover_from_env;
 use crate::prover::SP1Prover;
-use crate::prover::{ProgramProver, ProofCommitted, ProverConfig};
+use crate::prover::{BlockProofCommitted, ProgramProver, ProverConfig};
 use storage::proofs::ProofStorage;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
@@ -119,7 +119,7 @@ pub struct BlockExecProver {
     pub app: AppContext,
     pub config: ProverConfig,
     pub prover: Arc<SP1Prover>,
-    pub tx: Sender<ProofCommitted>,
+    pub tx: Sender<BlockProofCommitted>,
     pub storage: Arc<dyn ProofStorage>,
     pub queue_capacity: usize,
     pub concurrency: usize,
@@ -194,7 +194,7 @@ impl BlockExecProver {
     /// and prover environment settings.
     pub fn new(
         app: AppContext,
-        tx: Sender<ProofCommitted>,
+        tx: Sender<BlockProofCommitted>,
         storage: Arc<dyn ProofStorage>,
         queue_capacity: usize,
         concurrency: usize,
@@ -474,7 +474,7 @@ impl BlockExecProver {
             scheduled.job.height, outputs,
         );
 
-        self.tx.send(ProofCommitted(scheduled.job.height)).await?;
+        self.tx.send(BlockProofCommitted(scheduled.job.height)).await?;
 
         Ok(())
     }

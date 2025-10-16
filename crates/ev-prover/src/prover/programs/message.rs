@@ -2,7 +2,7 @@
 //! two given heights against a given EVM block height.
 
 #![allow(dead_code)]
-use crate::prover::{prover_from_env, SP1Prover};
+use crate::prover::{prover_from_env, RangeProofCommitted, SP1Prover};
 use crate::prover::{ProgramProver, ProverConfig};
 use alloy_primitives::{hex::FromHex, Address, FixedBytes};
 use alloy_provider::{Provider, ProviderBuilder, WsConnect};
@@ -23,6 +23,7 @@ use std::{
 };
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use storage::proofs::ProofStorage;
+use tokio::sync::mpsc::Receiver;
 use tokio::time::sleep;
 use tracing::{debug, error, info};
 
@@ -65,6 +66,7 @@ pub struct HyperlaneMessageProver {
     pub app: AppContext,
     pub config: ProverConfig,
     pub prover: Arc<SP1Prover>,
+    pub range_rx: Receiver<RangeProofCommitted>,
     pub message_store: Arc<HyperlaneMessageStore>,
     pub snapshot_store: Arc<HyperlaneSnapshotStore>,
     pub proof_store: Arc<dyn ProofStorage>,
@@ -100,6 +102,7 @@ impl ProgramProver for HyperlaneMessageProver {
 impl HyperlaneMessageProver {
     pub fn new(
         app: AppContext,
+        range_rx: Receiver<RangeProofCommitted>,
         message_store: Arc<HyperlaneMessageStore>,
         snapshot_store: Arc<HyperlaneSnapshotStore>,
         proof_store: Arc<dyn ProofStorage>,
@@ -112,6 +115,7 @@ impl HyperlaneMessageProver {
             app,
             config,
             prover,
+            range_rx,
             message_store,
             snapshot_store,
             proof_store,
