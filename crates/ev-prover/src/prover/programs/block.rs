@@ -1,4 +1,7 @@
 #![allow(dead_code)]
+use celestia_grpc_client::types::ClientConfig;
+use celestia_grpc_client::CelestiaIsmClient;
+use celestia_grpc_client::QueryIsmRequest;
 use celestia_types::ExtendedHeader;
 use std::collections::BTreeMap;
 use std::env;
@@ -71,7 +74,7 @@ impl TrustedState {
 }
 
 impl AppContext {
-    pub fn from_config(config: Config) -> Result<Self> {
+    pub async fn from_config(config: Config) -> Result<Self> {
         let genesis = AppContext::load_genesis().context("Error loading app genesis")?;
         let chain_spec: Arc<ChainSpec> = Arc::new(
             (&genesis)
@@ -82,7 +85,19 @@ impl AppContext {
         let raw_ns = hex::decode(config.namespace_hex)?;
         let namespace = Namespace::new_v0(raw_ns.as_ref()).context("Failed to construct Namespace")?;
         let pub_key = hex::decode(config.pub_key)?;
-        let trusted_state = RwLock::new(TrustedState::new(0, chain_spec.genesis_header().state_root));
+
+        let client_config = ClientConfig::from_env().expect("failed to create celestia client config");
+        let ism_client = CelestiaIsmClient::new(client_config).await.unwrap();
+
+        let resp = ism_client
+            .ism(QueryIsmRequest {
+                id: "0x726f757465725f69736d000000000000000000000000002a0000000000000001".to_string(),
+            })
+            .await
+            .unwrap();
+
+        let ism = resp.ism.expect("ZKISM not found");
+        let trusted_state = RwLock::new(TrustedState::new(ism.height, FixedBytes::from_slice(&ism.state_root)));
 
         Ok(AppContext {
             chain_spec,

@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/celestia-grpc-client",
     "crates/e2e",
     "crates/ev-prover",
     "crates/ev-state-queries",
@@ -38,6 +39,7 @@ celestia-grpc = "0.8.0"
 celestia-rpc = "=0.13.0"
 celestia-types = "=0.15.0"
 chrono = "0.4"
+celestia-grpc-client = { path = "crates/celestia-grpc-client" }
 cosmrs = { version = "0.22", features = ["grpc", "cosmwasm"] }
 dirs = "5.0.1"
 dotenvy = "0.15.7"

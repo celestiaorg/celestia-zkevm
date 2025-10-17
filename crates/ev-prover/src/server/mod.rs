@@ -58,7 +58,7 @@ pub async fn start_server(config: Config) -> Result<()> {
 
     tokio::spawn({
         let block_prover = BlockExecProver::new(
-            AppContext::from_config(config_clone)?,
+            AppContext::from_config(config_clone).await?,
             block_tx,
             storage.clone(),
             queue_capacity,

@@ -3358,6 +3358,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "bytes",
+ "celestia-grpc-client",
  "celestia-rpc",
  "celestia-types 0.15.0",
  "clap",
