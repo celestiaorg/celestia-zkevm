@@ -24,7 +24,7 @@ use std::{
 };
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use storage::proofs::ProofStorage;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
@@ -141,17 +141,6 @@ impl HyperlaneMessageProver {
             let committed_height = commit_message.trusted_height;
             let committed_state_root = commit_message.trusted_root;
 
-            let state_root = self
-                .state_query_provider
-                .get_state_root(committed_height)
-                .await
-                .expect("Failed to get state root");
-
-            if state_root != committed_state_root {
-                warn!("Committed state root does not match trusted state root");
-                continue;
-            }
-
             let merkle_proof = evm_provider
                 .get_proof(
                     self.ctx.merkle_tree_address,
@@ -164,7 +153,7 @@ impl HyperlaneMessageProver {
                 .await?;
 
             info!(
-                "state_root: {state_root}, height: {committed_height}, trusted height: {}",
+                "state_root: {committed_state_root:?}, height: {committed_height}, trusted height: {}",
                 self.ctx.merkle_tree_state.read().unwrap().height + 1
             );
 
@@ -174,7 +163,7 @@ impl HyperlaneMessageProver {
                     &mut indexer,
                     committed_height,
                     merkle_proof.clone(),
-                    state_root,
+                    FixedBytes::from_slice(&committed_state_root),
                 )
                 .await
             {
