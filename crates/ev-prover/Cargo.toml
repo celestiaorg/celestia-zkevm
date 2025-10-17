@@ -13,6 +13,7 @@ anyhow = "1.0"
 async-trait = "0.1.88"
 bincode = { workspace = true }
 bytes = { workspace = true }
+rustls = "0.23.31"
 celestia-grpc-client = { workspace = true }
 celestia-rpc = { workspace = true }
 celestia-types = { workspace = true }

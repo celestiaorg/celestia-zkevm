@@ -22,6 +22,7 @@ use std::{
     str::FromStr,
     sync::{Arc, RwLock},
 };
+use storage::hyperlane::StoredHyperlaneMessage;
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use storage::proofs::ProofStorage;
 use tracing::{debug, error, info};
@@ -220,17 +221,17 @@ impl HyperlaneMessageProver {
             )
             .expect("Failed to get snapshot");
 
-        let messages = self
-            .message_store
-            .get_by_block(
-                self.ctx
-                    .merkle_tree_state
-                    .read()
-                    .expect("Failed to read trusted state")
-                    .height
-                    + 1,
-            )
-            .expect("Failed to get messages");
+        let mut messages: Vec<StoredHyperlaneMessage> = Vec::new();
+        for block in self
+            .ctx
+            .merkle_tree_state
+            .read()
+            .expect("Failed to read trusted state")
+            .height
+            + 1..=height
+        {
+            messages.extend(self.message_store.get_by_block(block).expect("Failed to get messages"));
+        }
 
         let branch_proof = HyperlaneBranchProof::new(proof);
 
@@ -243,6 +244,12 @@ impl HyperlaneMessageProver {
             snapshot.clone(),
         );
 
+        for message in messages.clone() {
+            snapshot
+                .insert(message.message.id())
+                .expect("Failed to insert message into snapshot");
+        }
+
         info!(
             "Proving messages with ids: {:?}",
             messages.iter().map(|m| m.message.id()).collect::<Vec<String>>()
@@ -254,13 +261,6 @@ impl HyperlaneMessageProver {
             .store_membership_proof(height, &proof.0, &proof.1)
             .await
             .expect("Failed to store proof");
-
-        // insert messages into snapshot to get new snapshot for next proof
-        for message in messages {
-            snapshot
-                .insert(message.message.id())
-                .expect("Failed to insert messages into snapshot");
-        }
 
         // store snapshot
         self.snapshot_store

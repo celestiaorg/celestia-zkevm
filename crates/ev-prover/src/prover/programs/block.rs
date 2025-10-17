@@ -86,6 +86,10 @@ impl AppContext {
         let namespace = Namespace::new_v0(raw_ns.as_ref()).context("Failed to construct Namespace")?;
         let pub_key = hex::decode(config.pub_key)?;
 
+        rustls::crypto::aws_lc_rs::default_provider()
+            .install_default()
+            .expect("Failed to set default crypto provider");
+
         let client_config = ClientConfig::from_env().expect("failed to create celestia client config");
         let ism_client = CelestiaIsmClient::new(client_config).await.unwrap();
 
