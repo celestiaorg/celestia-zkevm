@@ -148,6 +148,7 @@ impl HyperlaneMessageProver {
                 );
                 continue;
             }
+
             let state_root = self
                 .state_query_provider
                 .get_state_root(trusted_height)
@@ -237,6 +238,7 @@ impl HyperlaneMessageProver {
                     .snapshot_index,
             )
             .expect("Failed to get snapshot");
+
         let messages = self
             .message_store
             .get_by_block(
@@ -248,6 +250,7 @@ impl HyperlaneMessageProver {
                     + 1,
             )
             .expect("Failed to get messages");
+
         let branch_proof = HyperlaneBranchProof::new(proof);
 
         // Construct program inputs from values
@@ -258,6 +261,7 @@ impl HyperlaneMessageProver {
             HyperlaneBranchProofInputs::from(branch_proof),
             snapshot.clone(),
         );
+
         info!(
             "Proving messages with ids: {:?}",
             messages.iter().map(|m| m.message.id()).collect::<Vec<String>>()
