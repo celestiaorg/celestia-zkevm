@@ -27,14 +27,6 @@ pub async fn start_server(config: Config) -> Result<()> {
         .build()
         .unwrap();
 
-    // Initialize shared proof storage - used by both BlockExecProver and ProverService
-    let storage_path = dirs::home_dir()
-        .expect("cannot find home directory")
-        .join(APP_HOME)
-        .join("data")
-        .join("proofs.db");
-    let shared_storage = Arc::new(RocksDbProofStorage::new(storage_path)?);
-
     // TODO: Remove this config cloning when we can rely on the public key from config
     // https://github.com/evstack/ev-node/issues/2603
     let mut config_clone = config.clone();
