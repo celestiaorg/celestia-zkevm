@@ -25,6 +25,7 @@ async fn main() -> anyhow::Result<()> {
         Commands::Init {} => commands::command::init()?,
         Commands::Start {} => commands::command::start().await?,
         Commands::Version {} => commands::command::version(),
+        Commands::Query(query_cmd) => commands::command::query(query_cmd).await?,
     }
 
     Ok(())
