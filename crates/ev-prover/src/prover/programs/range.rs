@@ -8,14 +8,14 @@ use std::{
 use anyhow::{anyhow, Ok, Result};
 use async_trait::async_trait;
 use ev_zkevm_types::programs::block::{BlockRangeExecInput, BlockRangeExecOutput};
-use sp1_sdk::{include_elf, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
+use sp1_sdk::{include_elf, ProverClient, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
 use storage::proofs::ProofStorage;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{debug, info};
 
 use crate::prover::{
-    programs::block::EV_EXEC_ELF, BlockProofCommitted, ProgramProver, ProgramVerifyingKey, RangeProofCommitted,
-    RecursiveProverConfig,
+    programs::block::EV_EXEC_ELF, BaseProverConfig, BlockProofCommitted, ProgramProver, ProgramVerifyingKey,
+    RangeProofCommitted, RecursiveProverConfig,
 };
 use crate::prover::{prover_from_env, SP1Prover};
 
@@ -237,15 +237,22 @@ impl BlockRangeExecProver {
         let input = (BlockRangeExecInput { vkeys, public_values }, proofs);
 
         // NOTE: temporarily to allow local testing in mock mode
-        // let prover = ProverClient::builder().mock().build();
-        // let res = prover
-        //     .prove(&self.cfg().pk(), &self.build_stdin(input)?)
-        //     .deferred_proof_verification(false)
-        //     .run()?;
+        let prover = ProverClient::builder().mock().build();
+        let res = prover
+            .prove(&self.cfg().pk(), &self.build_stdin(input)?)
+            .deferred_proof_verification(false)
+            .run()?;
 
-        // let output = self.post_process(res)?;
+        let output = self.post_process(res.clone())?;
 
-        let (res, output) = self.prove(input).await?;
+        self.range_tx
+            .send(RangeProofCommitted {
+                trusted_height: output.new_height,
+                trusted_root: output.new_state_root,
+            })
+            .await?;
+
+        //let (res, output) = self.prove(input).await?;
         self.storage.store_range_proof(start, end, &res, &output).await?;
         info!("Successfully run range prover with result: {output}");
 

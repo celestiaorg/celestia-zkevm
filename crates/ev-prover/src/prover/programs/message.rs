@@ -136,22 +136,14 @@ impl HyperlaneMessageProver {
             let commit_message: RangeProofCommitted =
                 range_rx.recv().await.context("Failed to receive commit message")?;
 
+            info!("Received commit message: {:?}", commit_message);
+
             let committed_height = commit_message.trusted_height;
             let committed_state_root = commit_message.trusted_root;
 
-            // get the trusted height and state root from the state query provider
-            let trusted_height = self.state_query_provider.get_height().await;
-            if trusted_height != committed_height {
-                warn!(
-                    "Committed height {} does not match trusted height {}",
-                    committed_height, trusted_height
-                );
-                continue;
-            }
-
             let state_root = self
                 .state_query_provider
-                .get_state_root(trusted_height)
+                .get_state_root(committed_height)
                 .await
                 .expect("Failed to get state root");
 
@@ -168,11 +160,11 @@ impl HyperlaneMessageProver {
                         .map(|k| FixedBytes::from_hex(k).unwrap())
                         .collect(),
                 )
-                .block_id(trusted_height.into())
+                .block_id(committed_height.into())
                 .await?;
 
             info!(
-                "state_root: {state_root}, height: {trusted_height}, trusted height: {}",
+                "state_root: {state_root}, height: {committed_height}, trusted height: {}",
                 self.ctx.merkle_tree_state.read().unwrap().height + 1
             );
 
@@ -180,7 +172,7 @@ impl HyperlaneMessageProver {
                 .run_inner(
                     &evm_provider,
                     &mut indexer,
-                    trusted_height,
+                    committed_height,
                     merkle_proof.clone(),
                     state_root,
                 )
