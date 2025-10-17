@@ -5,7 +5,7 @@ use std::{
 
 use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
-use ev_prover::prover::programs::message::{AppContext, HyperlaneMessageProver, MerkleTreeState};
+use ev_prover::prover::programs::message::{Context as MessageContext, HyperlaneMessageProver, MerkleTreeState};
 use ev_state_queries::{DefaultProvider, MockStateQueryProvider};
 use reqwest::Url;
 use storage::{
@@ -45,7 +45,7 @@ async fn test_run_message_prover() {
     hyperlane_message_store.reset_db().unwrap();
     hyperlane_snapshot_store.reset_db().unwrap();
 
-    let app = AppContext {
+    let ctx = MessageContext {
         evm_rpc: "http://127.0.0.1:8545".to_string(),
         evm_ws: "ws://127.0.0.1:8546".to_string(),
         mailbox_address: Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap(),
@@ -58,13 +58,12 @@ async fn test_run_message_prover() {
 
     let (_tx, rx) = mpsc::channel(256);
     let prover = HyperlaneMessageProver::new(
-        app,
-        rx,
+        ctx,
         hyperlane_message_store,
         hyperlane_snapshot_store,
         proof_store,
         Arc::new(MockStateQueryProvider::new(evm_provider)),
     )
     .unwrap();
-    prover.run().await.unwrap();
+    prover.run(rx).await.unwrap();
 }

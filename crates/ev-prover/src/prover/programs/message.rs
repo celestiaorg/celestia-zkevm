@@ -4,31 +4,28 @@
 #![allow(dead_code)]
 use crate::prover::{prover_from_env, RangeProofCommitted, SP1Prover};
 use crate::prover::{ProgramProver, ProverConfig};
-use alloy_primitives::{hex::FromHex, Address, FixedBytes};
+use alloy::hex::FromHex;
+use alloy_primitives::{Address, FixedBytes};
 use alloy_provider::{Provider, ProviderBuilder, WsConnect};
 use alloy_rpc_types::{EIP1186AccountProofResponse, Filter};
-use anyhow::{Context, Result};
+use anyhow::{Context as AnyhowContext, Result};
 use ev_state_queries::{hyperlane::indexer::HyperlaneIndexer, DefaultProvider, StateQueryProvider};
+use ev_zkevm_types::events::Dispatch;
 use ev_zkevm_types::programs::hyperlane::types::{
     HyperlaneBranchProof, HyperlaneBranchProofInputs, HyperlaneMessageInputs, HyperlaneMessageOutputs,
+    HYPERLANE_MERKLE_TREE_KEYS,
 };
-use ev_zkevm_types::{events::Dispatch, programs::hyperlane::types::HYPERLANE_MERKLE_TREE_KEYS};
 use reqwest::Url;
 use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 use std::{
     env,
     str::FromStr,
     sync::{Arc, RwLock},
-    time::Duration,
 };
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use storage::proofs::ProofStorage;
-use tokio::sync::mpsc::Receiver;
-use tokio::time::sleep;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
-const TIMEOUT: u64 = 6; // in seconds
-const DISTANCE_TO_HEAD: u64 = 32; // in blocks
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
 
@@ -37,7 +34,7 @@ pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
 ///
 /// This separates RPC concerns from the proving logic, allowing `AppContext`
 /// to be responsible for gathering the data required for the proof system inputs.
-pub struct AppContext {
+pub struct Context {
     // reth http, for example http://127.0.0.1:8545
     pub evm_rpc: String,
     // reth websocket, for example ws://127.0.0.1:8546
@@ -63,10 +60,9 @@ impl MerkleTreeState {
 
 /// HyperlaneMessageProver is a prover for generating SP1 proofs for Hyperlane message inclusion in EVM blocks.
 pub struct HyperlaneMessageProver {
-    pub app: AppContext,
+    pub ctx: Context,
     pub config: ProverConfig,
     pub prover: Arc<SP1Prover>,
-    pub range_rx: Receiver<RangeProofCommitted>,
     pub message_store: Arc<HyperlaneMessageStore>,
     pub snapshot_store: Arc<HyperlaneSnapshotStore>,
     pub proof_store: Arc<dyn ProofStorage>,
@@ -101,8 +97,7 @@ impl ProgramProver for HyperlaneMessageProver {
 
 impl HyperlaneMessageProver {
     pub fn new(
-        app: AppContext,
-        range_rx: Receiver<RangeProofCommitted>,
+        ctx: Context,
         message_store: Arc<HyperlaneMessageStore>,
         snapshot_store: Arc<HyperlaneSnapshotStore>,
         proof_store: Arc<dyn ProofStorage>,
@@ -112,10 +107,9 @@ impl HyperlaneMessageProver {
         let config = HyperlaneMessageProver::default_config(prover.as_ref());
 
         Ok(Arc::new(Self {
-            app,
+            ctx,
             config,
             prover,
-            range_rx,
             message_store,
             snapshot_store,
             proof_store,
@@ -130,63 +124,65 @@ impl HyperlaneMessageProver {
     }
 
     /// Run the message prover with indexer
-    pub async fn run(self: Arc<Self>) -> Result<()> {
+    pub async fn run(self: Arc<Self>, mut range_rx: tokio::sync::mpsc::Receiver<RangeProofCommitted>) -> Result<()> {
         let evm_provider: DefaultProvider =
-            ProviderBuilder::new().connect_http(Url::from_str(&self.app.evm_rpc).unwrap());
-        let socket = WsConnect::new(&self.app.evm_ws);
-        let contract_address = self.app.mailbox_address;
+            ProviderBuilder::new().connect_http(Url::from_str(&self.ctx.evm_rpc).unwrap());
+        let socket = WsConnect::new(&self.ctx.evm_ws);
+        let contract_address = self.ctx.mailbox_address;
         let filter = Filter::new().address(contract_address).event(&Dispatch::id());
         let mut indexer = HyperlaneIndexer::new(socket, contract_address, filter.clone());
-
         loop {
+            // Wait for the next range proof to be committed
+            let commit_message: RangeProofCommitted =
+                range_rx.recv().await.context("Failed to receive commit message")?;
+
+            let committed_height = commit_message.trusted_height;
+            let committed_state_root = commit_message.trusted_root;
+
             // get the trusted height and state root from the state query provider
-            let height = self.state_query_provider.get_height().await;
+            let trusted_height = self.state_query_provider.get_height().await;
+            if trusted_height != committed_height {
+                warn!(
+                    "Committed height {} does not match trusted height {}",
+                    committed_height, trusted_height
+                );
+                continue;
+            }
             let state_root = self
                 .state_query_provider
-                .get_state_root(height)
+                .get_state_root(trusted_height)
                 .await
                 .expect("Failed to get state root");
 
+            if state_root != committed_state_root {
+                warn!("Committed state root does not match trusted state root");
+                continue;
+            }
+
             let merkle_proof = evm_provider
                 .get_proof(
-                    self.app.merkle_tree_address,
+                    self.ctx.merkle_tree_address,
                     HYPERLANE_MERKLE_TREE_KEYS
                         .iter()
                         .map(|k| FixedBytes::from_hex(k).unwrap())
                         .collect(),
                 )
-                .block_id(height.into())
+                .block_id(trusted_height.into())
                 .await?;
+
             info!(
-                "state_root: {state_root}, height: {height}, trusted height: {}",
-                self.app.merkle_tree_state.read().unwrap().height + 1
+                "state_root: {state_root}, height: {trusted_height}, trusted height: {}",
+                self.ctx.merkle_tree_state.read().unwrap().height + 1
             );
 
-            if self.app.merkle_tree_state.read().unwrap().height >= height {
-                info!(
-                    "Waiting for more blocks to occur {}/{}...",
-                    height,
-                    self.app.merkle_tree_state.read().unwrap().height + DISTANCE_TO_HEAD
-                );
-                sleep(Duration::from_secs(TIMEOUT)).await;
-                continue;
-            }
-
-            // Check if the root has changed for our height, if so panic
-            let block = evm_provider
-                .get_block(height.into())
-                .await?
-                .context("Failed to get block")?;
-            // This is an optional check to ensure the state root is always finalized
-            let new_root = alloy::hex::encode(block.header.state_root);
-            if new_root != hex::encode(state_root) {
-                panic!(
-                    "The state root has changed at depth HEAD-{DISTANCE_TO_HEAD}, this should not happen! Expected: {state_root}, Got: {new_root}",
-                );
-            }
-
             if let Err(e) = self
-                .run_inner(&evm_provider, &mut indexer, height, merkle_proof.clone(), state_root)
+                .run_inner(
+                    &evm_provider,
+                    &mut indexer,
+                    trusted_height,
+                    merkle_proof.clone(),
+                    state_root,
+                )
                 .await
             {
                 error!(
@@ -210,7 +206,7 @@ impl HyperlaneMessageProver {
             .address(indexer.contract_address)
             .event(&Dispatch::id())
             .from_block(
-                self.app
+                self.ctx
                     .merkle_tree_state
                     .read()
                     .expect("Failed to read trusted state")
@@ -234,7 +230,7 @@ impl HyperlaneMessageProver {
         let mut snapshot = self
             .snapshot_store
             .get_snapshot(
-                self.app
+                self.ctx
                     .merkle_tree_state
                     .read()
                     .expect("Failed to read trusted state")
@@ -244,7 +240,7 @@ impl HyperlaneMessageProver {
         let messages = self
             .message_store
             .get_by_block(
-                self.app
+                self.ctx
                     .merkle_tree_state
                     .read()
                     .expect("Failed to read trusted state")
@@ -257,7 +253,7 @@ impl HyperlaneMessageProver {
         // Construct program inputs from values
         let input = HyperlaneMessageInputs::new(
             state_root.to_string(),
-            self.app.merkle_tree_address.to_string(),
+            self.ctx.merkle_tree_address.to_string(),
             messages.clone().into_iter().map(|m| m.message).collect(),
             HyperlaneBranchProofInputs::from(branch_proof),
             snapshot.clone(),
@@ -284,7 +280,7 @@ impl HyperlaneMessageProver {
         // store snapshot
         self.snapshot_store
             .insert_snapshot(
-                self.app
+                self.ctx
                     .merkle_tree_state
                     .read()
                     .expect("Failed to read trusted state")
@@ -295,13 +291,13 @@ impl HyperlaneMessageProver {
             .expect("Failed to insert snapshot into snapshot store");
 
         // update trusted state
-        self.app
+        self.ctx
             .merkle_tree_state
             .write()
             .expect("Failed to write trusted state")
             .height = height;
 
-        self.app
+        self.ctx
             .merkle_tree_state
             .write()
             .expect("Failed to write trusted state")
