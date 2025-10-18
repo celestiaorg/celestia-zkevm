@@ -75,7 +75,7 @@ pub async fn start_server(config: Config) -> Result<()> {
         let range_prover = BlockRangeExecProver::new(batch_size, block_rx, range_tx, storage.clone())?;
         async move {
             if let Err(e) = range_prover.run().await {
-                error!("Block prover task failed: {e:?}");
+                error!("Range prover task failed: {e:?}");
             }
         }
     });

@@ -233,6 +233,10 @@ impl HyperlaneMessageProver {
             messages.extend(self.message_store.get_by_block(block).expect("Failed to get messages"));
         }
 
+        if messages.is_empty() {
+            return Ok(());
+        }
+
         let branch_proof = HyperlaneBranchProof::new(proof);
 
         // Construct program inputs from values
@@ -261,6 +265,8 @@ impl HyperlaneMessageProver {
             .store_membership_proof(height, &proof.0, &proof.1)
             .await
             .expect("Failed to store proof");
+
+        info!("Membership proof generated successfully");
 
         // store snapshot
         self.snapshot_store
