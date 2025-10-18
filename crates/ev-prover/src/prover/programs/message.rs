@@ -25,7 +25,7 @@ use std::{
 use storage::hyperlane::StoredHyperlaneMessage;
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use storage::proofs::ProofStorage;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
@@ -203,10 +203,6 @@ impl HyperlaneMessageProver {
             .index(self.message_store.clone(), Arc::new(evm_provider.clone()))
             .await
             .expect("Failed to index messages");
-        debug!(
-            "Indexed messages, new height {}",
-            self.message_store.current_index().expect("Failed to get current index")
-        );
 
         // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
         // then save new snapshot
