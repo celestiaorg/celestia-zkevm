@@ -13,7 +13,6 @@ anyhow = "1.0"
 async-trait = "0.1.88"
 bincode = { workspace = true }
 bytes = { workspace = true }
-rustls = "0.23.31"
 celestia-grpc-client = { workspace = true }
 celestia-rpc = { workspace = true }
 celestia-types = { workspace = true }
@@ -34,6 +33,7 @@ rsp-client-executor = { workspace = true }
 rsp-host-executor = { workspace = true }
 rsp-primitives = { workspace = true }
 rsp-rpc-db = { workspace = true }
+rustls = "0.23.31"
 serde = { workspace = true, features = ["derive"] }
 serde_cbor = { workspace = true }
 serde_json = { workspace = true }
