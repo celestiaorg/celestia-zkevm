@@ -7,8 +7,8 @@ use crate::commands::cli::{QueryCommands, VERSION};
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, CONFIG_FILE, DEFAULT_GENESIS_JSON, GENESIS_FILE};
 use crate::proto::celestia::prover::v1::prover_client::ProverClient;
 use crate::proto::celestia::prover::v1::{
-    GetBlockProofRequest, GetBlockProofsInRangeRequest, GetLatestBlockProofRequest,
-    GetLatestMembershipProofRequest, GetMembershipProofRequest, GetRangeProofsRequest,
+    GetBlockProofRequest, GetBlockProofsInRangeRequest, GetLatestBlockProofRequest, GetLatestMembershipProofRequest,
+    GetMembershipProofRequest, GetRangeProofsRequest,
 };
 use crate::server::start_server;
 
@@ -121,10 +121,7 @@ pub async fn query(query_cmd: QueryCommands) -> Result<()> {
             let mut client = ProverClient::connect(server).await?;
             println!("✓ Connected\n");
 
-            println!(
-                "Querying block proofs in range [{}, {}]...",
-                start_height, end_height
-            );
+            println!("Querying block proofs in range [{}, {}]...", start_height, end_height);
             let response = client
                 .get_block_proofs_in_range(GetBlockProofsInRangeRequest {
                     start_height,
@@ -191,10 +188,7 @@ pub async fn query(query_cmd: QueryCommands) -> Result<()> {
             let mut client = ProverClient::connect(server).await?;
             println!("✓ Connected\n");
 
-            println!(
-                "Querying range proofs for range [{}, {}]...",
-                start_height, end_height
-            );
+            println!("Querying range proofs for range [{}, {}]...", start_height, end_height);
             let response = client
                 .get_range_proofs(GetRangeProofsRequest {
                     start_height,
