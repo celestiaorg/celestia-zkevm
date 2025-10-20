@@ -12,12 +12,17 @@ use ev_state_queries::{DefaultProvider, StateQueryProvider};
 use ev_zkevm_types::{
     events::{Dispatch, DispatchEvent},
     hyperlane::decode_hyperlane_message,
-    programs::hyperlane::types::{
-        HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof, HyperlaneBranchProofInputs, HyperlaneMessageInputs,
+    programs::hyperlane::{
+        tree::MerkleTree,
+        types::{HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof, HyperlaneBranchProofInputs, HyperlaneMessageInputs},
     },
 };
 use sp1_sdk::{EnvProver, SP1ProofWithPublicValues, SP1Stdin};
-use storage::hyperlane::{StoredHyperlaneMessage, message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
+use storage::hyperlane::{
+    StoredHyperlaneMessage,
+    message::HyperlaneMessageStore,
+    snapshot::{HyperlaneSnapshot, HyperlaneSnapshotStore},
+};
 use tempfile::TempDir;
 use tracing::{debug, error};
 
@@ -99,6 +104,7 @@ pub async fn prove_messages(
         .join("snapshots.db");
     let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path, None).unwrap());
     hyperlane_snapshot_store.reset_db().unwrap();
+    hyperlane_snapshot_store.insert_snapshot(0, HyperlaneSnapshot::new(0, MerkleTree::default()))?;
     let snapshot = hyperlane_snapshot_store.get_snapshot(0).unwrap();
 
     // Construct program inputs from values
