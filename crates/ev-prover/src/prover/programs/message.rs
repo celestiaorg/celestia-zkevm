@@ -17,11 +17,7 @@ use ev_zkevm_types::programs::hyperlane::types::{
 };
 use reqwest::Url;
 use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
-use std::{
-    env,
-    str::FromStr,
-    sync::{Arc, RwLock},
-};
+use std::{env, str::FromStr, sync::Arc};
 use storage::hyperlane::StoredHyperlaneMessage;
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use storage::proofs::ProofStorage;
@@ -42,7 +38,6 @@ pub struct Context {
     pub evm_ws: String,
     pub mailbox_address: Address,
     pub merkle_tree_address: Address,
-    pub merkle_tree_state: RwLock<MerkleTreeState>,
 }
 
 /// MerkleTreeState encapsulates the height of the merkle tree in terms of snapshots and blocks
@@ -153,11 +148,6 @@ impl HyperlaneMessageProver {
                 .block_id(committed_height.into())
                 .await?;
 
-            info!(
-                "state_root: {committed_state_root:?}, height: {committed_height}, trusted height: {}",
-                self.ctx.merkle_tree_state.read().unwrap().height + 1
-            );
-
             if let Err(e) = self
                 .run_inner(
                     &evm_provider,
@@ -185,17 +175,19 @@ impl HyperlaneMessageProver {
         proof: EIP1186AccountProofResponse,
         state_root: FixedBytes<32>,
     ) -> Result<()> {
+        // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
+        // then save new snapshot
+        let mut snapshot = self
+            .snapshot_store
+            .get_snapshot(self.snapshot_store.current_index()?)
+            .expect("Failed to get snapshot");
+
+        let start_height = snapshot.height + 1;
+
         indexer.filter = Filter::new()
             .address(indexer.contract_address)
             .event(&Dispatch::id())
-            .from_block(
-                self.ctx
-                    .merkle_tree_state
-                    .read()
-                    .expect("Failed to read trusted state")
-                    .height
-                    + 1,
-            )
+            .from_block(start_height)
             .to_block(height);
 
         // run the indexer to get all messages that occurred since the last trusted height
@@ -204,28 +196,8 @@ impl HyperlaneMessageProver {
             .await
             .expect("Failed to index messages");
 
-        // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
-        // then save new snapshot
-        let mut snapshot = self
-            .snapshot_store
-            .get_snapshot(
-                self.ctx
-                    .merkle_tree_state
-                    .read()
-                    .expect("Failed to read trusted state")
-                    .snapshot_index,
-            )
-            .expect("Failed to get snapshot");
-
         let mut messages: Vec<StoredHyperlaneMessage> = Vec::new();
-        for block in self
-            .ctx
-            .merkle_tree_state
-            .read()
-            .expect("Failed to read trusted state")
-            .height
-            + 1..=height
-        {
+        for block in start_height..=height {
             messages.extend(self.message_store.get_by_block(block).expect("Failed to get messages"));
         }
 
@@ -241,11 +213,12 @@ impl HyperlaneMessageProver {
             self.ctx.merkle_tree_address.to_string(),
             messages.clone().into_iter().map(|m| m.message).collect(),
             HyperlaneBranchProofInputs::from(branch_proof),
-            snapshot.clone(),
+            snapshot.tree.clone(),
         );
 
         for message in messages.clone() {
             snapshot
+                .tree
                 .insert(message.message.id())
                 .expect("Failed to insert message into snapshot");
         }
@@ -255,7 +228,7 @@ impl HyperlaneMessageProver {
             messages.iter().map(|m| m.message.id()).collect::<Vec<String>>()
         );
 
-        // Generate a proof
+        // Prove messages against trusted root
         let proof = self.prove(input).await.expect("Failed to prove");
         self.proof_store
             .store_membership_proof(height, &proof.0, &proof.1)
@@ -264,31 +237,12 @@ impl HyperlaneMessageProver {
 
         info!("Membership proof generated successfully");
 
-        // store snapshot
+        snapshot.height = height;
+
+        // store mutated snapshot at next index
         self.snapshot_store
-            .insert_snapshot(
-                self.ctx
-                    .merkle_tree_state
-                    .read()
-                    .expect("Failed to read trusted state")
-                    .snapshot_index
-                    + 1,
-                snapshot,
-            )
+            .insert_snapshot(self.snapshot_store.current_index()? + 1, snapshot)
             .expect("Failed to insert snapshot into snapshot store");
-
-        // update trusted state
-        self.ctx
-            .merkle_tree_state
-            .write()
-            .expect("Failed to write trusted state")
-            .height = height;
-
-        self.ctx
-            .merkle_tree_state
-            .write()
-            .expect("Failed to write trusted state")
-            .snapshot_index += 1;
 
         Ok(())
     }

@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
@@ -22,7 +22,7 @@ use tracing::{debug, error};
 use crate::config::config::{Config, APP_HOME};
 use crate::proto::celestia::prover::v1::prover_server::ProverServer;
 use crate::prover::programs::block::{AppContext, BlockExecProver};
-use crate::prover::programs::message::{Context as MessageContext, HyperlaneMessageProver, MerkleTreeState};
+use crate::prover::programs::message::{Context as MessageContext, HyperlaneMessageProver};
 use crate::prover::programs::range::BlockRangeExecProver;
 use crate::prover::service::ProverService;
 
@@ -91,7 +91,7 @@ pub async fn start_server(config: Config) -> Result<()> {
             .join(APP_HOME)
             .join("data")
             .join("messages.db");
-        let snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
+        let snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path, None).unwrap());
         let message_store = Arc::new(HyperlaneMessageStore::new(message_storage_path).unwrap());
 
         let evm_provider: DefaultProvider =
@@ -102,7 +102,6 @@ pub async fn start_server(config: Config) -> Result<()> {
             evm_ws: "ws://127.0.0.1:8546".to_string(),
             mailbox_address: Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap(),
             merkle_tree_address: Address::from_str("0xfcb1d485ef46344029d9e8a7925925e146b3430e").unwrap(),
-            merkle_tree_state: RwLock::new(MerkleTreeState::new(0, 0)),
         };
 
         let message_prover = HyperlaneMessageProver::new(
