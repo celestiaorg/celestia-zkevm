@@ -1,4 +1,4 @@
-//! A Risc0 program that verifies a sequence of N `ev-exec` proofs.
+//! Library for RISC0 guest program that verifies a sequence of N `ev-exec` proofs.
 //!
 //! It accepts:
 //! - N image IDs (32-byte digests identifying the guest program)
@@ -14,19 +14,22 @@
 //! - The new block height and state root
 //! - The latest Celestia header hash from the sequence
 
-#![no_main]
 #![no_std]
 
+extern crate alloc;
+
+use alloc::vec::Vec;
 use risc0_zkvm::guest::env;
 use ev_zkevm_types::programs::block::{BlockExecOutput, BlockRangeExecInput, BlockRangeExecOutput, Buffer};
 
-risc0_zkvm::guest::entry!(main);
+// Re-export types for convenience
+pub use ev_zkevm_types::programs::block;
 
-pub fn main() {
+/// Verify and aggregate a sequence of ev-exec proofs
+pub fn verify_and_aggregate(inputs: BlockRangeExecInput) -> BlockRangeExecOutput {
     // ------------------------------
-    // 1. Deserialize inputs
+    // 1. Validate inputs
     // ------------------------------
-    let inputs: BlockRangeExecInput = env::read();
 
     assert_eq!(
         inputs.vkeys.len(),
@@ -117,7 +120,7 @@ pub fn main() {
     let first = outputs.first().expect("No outputs provided");
     let last = outputs.last().expect("No outputs provided");
 
-    let output = BlockRangeExecOutput {
+    BlockRangeExecOutput {
         celestia_header_hash: last.celestia_header_hash,
         trusted_height: first.prev_height,
         trusted_state_root: first.prev_state_root,
@@ -129,9 +132,7 @@ pub fn main() {
             .try_into()
             .expect("namespace must be 29 bytes"),
         public_key: last.public_key,
-    };
-
-    env::commit(&output);
+    }
 }
 
 /// Convert SP1-style [u32; 8] vkey format to Risc0's 32-byte image_id

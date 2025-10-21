@@ -3,10 +3,6 @@ name = "ev-hyperlane-guest"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "ev-hyperlane-guest"
-path = "src/lib.rs"
-
 [dependencies]
 risc0-zkvm = { workspace = true, default-features = false, features = ["std"] }
 ev-zkevm-types = { workspace = true }
