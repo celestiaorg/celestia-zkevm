@@ -1,0 +1,13 @@
+{
+  "total_proofs": 50,
+  "total_gas": 9511553,
+  "total_instruction_count": 8176313,
+  "total_syscall_count": 621,
+  "cycle_tracker_results": {
+    "build and commit outputs": 457,
+    "decode public values from proofs": 448397,
+    "verify sequential headers": 47314,
+    "verify sp1 proofs": 7451026,
+    "deserialize inputs": 202147
+  }
+}

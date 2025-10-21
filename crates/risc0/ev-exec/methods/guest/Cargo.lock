@@ -2566,8 +2566,7 @@ dependencies = [
 [[package]]
 name = "kzg-rs"
 version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9201effeea3fcc93b587904ae2df9ce97e433184b9d6d299e9ebc9830a546636"
+source = "git+https://github.com/jonas089/kzg-rs.git?branch=v0.2.7-sanitized#d8809a7e7ad15fb85ba420c45f3d5baac468793d"
 dependencies = [
  "ff",
  "hex",

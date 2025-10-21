@@ -15,3 +15,4 @@ ev-exec = { path = "../../../../ev-exec" }
 [patch.crates-io]
 sp1_bls12_381 = { git = "https://github.com/jonas089/bls12_381.git", branch = "0.8.0", package = "sp1_bls12_381", default-features = false, features = [
 ] }
+kzg-rs = { git = "https://github.com/jonas089/kzg-rs.git", branch = "v0.2.7-sanitized" }

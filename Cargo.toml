@@ -112,4 +112,5 @@ url = { version = "2.5", default-features = false }
 # This succinct crate uses precompiles by default and is a dependency of rsp
 # Therefore I had to fork it and replace succinct's implementation of "msm_variable_base" with a naive one.
 kzg-rs = { git = "https://github.com/jonas089/kzg-rs.git", branch = "v0.2.7-sanitized" }
-sp1_bls12_381 = { git = "https://github.com/jonas089/bls12_381.git", branch = "0.8.0", package = "sp1_bls12_381" }
+sp1_bls12_381 = { git = "https://github.com/jonas089/bls12_381.git", branch = "0.8.0", package = "sp1_bls12_381", default-features = false, features = [
+] }
