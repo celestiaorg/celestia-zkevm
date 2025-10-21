@@ -189,6 +189,7 @@ mod tests {
 
         let stored_proof = StoredBlockProof {
             celestia_height: 100,
+            proof_system: storage::proofs::ProofSystem::SP1,
             proof_data: vec![1, 2, 3, 4],
             public_values: vec![5, 6, 7, 8],
             created_at: 1234567890,
@@ -223,6 +224,7 @@ mod tests {
         for height in [30, 31, 32, 33, 34, 35] {
             let stored_proof = StoredBlockProof {
                 celestia_height: height,
+                proof_system: storage::proofs::ProofSystem::SP1,
                 proof_data: vec![1, 2, 3, 4],
                 public_values: vec![5, 6, 7, 8],
                 created_at: 1234567890,
@@ -249,6 +251,7 @@ mod tests {
         for height in [30, 31, 32] {
             let stored_proof = StoredBlockProof {
                 celestia_height: height,
+                proof_system: storage::proofs::ProofSystem::SP1,
                 proof_data: vec![1, 2, 3, 4],
                 public_values: vec![height as u8],
                 created_at: 1234567890,
@@ -282,6 +285,7 @@ mod tests {
         let (service, mock) = create_test_service();
 
         let stored_proof = StoredMembershipProof {
+            proof_system: storage::proofs::ProofSystem::SP1,
             proof_data: vec![9, 10, 11, 12],
             public_values: vec![13, 14, 15, 16],
             created_at: 1234567890,
@@ -314,6 +318,7 @@ mod tests {
 
         for height in [100, 101, 102] {
             let stored_proof = StoredMembershipProof {
+                proof_system: storage::proofs::ProofSystem::SP1,
                 proof_data: vec![height as u8],
                 public_values: vec![13, 14, 15, 16],
                 created_at: 1234567890,
@@ -348,6 +353,7 @@ mod tests {
         let ranges = vec![(30, 35), (36, 40), (41, 45)];
         for (start, end) in ranges {
             let stored_proof = StoredRangeProof {
+                proof_system: storage::proofs::ProofSystem::SP1,
                 start_height: start,
                 end_height: end,
                 proof_data: vec![1, 2, 3, 4],

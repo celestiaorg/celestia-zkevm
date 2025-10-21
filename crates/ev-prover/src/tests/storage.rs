@@ -51,7 +51,9 @@ mod tests {
         let output = create_mock_block_output();
 
         // Store the proof
-        storage.store_block_proof(42, &proof, &output).await.unwrap();
+        let proof_data = bincode::serialize(&proof.proof).unwrap();
+        let public_values = proof.public_values.to_vec();
+        storage.store_block_proof(42, storage::proofs::ProofSystem::SP1, &proof_data, &public_values, &output).await.unwrap();
 
         // Retrieve the proof
         let retrieved_proof = storage.get_block_proof(42).await.unwrap();
@@ -66,7 +68,9 @@ mod tests {
         let output = create_mock_range_output();
 
         // Store the range proof
-        storage.store_range_proof(10, 20, &proof, &output).await.unwrap();
+        let proof_data = bincode::serialize(&proof.proof).unwrap();
+        let public_values = proof.public_values.to_vec();
+        storage.store_range_proof(10, 20, storage::proofs::ProofSystem::SP1, &proof_data, &public_values, &output).await.unwrap();
 
         // Retrieve range proofs
         let retrieved_proofs = storage.get_range_proofs(5, 25).await.unwrap();
@@ -84,8 +88,10 @@ mod tests {
         let output = create_mock_block_output();
 
         // Store multiple block proofs
+        let proof_data = bincode::serialize(&proof.proof).unwrap();
+        let public_values = proof.public_values.to_vec();
         for height in [10, 15, 20, 25, 30] {
-            storage.store_block_proof(height, &proof, &output).await.unwrap();
+            storage.store_block_proof(height, storage::proofs::ProofSystem::SP1, &proof_data, &public_values, &output).await.unwrap();
         }
 
         // Retrieve proofs in range
@@ -107,9 +113,11 @@ mod tests {
         assert!(latest.is_none());
 
         // Store some proofs
-        storage.store_block_proof(10, &proof, &output).await.unwrap();
-        storage.store_block_proof(20, &proof, &output).await.unwrap();
-        storage.store_block_proof(15, &proof, &output).await.unwrap();
+        let proof_data = bincode::serialize(&proof.proof).unwrap();
+        let public_values = proof.public_values.to_vec();
+        storage.store_block_proof(10, storage::proofs::ProofSystem::SP1, &proof_data, &public_values, &output).await.unwrap();
+        storage.store_block_proof(20, storage::proofs::ProofSystem::SP1, &proof_data, &public_values, &output).await.unwrap();
+        storage.store_block_proof(15, storage::proofs::ProofSystem::SP1, &proof_data, &public_values, &output).await.unwrap();
 
         // Should return the highest height proof
         let latest = storage.get_latest_block_proof().await.unwrap();

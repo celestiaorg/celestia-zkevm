@@ -1,7 +1,31 @@
 ## Overview
 
 The `ev-prover` service is a simple gRPC service designed to serve ZK proofs to clients.
-It encapsulates the SP1 programs maintained under `sp1`, and uses the `sp1_sdk::ProverClient` in order to interface with them.
+It supports multiple proof system backends:
+- **SP1** (default): Uses the SP1 programs maintained under `crates/sp1` via the `sp1_sdk::ProverClient`
+- **RISC0**: Uses the RISC0 programs maintained under `crates/risc0` via the `risc0_zkvm` library
+
+Both proof systems share the same core verification logic from the `ev-zkevm-types` crate, ensuring consistency.
+
+### Building with Features
+
+The proof systems are controlled by Cargo features:
+- `sp1` (default): Includes SP1 support
+- `risc0`: Includes RISC0 support
+
+Build with specific features:
+```bash
+# SP1 only (default)
+cargo build --release
+
+# RISC0 only
+cargo build --release --no-default-features --features risc0
+
+# Both SP1 and RISC0
+cargo build --release --features risc0
+```
+
+The active proof system can be selected via the `PROOF_SYSTEM` environment variable or in the configuration file.
 
 ### Running the ev-prover service
 
@@ -22,7 +46,14 @@ Run the following commands from the root of the repository.
 3. Start the `ev-prover` application binary using:
 
     ```shell
+    # Using SP1 (default)
     RUST_LOG="ev_prover=debug" ev-prover start
+
+    # Or explicitly with SP1
+    RUST_LOG="ev_prover=debug" PROOF_SYSTEM=sp1 ev-prover start
+
+    # Using RISC0
+    RUST_LOG="ev_prover=debug" PROOF_SYSTEM=risc0 ev-prover start
     ```
 
 4. Verify the service is up and running using `grpcurl`:

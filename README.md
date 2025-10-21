@@ -10,6 +10,46 @@ For more information refer to the [architecture](./docs/ARCHITECTURE.md). Note t
 
 ### Preamble
 
+#### Choosing a Proof System
+
+This project supports two zero-knowledge proof systems:
+- **SP1** (default): Succinct's SP1 zkVM
+- **RISC0**: RISC Zero's zkVM
+
+Both proof systems are optional and controlled by Cargo features. By default, only SP1 is enabled.
+
+**To use SP1 (default):**
+```bash
+# Build with default features (SP1 only)
+cargo build --release
+```
+
+**To use RISC0:**
+```bash
+# Build with RISC0 feature instead of SP1
+cargo build --release --no-default-features --features risc0
+```
+
+**To enable both:**
+```bash
+# Build with both proof systems available
+cargo build --release --features risc0
+```
+
+Once built with the desired features, select the active proof system at runtime using the `PROOF_SYSTEM` environment variable:
+
+```env
+# Use SP1 (if built with sp1 feature)
+PROOF_SYSTEM=sp1
+
+# Or use RISC0 (if built with risc0 feature)
+PROOF_SYSTEM=risc0
+```
+
+If not specified, the system defaults to SP1 when available, otherwise RISC0.
+
+#### SP1 Configuration
+
 SP1 supports generating proofs in mock mode or network mode. By default, mock mode is used which is faster for testing and development purposes. Network mode is used for production purposes to generate real proofs. To use network mode, modify your `.env` file:
 
 ```env
@@ -17,12 +57,50 @@ SP1_PROVER=network
 NETWORK_PRIVATE_KEY="PRIVATE_KEY" to the SP1 prover network private key from Celestia 1Password
 ```
 
+#### RISC0 Configuration
+
+RISC0 supports multiple proving modes similar to SP1:
+
+```env
+# Use local CPU proving (default for RISC0)
+RISC0_PROVER=local
+
+# Use Bonsai proving network (requires API key)
+RISC0_PROVER=bonsai
+BONSAI_API_KEY="your_api_key"
+BONSAI_API_URL="https://api.bonsai.xyz/"
+
+# Use GPU acceleration (if available)
+RISC0_PROVER=cuda
+```
+
+**Proof Modes:**
+- **Default/Core**: Fast proving, larger proof size (development/testing)
+- **Groth16**: Slower proving, smallest proof size, fastest verification (production)
+
+By default, RISC0 will use local CPU proving. For production deployments using Groth16 proofs with the Bonsai proving network, configure the environment variables above.
+
+#### SP1 vs RISC0: Quick Comparison
+
+| Feature | SP1 | RISC0 |
+|---------|-----|-------|
+| **Default Mode** | Mock (fastest, no proof) | Local CPU proving |
+| **Network Proving** | `SP1_PROVER=network` | `RISC0_PROVER=bonsai` |
+| **GPU Support** | `SP1_PROVER=cuda` | `RISC0_PROVER=cuda` |
+| **Proof Formats** | Core, Compressed, Groth16, PLONK | Default, Groth16 |
+| **Development Speed** | Fastest (mock mode) | Fast (local proving) |
+| **Maturity** | Production-ready | Experimental integration |
+
+For most use cases, **SP1 is recommended** as it's the default and has been more extensively tested in this project. RISC0 support is provided as an alternative backend for users who prefer that ecosystem.
+
 ### Prerequisites
 
 1. Install [Docker](https://docs.docker.com/get-docker/)
 2. Install [Foundry](https://book.getfoundry.sh/getting-started/installation)
 3. Install [Rust](https://rustup.rs/)
-4. Install [SP1](https://docs.succinct.xyz/docs/sp1/getting-started/install)
+4. Install a zkVM toolchain:
+   - For SP1: Install [SP1](https://docs.succinct.xyz/docs/sp1/getting-started/install)
+   - For RISC0: Install [RISC0](https://dev.risczero.com/api/zkvm/install) via `curl -L https://risczero.com/install | bash && rzup install`
 
 ### Steps
 

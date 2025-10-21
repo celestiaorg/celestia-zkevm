@@ -1,0 +1,9 @@
+[package]
+name = "ev-hyperlane-guest"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+risc0-zkvm = { workspace = true, default-features = false, features = ["std"] }
+ev-zkevm-types = { workspace = true }
+alloy-primitives = { workspace = true }

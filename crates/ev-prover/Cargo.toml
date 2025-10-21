@@ -3,6 +3,11 @@ name = "ev-prover"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = ["sp1"]
+sp1 = ["dep:sp1-sdk", "sp1-build"]
+risc0 = ["dep:risc0-zkvm", "dep:ev-exec-host", "dep:ev-hyperlane-host", "dep:ev-range-exec-host"]
+
 [dependencies]
 alloy = { workspace = true }
 alloy-genesis = { workspace = true }
@@ -21,12 +26,17 @@ dotenvy = { workspace = true }
 ev-state-queries = { workspace = true }
 ev-types = { workspace = true, features = ["grpc"] }
 ev-zkevm-types = { workspace = true }
+# RISC0 host crates (optional)
+ev-exec-host = { path = "../risc0/ev-exec/host", optional = true }
+ev-hyperlane-host = { path = "../risc0/ev-hyperlane/host", optional = true }
+ev-range-exec-host = { path = "../risc0/ev-range-exec/host", optional = true }
 hex = { workspace = true }
 jsonrpsee-core = { workspace = true }
 nmt-rs = { workspace = true }
 prost = { workspace = true }
 reqwest = { workspace = true }
 reth-chainspec = { workspace = true }
+risc0-zkvm = { workspace = true, optional = true }
 rocksdb = "0.24"
 rsp-client-executor = { workspace = true }
 rsp-host-executor = { workspace = true }
@@ -37,7 +47,7 @@ serde_cbor = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = "0.9"
 sha3 = { workspace = true }
-sp1-sdk = { workspace = true }
+sp1-sdk = { workspace = true, optional = true }
 storage = { workspace = true }
 tendermint = { workspace = true }
 tendermint-proto = { workspace = true }
@@ -50,7 +60,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 [build-dependencies]
-sp1-build = { workspace = true }
+sp1-build = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

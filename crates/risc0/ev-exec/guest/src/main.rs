@@ -1,4 +1,4 @@
-//! An SP1 program that verifies inclusion of EVM reth blocks in the Celestia data availability network
+//! A Risc0 guest program that verifies inclusion of EVM reth blocks in the Celestia data availability network
 //! and executes their state transition functions.
 //!
 //! ## Functionality
@@ -30,22 +30,22 @@
 //! - Trusted State Root
 //! - Namespace
 //! - Public Key
+
 #![no_main]
+#![no_std]
 
-sp1_zkvm::entrypoint!(main);
-
+use risc0_zkvm::guest::env;
 use ev_zkevm_types::programs::block::BlockExecInput;
 
+risc0_zkvm::guest::entry!(main);
+
 pub fn main() {
-    println!("cycle-tracker-report-start: read inputs");
-    let inputs: BlockExecInput = sp1_zkvm::io::read::<BlockExecInput>();
-    println!("cycle-tracker-report-end: read inputs");
+    // Read inputs from host
+    let inputs: BlockExecInput = env::read();
 
-    println!("cycle-tracker-report-start: verify and execute");
+    // Verify and execute using the factored logic
     let output = inputs.verify_and_execute().expect("Block execution verification failed");
-    println!("cycle-tracker-report-end: verify and execute");
 
-    println!("cycle-tracker-report-start: commit outputs");
-    sp1_zkvm::io::commit(&output);
-    println!("cycle-tracker-report-end: commit outputs");
+    // Commit outputs to journal
+    env::commit(&output);
 }
