@@ -3517,25 +3517,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ev-exec-guest"
-version = "0.1.0"
-dependencies = [
- "ev-zkevm-types",
- "risc0-zkvm",
-]
-
-[[package]]
-name = "ev-exec-host"
-version = "0.1.0"
-dependencies = [
- "ev-exec-guest",
- "ev-zkevm-types",
- "risc0-build",
- "risc0-zkvm",
- "serde",
-]
-
-[[package]]
 name = "ev-exec-program"
 version = "0.1.0"
 dependencies = [
@@ -3600,26 +3581,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ev-hyperlane-guest"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives",
- "ev-zkevm-types",
- "risc0-zkvm",
-]
-
-[[package]]
-name = "ev-hyperlane-host"
-version = "0.1.0"
-dependencies = [
- "ev-hyperlane-guest",
- "ev-zkevm-types",
- "risc0-build",
- "risc0-zkvm",
- "serde",
-]
-
-[[package]]
 name = "ev-hyperlane-program"
 version = "0.1.0"
 dependencies = [
@@ -3667,9 +3628,6 @@ dependencies = [
  "clap",
  "dirs 5.0.1",
  "dotenvy",
- "ev-exec-host",
- "ev-hyperlane-host",
- "ev-range-exec-host",
  "ev-state-queries",
  "ev-types",
  "ev-zkevm-types",
@@ -3703,27 +3661,6 @@ dependencies = [
  "tonic-reflection",
  "tracing",
  "tracing-subscriber 0.3.20",
-]
-
-[[package]]
-name = "ev-range-exec-guest"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "ev-zkevm-types",
- "risc0-zkvm",
- "serde",
-]
-
-[[package]]
-name = "ev-range-exec-host"
-version = "0.1.0"
-dependencies = [
- "ev-range-exec-guest",
- "ev-zkevm-types",
- "risc0-build",
- "risc0-zkvm",
- "serde",
 ]
 
 [[package]]

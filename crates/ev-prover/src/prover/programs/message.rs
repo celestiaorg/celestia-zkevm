@@ -35,11 +35,11 @@ const DISTANCE_TO_HEAD: u64 = 32; // in blocks
 #[cfg(feature = "sp1")]
 pub const EV_HYPERLANE_PROGRAM_ID: &[u8] = include_elf!("ev-hyperlane-program");
 
+// NOTE: RISC0 ImageID would be loaded from ev-hyperlane-host, but that crate
+// is excluded from workspace due to crypto patch conflicts.
+// For RISC0 support, the ImageID must be provided via ProverConfig.
 #[cfg(all(feature = "risc0", not(feature = "sp1")))]
-pub const EV_HYPERLANE_PROGRAM_ID: &[u8] = {
-    use ev_hyperlane_host::EV_HYPERLANE_ID;
-    &EV_HYPERLANE_ID
-};
+pub const EV_HYPERLANE_PROGRAM_ID: &[u8] = &[];  // Placeholder - use config.program_id instead
 
 // Compatibility alias
 pub const EV_HYPERLANE_ELF: &[u8] = EV_HYPERLANE_PROGRAM_ID;

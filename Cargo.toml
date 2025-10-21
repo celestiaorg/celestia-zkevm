@@ -10,13 +10,15 @@ members = [
     "crates/sp1/ev-hyperlane/script",
     "crates/sp1/ev-range-exec/program",
     "crates/sp1/ev-range-exec/script",
-    # Risc0 guest programs
-    "crates/risc0/ev-exec/guest",
-    "crates/risc0/ev-exec/host",
-    "crates/risc0/ev-hyperlane/guest",
-    "crates/risc0/ev-hyperlane/host",
-    "crates/risc0/ev-range-exec/guest",
-    "crates/risc0/ev-range-exec/host",
+    # NOTE: RISC0 guest/host programs are excluded from workspace due to conflicting
+    # crypto patches with SP1. They need to be built in a separate workspace.
+    # See crates/risc0/README.md for details.
+    # "crates/risc0/ev-exec/guest",
+    # "crates/risc0/ev-exec/host",
+    # "crates/risc0/ev-hyperlane/guest",
+    # "crates/risc0/ev-hyperlane/host",
+    # "crates/risc0/ev-range-exec/guest",
+    # "crates/risc0/ev-range-exec/host",
     "crates/storage",
 ]
 resolver = "2"

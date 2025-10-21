@@ -15,11 +15,11 @@ use crate::proof_system::{ProofMode, ProofSystemBackend, ProverFactory, UnifiedP
 #[cfg(feature = "sp1")]
 pub const EV_RANGE_EXEC_PROGRAM_ID: &[u8] = include_elf!("ev-range-exec-program");
 
+// NOTE: RISC0 ImageID would be loaded from ev-range-exec-host, but that crate
+// is excluded from workspace due to crypto patch conflicts.
+// For RISC0 support, the ImageID must be provided via ProverConfig.
 #[cfg(all(feature = "risc0", not(feature = "sp1")))]
-pub const EV_RANGE_EXEC_PROGRAM_ID: &[u8] = {
-    use ev_range_exec_host::EV_RANGE_EXEC_ID;
-    &EV_RANGE_EXEC_ID
-};
+pub const EV_RANGE_EXEC_PROGRAM_ID: &[u8] = &[];  // Placeholder - use config.program_id instead
 
 // Compatibility alias
 pub const EV_RANGE_EXEC_ELF: &[u8] = EV_RANGE_EXEC_PROGRAM_ID;

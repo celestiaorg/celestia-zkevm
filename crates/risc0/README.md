@@ -50,6 +50,14 @@ Will aggregate multiple compressed proofs into a single Groth16 proof.
 
 ## Building
 
+### ⚠️ Important: Workspace Limitation
+
+**RISC0 guest/host crates are currently excluded from the main workspace** due to conflicting cryptographic library patches between SP1 and RISC0. Both proof systems use patched versions of `k256`, `sha2`, and other crypto libraries, but the patches are incompatible.
+
+**Current Status**: The RISC0 backend implementation in `ev-prover` is complete and functional, but building RISC0 guest programs requires a separate workspace setup.
+
+**Workaround**: Create a separate Cargo workspace for RISC0 crates or build them individually with manual dependency management.
+
 ### Prerequisites
 ```bash
 # Install Risc0 toolchain
@@ -63,6 +71,9 @@ cargo risczero install
 
 ### Build Guest Programs
 ```bash
+# NOTE: These commands will currently fail when run from the main workspace
+# due to SP1 crypto patches. A separate workspace is needed.
+
 # Build all Risc0 guest programs
 cargo build --package ev-exec-guest
 cargo build --package ev-hyperlane-guest
@@ -70,6 +81,9 @@ cargo build --package ev-hyperlane-guest
 
 ### Build Host/Prover
 ```bash
+# NOTE: These commands will currently fail when run from the main workspace
+# due to SP1 crypto patches. A separate workspace is needed.
+
 # Build host code with embedded guest binaries
 cargo build --package ev-exec-host
 cargo build --package ev-hyperlane-host
@@ -164,6 +178,7 @@ Expected characteristics:
 - [x] Risc0Backend prover integration
 - [x] Multi-backend prover programs (block.rs, message.rs, range.rs)
 - [x] Feature-gated compilation support
+- [ ] **Resolve workspace crypto patch conflicts** (blocking)
 - [ ] End-to-end testing with RISC0 backend
 - [ ] Groth16 SNARK conversion implementation
 - [ ] Performance optimizations

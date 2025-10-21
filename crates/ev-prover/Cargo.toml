@@ -6,7 +6,9 @@ edition = "2021"
 [features]
 default = ["sp1"]
 sp1 = ["dep:sp1-sdk", "sp1-build"]
-risc0 = ["dep:risc0-zkvm", "dep:ev-exec-host", "dep:ev-hyperlane-host", "dep:ev-range-exec-host"]
+# NOTE: RISC0 support is currently limited due to workspace crypto patch conflicts
+# The RISC0 backend is implemented but guest/host crates must be built separately
+risc0 = ["dep:risc0-zkvm"]
 
 [dependencies]
 alloy = { workspace = true }
@@ -26,10 +28,11 @@ dotenvy = { workspace = true }
 ev-state-queries = { workspace = true }
 ev-types = { workspace = true, features = ["grpc"] }
 ev-zkevm-types = { workspace = true }
-# RISC0 host crates (optional)
-ev-exec-host = { path = "../risc0/ev-exec/host", optional = true }
-ev-hyperlane-host = { path = "../risc0/ev-hyperlane/host", optional = true }
-ev-range-exec-host = { path = "../risc0/ev-range-exec/host", optional = true }
+# NOTE: RISC0 host crates excluded from workspace due to crypto patch conflicts
+# The RISC0 backend is implemented but ImageIDs must be provided via config
+# ev-exec-host = { path = "../risc0/ev-exec/host", optional = true }
+# ev-hyperlane-host = { path = "../risc0/ev-hyperlane/host", optional = true }
+# ev-range-exec-host = { path = "../risc0/ev-range-exec/host", optional = true }
 hex = { workspace = true }
 jsonrpsee-core = { workspace = true }
 nmt-rs = { workspace = true }
