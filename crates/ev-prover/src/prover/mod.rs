@@ -2,21 +2,29 @@ use std::result::Result::Ok;
 
 use anyhow::Result;
 use async_trait::async_trait;
+
+#[cfg(feature = "sp1")]
 use sp1_sdk::{EnvProver, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
+
+use crate::proof_system::ProofMode;
 
 #[allow(clippy::module_inception)]
 pub mod programs;
 pub mod service;
 
-/// ProverConfig defines metadata about the program binary (ELF), proof mode and any static keys.
+/// ProverConfig defines metadata about the program binary and proof mode.
+/// The program_id is a generic identifier that works for both SP1 (ELF) and RISC0 (ImageID).
 pub struct ProverConfig {
-    pub elf: &'static [u8],
-    pub proof_mode: SP1ProofMode,
+    pub program_id: &'static [u8],
+    pub proof_mode: ProofMode,
 }
 
-/// ProgramProver is a trait implemented per SP1 program*.
+/// ProgramProver is a legacy trait implemented per SP1 program.
+/// NOTE: This trait is deprecated and only kept for backward compatibility.
+/// New code should use ProofSystemBackend directly.
 ///
 /// Associated types let each program pick its own Input and Output context.
+#[cfg(feature = "sp1")]
 #[async_trait]
 pub trait ProgramProver {
     /// Context needed to build the stdin for this program.
@@ -36,8 +44,17 @@ pub trait ProgramProver {
         let cfg = self.cfg();
         let stdin = self.build_stdin(input)?;
 
-        let (pk, _vk) = self.prover().setup(cfg.elf);
-        let proof: SP1ProofWithPublicValues = match cfg.proof_mode {
+        let (pk, _vk) = self.prover().setup(cfg.program_id);
+
+        // Convert ProofMode to SP1ProofMode
+        let sp1_mode = match cfg.proof_mode {
+            ProofMode::Core => SP1ProofMode::Core,
+            ProofMode::Compressed => SP1ProofMode::Compressed,
+            ProofMode::Groth16 => SP1ProofMode::Groth16,
+            ProofMode::Plonk => SP1ProofMode::Plonk,
+        };
+
+        let proof: SP1ProofWithPublicValues = match sp1_mode {
             SP1ProofMode::Core => self.prover().prove(&pk, &stdin).core().run()?,
             SP1ProofMode::Compressed => self.prover().prove(&pk, &stdin).compressed().run()?,
             SP1ProofMode::Groth16 => self.prover().prove(&pk, &stdin).groth16().run()?,

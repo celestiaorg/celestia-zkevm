@@ -2,7 +2,7 @@
 //! two given heights against a given EVM block height.
 
 #![allow(dead_code)]
-use crate::prover::{ProgramProver, ProverConfig};
+use crate::prover::ProverConfig;
 use alloy_primitives::{hex::FromHex, Address, FixedBytes};
 use alloy_provider::{Provider, ProviderBuilder, WsConnect};
 use alloy_rpc_types::{EIP1186AccountProofResponse, Filter};
@@ -13,7 +13,11 @@ use ev_zkevm_types::programs::hyperlane::types::{
 };
 use ev_zkevm_types::{events::Dispatch, programs::hyperlane::types::HYPERLANE_MERKLE_TREE_KEYS};
 use reqwest::Url;
-use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
+
+#[cfg(feature = "sp1")]
+use sp1_sdk::include_elf;
+
+use crate::proof_system::{ProofSystemBackend, ProofMode, ProverFactory};
 use std::{
     str::FromStr,
     sync::{Arc, RwLock},
@@ -26,8 +30,19 @@ use tracing::{debug, error, info};
 
 const TIMEOUT: u64 = 6; // in seconds
 const DISTANCE_TO_HEAD: u64 = 32; // in blocks
-/// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
-pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
+
+// Program IDs for different proof systems
+#[cfg(feature = "sp1")]
+pub const EV_HYPERLANE_PROGRAM_ID: &[u8] = include_elf!("ev-hyperlane-program");
+
+#[cfg(all(feature = "risc0", not(feature = "sp1")))]
+pub const EV_HYPERLANE_PROGRAM_ID: &[u8] = {
+    use ev_hyperlane_host::EV_HYPERLANE_ID;
+    &EV_HYPERLANE_ID
+};
+
+// Compatibility alias
+pub const EV_HYPERLANE_ELF: &[u8] = EV_HYPERLANE_PROGRAM_ID;
 
 /// AppContext encapsulates the full set of RPC endpoints and configuration
 /// needed to fetch input data for execution and data availability proofs.
@@ -62,37 +77,14 @@ impl MerkleTreeState {
 pub struct HyperlaneMessageProver {
     pub app: AppContext,
     pub config: ProverConfig,
-    pub prover: EnvProver,
+    pub prover: Arc<dyn ProofSystemBackend>,
     pub message_store: Arc<HyperlaneMessageStore>,
     pub snapshot_store: Arc<HyperlaneSnapshotStore>,
     pub proof_store: Arc<dyn ProofStorage>,
     pub state_query_provider: Arc<dyn StateQueryProvider>,
 }
 
-impl ProgramProver for HyperlaneMessageProver {
-    type Input = HyperlaneMessageInputs;
-    type Output = HyperlaneMessageOutputs;
-
-    fn cfg(&self) -> &ProverConfig {
-        &self.config
-    }
-
-    fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin> {
-        let mut stdin = SP1Stdin::new();
-        stdin.write(&input);
-        Ok(stdin)
-    }
-
-    fn post_process(&self, proof: SP1ProofWithPublicValues) -> Result<Self::Output> {
-        Ok(bincode::deserialize::<HyperlaneMessageOutputs>(
-            proof.public_values.as_slice(),
-        )?)
-    }
-
-    fn prover(&self) -> &EnvProver {
-        &self.prover
-    }
-}
+// ProgramProver trait removed - using ProofSystemBackend directly
 
 impl HyperlaneMessageProver {
     pub fn new(
@@ -103,7 +95,7 @@ impl HyperlaneMessageProver {
         state_query_provider: Arc<dyn StateQueryProvider>,
     ) -> Result<Arc<Self>> {
         let config = HyperlaneMessageProver::default_config();
-        let prover = ProverClient::from_env();
+        let prover = Arc::from(ProverFactory::from_env()?);
 
         Ok(Arc::new(Self {
             app,
@@ -116,12 +108,30 @@ impl HyperlaneMessageProver {
         }))
     }
 
-    /// Returns the default prover configuration for the block execution program.
+    /// Returns the default prover configuration for the Hyperlane message program.
     pub fn default_config() -> ProverConfig {
         ProverConfig {
-            elf: EV_HYPERLANE_ELF,
-            proof_mode: SP1ProofMode::Groth16,
+            program_id: EV_HYPERLANE_PROGRAM_ID,
+            proof_mode: ProofMode::Groth16,
         }
+    }
+
+    /// Generates a proof for the given Hyperlane message input using the configured proof system.
+    async fn prove(&self, input: HyperlaneMessageInputs) -> Result<(crate::proof_system::UnifiedProof, HyperlaneMessageOutputs)> {
+        // Serialize input to bytes
+        let input_bytes = bincode::serialize(&input)?;
+
+        // Use program ID from config
+        let program_id = self.config.program_id;
+        let proof_mode = self.config.proof_mode;
+
+        // Generate proof using the abstraction layer
+        let proof = self.prover.prove(program_id, &input_bytes, proof_mode).await?;
+
+        // Deserialize public values to output
+        let output: HyperlaneMessageOutputs = bincode::deserialize(&proof.public_values)?;
+
+        Ok((proof, output))
     }
 
     /// Run the message prover with indexer
@@ -263,9 +273,20 @@ impl HyperlaneMessageProver {
         );
 
         // Generate a proof
-        let proof = self.prove(input).await.expect("Failed to prove");
+        let (proof, output) = self.prove(input).await.expect("Failed to prove");
+
+        // UnifiedProof already contains proof_bytes and public_values
+        let proof_data = proof.proof_bytes.clone();
+        let public_values = proof.public_values.clone();
+
         self.proof_store
-            .store_membership_proof(height, &proof.0, &proof.1)
+            .store_membership_proof(
+                height,
+                storage::proofs::ProofSystem::SP1,
+                &proof_data,
+                &public_values,
+                &output
+            )
             .await
             .expect("Failed to store proof");
 
