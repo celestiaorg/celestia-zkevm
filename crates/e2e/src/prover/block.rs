@@ -329,8 +329,8 @@ pub async fn parallel_prover(
     let input = BlockRangeExecInput {
         vkeys,
         public_values: public_inputs,
-        trusted_celestia_height: trusted_celestia_height,
-        trusted_celestia_root: trusted_celestia_root,
+        trusted_celestia_height,
+        trusted_celestia_root,
     };
     stdin.write(&input);
 
@@ -435,8 +435,8 @@ pub async fn synchronous_prover(
     let input = BlockRangeExecInput {
         vkeys,
         public_values: public_inputs,
-        trusted_celestia_height: trusted_celestia_height,
-        trusted_celestia_root: trusted_celestia_root,
+        trusted_celestia_height,
+        trusted_celestia_root,
     };
     stdin.write(&input);
 
