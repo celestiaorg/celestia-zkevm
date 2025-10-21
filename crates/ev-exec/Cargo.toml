@@ -1,0 +1,24 @@
+[package]
+name = "ev-exec"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+alloy-consensus = { workspace = true }
+alloy-primitives = { workspace = true }
+alloy-rlp = { workspace = true }
+bincode = { workspace = true }
+bytes = { workspace = true }
+celestia-types = { workspace = true }
+ed25519-dalek = { workspace = true }
+ev-types = { workspace = true, default-features = false }
+ev-zkevm-types = { workspace = true }
+hex = { workspace = true }
+nmt-rs = "*"
+prost = { workspace = true }
+reth-primitives = { workspace = true }
+rsp-client-executor = { workspace = true }
+serde_cbor = { workspace = true }
+sha3 = { workspace = true }
+tendermint = { workspace = true }
+tendermint-proto = { workspace = true }

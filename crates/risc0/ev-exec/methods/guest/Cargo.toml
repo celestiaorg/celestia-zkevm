@@ -1,0 +1,13 @@
+[package]
+name = "ev_exec"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+risc0-zkvm = { version = "^3.0.3", default-features = false, features = [
+    'std',
+] }
+ev-zkevm-types = { path = "../../../../ev-zkevm-types" }
+ev-exec = { path = "../../../../ev-exec" }

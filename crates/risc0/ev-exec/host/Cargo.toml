@@ -1,0 +1,23 @@
+[package]
+name = "host"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+methods = { path = "../methods" }
+risc0-zkvm = { version = "^3.0.3" }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { workspace = true, features = ["derive"] }
+alloy-primitives = { workspace = true }
+anyhow = { workspace = true }
+celestia-types = { workspace = true }
+clap = { version = "4.0", features = ["cargo", "derive", "env"] }
+ev-zkevm-types = { workspace = true }
+hashbrown = "0.14.5"
+rsp-client-executor = { workspace = true }
+tendermint = { workspace = true }
+bincode = { workspace = true }
+dotenvy = { workspace = true }
+serde_json = { workspace = true }
+serde_cbor = { workspace = true }
+hex = { workspace = true }
