@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 methods = { path = "../methods" }
-risc0-zkvm = { version = "^3.0.3" }
+risc0-zkvm = { version = "^3.0.3", features = ["metal"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serde = { workspace = true, features = ["derive"] }
 alloy-primitives = { workspace = true }
