@@ -8290,7 +8290,7 @@ dependencies = [
 [[package]]
 name = "rsp-client-executor"
 version = "0.1.0"
-source = "git+https://github.com/jonas089/rsp.git?branch=reth-1.5.0-sanitized#2d6e87fb44e35e53b682f8e89eab4f253d771c95"
+source = "git+https://github.com/jonas089/rsp.git?branch=reth-1.5.0-sanitized#f8930fc408505ba7beb85f47e7fc8126f2b814aa"
 dependencies = [
  "alloy-consensus",
  "alloy-evm",
@@ -8328,7 +8328,7 @@ dependencies = [
 [[package]]
 name = "rsp-host-executor"
 version = "0.1.0"
-source = "git+https://github.com/jonas089/rsp.git?branch=reth-1.5.0-sanitized#2d6e87fb44e35e53b682f8e89eab4f253d771c95"
+source = "git+https://github.com/jonas089/rsp.git?branch=reth-1.5.0-sanitized#f8930fc408505ba7beb85f47e7fc8126f2b814aa"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -8368,7 +8368,7 @@ dependencies = [
 [[package]]
 name = "rsp-mpt"
 version = "0.1.0"
-source = "git+https://github.com/jonas089/rsp.git?branch=reth-1.5.0-sanitized#2d6e87fb44e35e53b682f8e89eab4f253d771c95"
+source = "git+https://github.com/jonas089/rsp.git?branch=reth-1.5.0-sanitized#f8930fc408505ba7beb85f47e7fc8126f2b814aa"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -8382,7 +8382,7 @@ dependencies = [
 [[package]]
 name = "rsp-primitives"
 version = "0.1.0"
-source = "git+https://github.com/jonas089/rsp.git?branch=reth-1.5.0-sanitized#2d6e87fb44e35e53b682f8e89eab4f253d771c95"
+source = "git+https://github.com/jonas089/rsp.git?branch=reth-1.5.0-sanitized#f8930fc408505ba7beb85f47e7fc8126f2b814aa"
 dependencies = [
  "alloy-eips",
  "alloy-genesis",
@@ -8403,7 +8403,7 @@ dependencies = [
 [[package]]
 name = "rsp-rpc-db"
 version = "0.1.0"
-source = "git+https://github.com/jonas089/rsp.git?branch=reth-1.5.0-sanitized#2d6e87fb44e35e53b682f8e89eab4f253d771c95"
+source = "git+https://github.com/jonas089/rsp.git?branch=reth-1.5.0-sanitized#f8930fc408505ba7beb85f47e7fc8126f2b814aa"
 dependencies = [
  "alloy-primitives",
  "alloy-provider",

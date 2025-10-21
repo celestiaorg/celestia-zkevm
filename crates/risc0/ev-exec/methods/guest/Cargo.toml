@@ -11,3 +11,7 @@ risc0-zkvm = { version = "^3.0.3", default-features = false, features = [
 ] }
 ev-zkevm-types = { path = "../../../../ev-zkevm-types" }
 ev-exec = { path = "../../../../ev-exec" }
+
+[patch.crates-io]
+sp1_bls12_381 = { git = "https://github.com/jonas089/bls12_381.git", branch = "0.8.0", package = "sp1_bls12_381", default-features = false, features = [
+] }
