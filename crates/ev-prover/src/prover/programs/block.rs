@@ -9,7 +9,6 @@ use alloy_genesis::Genesis as AlloyGenesis;
 use alloy_primitives::FixedBytes;
 use alloy_provider::ProviderBuilder;
 use anyhow::{anyhow, Context, Result};
-use async_trait::async_trait;
 use bytes::Bytes;
 use celestia_rpc::blob::BlobsAtHeight;
 use celestia_rpc::{client::Client, BlobClient, HeaderClient, ShareClient};
@@ -24,7 +23,11 @@ use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
-use sp1_sdk::{include_elf, EnvProver, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
+
+#[cfg(feature = "sp1")]
+use sp1_sdk::include_elf;
+
+use crate::proof_system::{ProofSystemBackend, ProofMode, ProverFactory};
 use tokio::{
     sync::{mpsc, RwLock, Semaphore},
     task::JoinSet,
@@ -32,11 +35,25 @@ use tokio::{
 use tracing::{debug, error, info};
 
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
-use crate::prover::{ProgramProver, ProverConfig};
+use crate::prover::ProverConfig;
 use storage::proofs::{ProofStorage, RocksDbProofStorage};
 
-/// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
-pub const EV_EXEC_ELF: &[u8] = include_elf!("ev-exec-program");
+// Program IDs for different proof systems
+// For SP1: Use the ELF binary
+#[cfg(feature = "sp1")]
+pub const EV_EXEC_PROGRAM_ID: &[u8] = include_elf!("ev-exec-program");
+
+// For RISC0: Use the ImageID from the generated constants file
+#[cfg(all(feature = "risc0", not(feature = "sp1")))]
+mod risc0_constants {
+    include!("../../../risc0/RISC0_CONSTANTS.rs");
+}
+
+#[cfg(all(feature = "risc0", not(feature = "sp1")))]
+pub const EV_EXEC_PROGRAM_ID: &[u8] = &risc0_constants::RISC0_EV_EXEC_ID_BYTES;
+
+// Compatibility alias for existing code
+pub const EV_EXEC_ELF: &[u8] = EV_EXEC_PROGRAM_ID;
 
 /// AppContext encapsulates the full set of RPC endpoints and configuration
 /// needed to fetch input data for execution and data availability proofs.
@@ -115,49 +132,13 @@ impl AppContext {
 pub struct BlockExecProver {
     pub app: AppContext,
     pub config: ProverConfig,
-    pub prover: EnvProver,
+    pub prover: Arc<dyn ProofSystemBackend>,
     pub storage: Arc<dyn ProofStorage>,
     pub queue_capacity: usize,
     pub concurrency: usize,
 }
 
-#[async_trait]
-impl ProgramProver for BlockExecProver {
-    type Input = BlockExecInput;
-    type Output = BlockExecOutput;
-
-    /// Returns the program configuration containing the ELF and proof mode.
-    fn cfg(&self) -> &ProverConfig {
-        &self.config
-    }
-
-    /// Constructs the `SP1Stdin` input required for proving.
-    ///
-    /// This function serializes and writes structured input data into the
-    /// stdin buffer in the expected format for the SP1 program.
-    ///
-    /// # Errors
-    /// Returns an error if serialization of any input component fails.
-    fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin> {
-        let mut stdin = SP1Stdin::new();
-        stdin.write(&input);
-        Ok(stdin)
-    }
-
-    /// Parses the `SP1PublicValues` from the proof and converts it into the
-    /// program's custom output type.
-    ///
-    /// # Errors
-    /// - Returns an error if deserialization fails.
-    fn post_process(&self, proof: SP1ProofWithPublicValues) -> Result<Self::Output> {
-        Ok(bincode::deserialize::<BlockExecOutput>(proof.public_values.as_slice())?)
-    }
-
-    /// Returns the SP1 Prover.
-    fn prover(&self) -> &EnvProver {
-        &self.prover
-    }
-}
+// ProgramProver trait removed - using ProofSystemBackend directly
 
 struct BlockEvent {
     height: u64,
@@ -189,7 +170,7 @@ impl BlockExecProver {
     /// and prover environment settings.
     pub fn new(app: AppContext, queue_capacity: usize, concurrency: usize) -> Result<Arc<Self>> {
         let config = BlockExecProver::default_config();
-        let prover = ProverClient::from_env();
+        let prover = Arc::from(ProverFactory::from_env()?);
 
         // Initialize RocksDB storage in the default data directory
         let storage_path = dirs::home_dir()
@@ -216,26 +197,47 @@ impl BlockExecProver {
         storage: Arc<dyn ProofStorage>,
         queue_capacity: usize,
         concurrency: usize,
-    ) -> Arc<Self> {
+    ) -> Result<Arc<Self>> {
         let config = BlockExecProver::default_config();
-        let prover = ProverClient::from_env();
+        let prover = Arc::from(ProverFactory::from_env()?);
 
-        Arc::new(Self {
+        Ok(Arc::new(Self {
             app,
             config,
             prover,
             storage,
             queue_capacity,
             concurrency,
-        })
+        }))
     }
 
     /// Returns the default prover configuration for the block execution program.
     pub fn default_config() -> ProverConfig {
         ProverConfig {
-            elf: EV_EXEC_ELF,
-            proof_mode: SP1ProofMode::Compressed,
+            program_id: EV_EXEC_PROGRAM_ID,
+            proof_mode: ProofMode::Compressed,
         }
+    }
+
+    /// Generates a proof for the given block execution input using the configured proof system.
+    async fn prove(&self, input: BlockExecInput) -> Result<(crate::proof_system::UnifiedProof, BlockExecOutput)> {
+        // Serialize input to bytes
+        let input_bytes = bincode::serialize(&input)
+            .context("Failed to serialize BlockExecInput")?;
+
+        // Use program ID from config (works for both SP1 ELF and Risc0 ImageID)
+        let program_id = self.config.program_id;
+        let proof_mode = self.config.proof_mode;
+
+        // Generate proof using the abstraction layer
+        let proof = self.prover.prove(program_id, &input_bytes, proof_mode).await
+            .context("Failed to generate proof")?;
+
+        // Deserialize public values to output
+        let output: BlockExecOutput = bincode::deserialize(&proof.public_values)
+            .context("Failed to deserialize BlockExecOutput from public values")?;
+
+        Ok((proof, output))
     }
 
     async fn connect_and_subscribe(&self) -> Result<(Arc<Client>, Subscription<BlobsAtHeight>)> {
@@ -476,9 +478,19 @@ impl BlockExecProver {
 
         let (proof, outputs) = self.prove(inputs).await?;
 
+        // UnifiedProof already contains proof_bytes and public_values
+        let proof_data = proof.proof_bytes.clone();
+        let public_values = proof.public_values.clone();
+
         if let Err(e) = self
             .storage
-            .store_block_proof(scheduled.job.height, &proof, &outputs)
+            .store_block_proof(
+                scheduled.job.height,
+                storage::proofs::ProofSystem::SP1,
+                &proof_data,
+                &public_values,
+                &outputs
+            )
             .await
         {
             error!(

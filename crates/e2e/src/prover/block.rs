@@ -260,12 +260,19 @@ pub async fn parallel_prover(
 
                 // store proof in proof storage
                 // later retrieved to generate range proof
+                let proof_data = bincode::serialize(&proof.proof)
+                    .expect("Failed to serialize proof");
+                let public_values = proof.public_values.to_vec();
+                let output: ev_zkevm_types::programs::block::BlockExecOutput = bincode::deserialize(proof.public_values.as_slice())
+                    .expect("Failed to deserialize public values");
+
                 proof_storage
                     .store_block_proof(
                         block_number,
-                        &proof,
-                        &bincode::deserialize(proof.public_values.as_slice())
-                            .expect("Failed to deserialize public values"),
+                        storage::proofs::ProofSystem::SP1,
+                        &proof_data,
+                        &public_values,
+                        &output,
                     )
                     .await
                     .expect("Failed to store proof");

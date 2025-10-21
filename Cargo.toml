@@ -10,6 +10,15 @@ members = [
     "crates/sp1/ev-hyperlane/script",
     "crates/sp1/ev-range-exec/program",
     "crates/sp1/ev-range-exec/script",
+    # NOTE: RISC0 guest/host programs are excluded from workspace due to conflicting
+    # crypto patches with SP1. They need to be built in a separate workspace.
+    # See crates/risc0/README.md for details.
+    # "crates/risc0/ev-exec/guest",
+    # "crates/risc0/ev-exec/host",
+    # "crates/risc0/ev-hyperlane/guest",
+    # "crates/risc0/ev-hyperlane/host",
+    # "crates/risc0/ev-range-exec/guest",
+    # "crates/risc0/ev-range-exec/host",
     "crates/storage",
 ]
 resolver = "2"
@@ -68,6 +77,8 @@ sp1-build = "=5.2.1"
 sp1-core-executor = { version = "=5.2.1", features = ["bigint-rug"] }
 sp1-sdk = { version = "=5.2.1", features = ["native-gnark"] }
 sp1-zkvm = "=5.2.1"
+risc0-build = "3.0.3"
+risc0-zkvm = "3.0.3"
 storage = { path = "crates/storage" }
 tempfile = "3.8"
 tendermint = "0.40.1"

@@ -1,0 +1,16 @@
+[package]
+name = "ev-hyperlane-host"
+version = "0.1.0"
+edition = "2021"
+
+[package.metadata.risc0]
+methods = ["../guest"]
+
+[dependencies]
+risc0-zkvm = { workspace = true }
+ev-zkevm-types = { workspace = true }
+serde = { workspace = true }
+ev-hyperlane-guest = { path = "../guest" }
+
+[build-dependencies]
+risc0-build = { workspace = true }

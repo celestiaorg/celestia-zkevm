@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::proof_system::ProofSystemType;
 
 pub const APP_HOME: &str = ".ev-prover";
 
@@ -22,6 +23,10 @@ pub struct Config {
     pub queue_capacity: usize,
     #[serde(default = "default_concurrency")]
     pub concurrency: usize,
+    /// Which proof system to use (SP1 or Risc0). Defaults to SP1 if not specified.
+    /// Can also be overridden by PROOF_SYSTEM environment variable.
+    #[serde(default = "default_proof_system")]
+    pub proof_system: ProofSystemType,
 }
 
 fn default_queue_capacity() -> usize {
@@ -30,6 +35,21 @@ fn default_queue_capacity() -> usize {
 
 fn default_concurrency() -> usize {
     16
+}
+
+fn default_proof_system() -> ProofSystemType {
+    // Check environment variable first, default to SP1
+    ProofSystemType::from_env()
+}
+
+impl Config {
+    /// Get the effective proof system, preferring environment variable over config
+    pub fn effective_proof_system(&self) -> ProofSystemType {
+        std::env::var("PROOF_SYSTEM")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(self.proof_system)
+    }
 }
 
 impl Default for Config {
@@ -42,6 +62,7 @@ impl Default for Config {
             pub_key: DEFAULT_PUB_KEY_HEX.to_string(),
             queue_capacity: default_queue_capacity(),
             concurrency: default_concurrency(),
+            proof_system: default_proof_system(),
         }
     }
 }

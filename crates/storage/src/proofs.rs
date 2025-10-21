@@ -6,7 +6,6 @@ use ev_zkevm_types::programs::{
 };
 use rocksdb::{ColumnFamily, ColumnFamilyDescriptor, DB, Options};
 use serde::{Deserialize, Serialize};
-use sp1_sdk::SP1ProofWithPublicValues;
 use std::path::Path;
 use std::sync::Arc;
 use thiserror::Error;
@@ -26,9 +25,17 @@ pub enum ProofStorageError {
     RangeProofNotFound(u64, u64),
 }
 
+/// Proof system identifier for stored proofs
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ProofSystem {
+    SP1,
+    Risc0,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredBlockProof {
     pub celestia_height: u64,
+    pub proof_system: ProofSystem,
     pub proof_data: Vec<u8>,
     pub public_values: Vec<u8>,
     pub created_at: u64,
@@ -38,6 +45,7 @@ pub struct StoredBlockProof {
 pub struct StoredRangeProof {
     pub start_height: u64,
     pub end_height: u64,
+    pub proof_system: ProofSystem,
     pub proof_data: Vec<u8>,
     pub public_values: Vec<u8>,
     pub created_at: u64,
@@ -45,6 +53,7 @@ pub struct StoredRangeProof {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredMembershipProof {
+    pub proof_system: ProofSystem,
     pub proof_data: Vec<u8>,
     pub public_values: Vec<u8>,
     pub created_at: u64,
@@ -55,7 +64,9 @@ pub trait ProofStorage: Send + Sync {
     async fn store_block_proof(
         &self,
         celestia_height: u64,
-        proof: &SP1ProofWithPublicValues,
+        proof_system: ProofSystem,
+        proof_data: &[u8],
+        public_values: &[u8],
         output: &BlockExecOutput,
     ) -> Result<(), ProofStorageError>;
 
@@ -64,7 +75,9 @@ pub trait ProofStorage: Send + Sync {
         &self,
         start_height: u64,
         end_height: u64,
-        proof: &SP1ProofWithPublicValues,
+        proof_system: ProofSystem,
+        proof_data: &[u8],
+        public_values: &[u8],
         output: &BlockRangeExecOutput,
     ) -> Result<(), ProofStorageError>;
 
@@ -89,7 +102,9 @@ pub trait ProofStorage: Send + Sync {
     async fn store_membership_proof(
         &self,
         height: u64,
-        proof: &SP1ProofWithPublicValues,
+        proof_system: ProofSystem,
+        proof_data: &[u8],
+        public_values: &[u8],
         output: &HyperlaneMessageOutputs,
     ) -> Result<(), ProofStorageError>;
 
@@ -160,15 +175,18 @@ impl ProofStorage for RocksDbProofStorage {
     async fn store_block_proof(
         &self,
         celestia_height: u64,
-        proof: &SP1ProofWithPublicValues,
+        proof_system: ProofSystem,
+        proof_data: &[u8],
+        public_values: &[u8],
         _output: &BlockExecOutput,
     ) -> Result<(), ProofStorageError> {
         let cf = self.get_cf(CF_BLOCK_PROOFS)?;
 
         let stored_proof = StoredBlockProof {
             celestia_height,
-            proof_data: bincode::serialize(&proof.proof)?,
-            public_values: proof.public_values.to_vec(),
+            proof_system,
+            proof_data: proof_data.to_vec(),
+            public_values: public_values.to_vec(),
             created_at: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -186,7 +204,9 @@ impl ProofStorage for RocksDbProofStorage {
         &self,
         start_height: u64,
         end_height: u64,
-        proof: &SP1ProofWithPublicValues,
+        proof_system: ProofSystem,
+        proof_data: &[u8],
+        public_values: &[u8],
         _output: &BlockRangeExecOutput,
     ) -> Result<(), ProofStorageError> {
         let cf = self.get_cf(CF_RANGE_PROOFS)?;
@@ -194,8 +214,9 @@ impl ProofStorage for RocksDbProofStorage {
         let stored_proof = StoredRangeProof {
             start_height,
             end_height,
-            proof_data: bincode::serialize(&proof.proof)?,
-            public_values: proof.public_values.to_vec(),
+            proof_system,
+            proof_data: proof_data.to_vec(),
+            public_values: public_values.to_vec(),
             created_at: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -212,14 +233,17 @@ impl ProofStorage for RocksDbProofStorage {
     async fn store_membership_proof(
         &self,
         height: u64,
-        proof: &SP1ProofWithPublicValues,
+        proof_system: ProofSystem,
+        proof_data: &[u8],
+        public_values: &[u8],
         _output: &HyperlaneMessageOutputs,
     ) -> Result<(), ProofStorageError> {
         let cf = self.get_cf(CF_MEMBERSHIP_PROOFS)?;
 
         let stored_proof = StoredMembershipProof {
-            proof_data: bincode::serialize(&proof.proof)?,
-            public_values: proof.public_values.to_vec(),
+            proof_system,
+            proof_data: proof_data.to_vec(),
+            public_values: public_values.to_vec(),
             created_at: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -388,13 +412,16 @@ pub mod testing {
         async fn store_block_proof(
             &self,
             celestia_height: u64,
-            _proof: &SP1ProofWithPublicValues,
+            proof_system: ProofSystem,
+            proof_data: &[u8],
+            public_values: &[u8],
             _output: &BlockExecOutput,
         ) -> Result<(), ProofStorageError> {
             let stored_proof = StoredBlockProof {
                 celestia_height,
-                proof_data: vec![1, 2, 3, 4],
-                public_values: vec![5, 6, 7, 8],
+                proof_system,
+                proof_data: proof_data.to_vec(),
+                public_values: public_values.to_vec(),
                 created_at: 1234567890,
             };
 
@@ -406,14 +433,17 @@ pub mod testing {
             &self,
             start_height: u64,
             end_height: u64,
-            _proof: &SP1ProofWithPublicValues,
+            proof_system: ProofSystem,
+            proof_data: &[u8],
+            public_values: &[u8],
             _output: &BlockRangeExecOutput,
         ) -> Result<(), ProofStorageError> {
             let stored_proof = StoredRangeProof {
                 start_height,
                 end_height,
-                proof_data: vec![1, 2, 3, 4],
-                public_values: vec![5, 6, 7, 8],
+                proof_system,
+                proof_data: proof_data.to_vec(),
+                public_values: public_values.to_vec(),
                 created_at: 1234567890,
             };
 
@@ -466,12 +496,15 @@ pub mod testing {
         async fn store_membership_proof(
             &self,
             height: u64,
-            _proof: &SP1ProofWithPublicValues,
+            proof_system: ProofSystem,
+            proof_data: &[u8],
+            public_values: &[u8],
             _output: &HyperlaneMessageOutputs,
         ) -> Result<(), ProofStorageError> {
             let stored_proof = StoredMembershipProof {
-                proof_data: vec![9, 10, 11, 12],
-                public_values: vec![13, 14, 15, 16],
+                proof_system,
+                proof_data: proof_data.to_vec(),
+                public_values: public_values.to_vec(),
                 created_at: 1234567890,
             };
 
