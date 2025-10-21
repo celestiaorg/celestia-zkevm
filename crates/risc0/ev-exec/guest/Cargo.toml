@@ -3,10 +3,20 @@ name = "ev-exec-guest"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "ev-exec-guest"
-path = "src/lib.rs"
-
 [dependencies]
 risc0-zkvm = { workspace = true, default-features = false, features = ["std"] }
-ev-zkevm-types = { workspace = true }
+zeth-core = { workspace = true }
+zeth-chainspec = { workspace = true }
+celestia-types = { workspace = true }
+tendermint = { workspace = true }
+nmt-rs = { workspace = true }
+ed25519-dalek = { workspace = true }
+serde = { workspace = true }
+serde_cbor = { workspace = true }
+bincode = { workspace = true }
+prost = { workspace = true }
+bytes = { workspace = true }
+hex = { workspace = true }
+alloy-consensus = { workspace = true }
+alloy-primitives = { workspace = true }
+alloy-rlp = { workspace = true }

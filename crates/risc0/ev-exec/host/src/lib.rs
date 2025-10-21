@@ -1,17 +1,15 @@
-// Risc0 host/prover for EV execution circuit
+//! RISC0 host/prover for EV execution circuit
 
 // Include the generated methods from the guest program
-// This generates constants like: EV_EXEC_GUEST_ID, EV_EXEC_GUEST_PATH, etc.
-risc0_zkvm::guest::host::include_methods!();
+// This generates constants like: EV_EXEC_ELF, EV_EXEC_ID, etc.
+include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 
-// Re-export the guest module for compatibility
-pub use ev_exec_guest::*;
+// Re-export the guest types for convenience
+pub use ev_exec_guest::{Risc0BlockExecInput, BlockExecOutput};
 
-// Export the ImageID for use in the prover
-// The risc0 macro generates EV_EXEC_GUEST_ID as [u32; 8]
-// We need to convert it to &[u8] for compatibility with the prover interface
-pub const EV_EXEC_ID: [u8; 32] = {
-    const ID_U32: [u32; 8] = EV_EXEC_GUEST_ID;
+// Export the ImageID as a byte array for compatibility with the prover interface
+pub const EV_EXEC_IMAGE_ID: [u8; 32] = {
+    const ID_U32: [u32; 8] = EV_EXEC_ID;
     let mut bytes = [0u8; 32];
     let mut i = 0;
     while i < 8 {

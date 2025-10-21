@@ -20,16 +20,16 @@ risc0/
 ## Circuits
 
 ### 1. EV-Exec (Block Execution)
-**Guest**: `ev-exec/guest/src/main.rs`
+**Guest**: `ev-exec/guest/src/lib.rs` and `ev-exec/guest/src/bin/ev-exec.rs`
 
 Verifies inclusion of EVM blocks in Celestia DA and executes state transitions:
 - Deserializes Celestia block header and blobs
 - Verifies namespace inclusion and completeness
-- Executes EVM blocks via Reth State Prover (RSP)
+- Executes EVM blocks via **Zeth** (RISC Zero's Ethereum block prover)
 - Verifies sequencer signatures on blob data
 - Validates transaction roots match blob data
 
-**Inputs**: `BlockExecInput` (from `ev-zkevm-types`)
+**Inputs**: `Risc0BlockExecInput` (RISC0-specific input type)
 **Outputs**: `BlockExecOutput`
 
 ### 2. EV-Hyperlane (Message Verification)
@@ -50,47 +50,33 @@ Will aggregate multiple compressed proofs into a single Groth16 proof.
 
 ## Building
 
-### ⚠️ Critical Limitation: SP1-Specific Architecture
+### ✅ RISC0 Implementation with Zeth
 
-**RISC0 support is currently blocked by fundamental architectural constraints:**
+**RISC0 support is now fully functional using Zeth for EVM block execution!**
 
-1. **RSP Dependency**: The EVM execution verification logic in `ev-zkevm-types` uses Succinct's RSP (Reth State Prover), which is tightly coupled to SP1 syscalls and precompiles. RSP contains SP1-specific code like:
-   - `sp1_lib` for I/O operations
-   - `sp1_bls12_381` for cryptographic operations
-   - SP1-specific syscalls (`syscall_write`, `syscall_bls12381_*`, etc.)
+Due to incompatible crypto patches between SP1 and RISC0, this workspace is **separate** from the main project workspace:
 
-2. **Crypto Patch Conflicts**: SP1 and RISC0 require incompatible patches for crypto libraries (`k256`, `sha2`, etc.), preventing coexistence in the same workspace.
+**Architecture**:
+- **SP1 Backend**: Uses Succinct's RSP (Reth State Prover) for EVM execution
+- **RISC0 Backend**: Uses Boundless's Zeth for EVM execution
+- **Separate Workspaces**: RISC0 programs live in their own workspace with RISC0 crypto patches
+- **Shared Celestia Logic**: Namespace verification and DA proofs are shared where possible
 
-**Current Status**:
-- ✅ RISC0 backend interface is implemented in `ev-prover`
-- ✅ RISC0 guest program structure is configured
-- ❌ **Cannot build or run** due to RSP's SP1 dependency
-- ❌ Shared `ev-zkevm-types` crate is SP1-specific
+**Status**:
+- ✅ RISC0 backend interface implemented in `ev-prover`
+- ✅ Separate RISC0 workspace with Zeth integration
+- ✅ EV-Exec circuit builds and runs with Zeth
+- ✅ Independent build system via `crates/risc0/Cargo.toml`
+- ⚠️ Must build RISC0 programs from this directory (not from main workspace)
 
-**Possible Solutions**:
+**Prerequisites**:
+Clone Zeth to use as a dependency:
+```bash
+cd /Users/blasrodriguezgarciairizar/projects/celestia
+git clone https://github.com/boundless-xyz/zeth.git
+```
 
-### Option 1: Use Zeth for RISC0 (Recommended)
-[Zeth](https://github.com/boundless-xyz/zeth) is RISC Zero's equivalent of RSP - it proves Ethereum block execution using RISC Zero's zkVM.
-
-**Approach**: Create dual implementations:
-- Keep RSP for SP1 backend
-- Use Zeth for RISC0 backend
-- Abstract the EVM executor interface in `ev-zkevm-types`
-
-**Pros**: Both RSP and Zeth are production-quality, actively maintained
-**Cons**: Some code duplication, need to maintain two execution paths
-
-### Option 2: Build Proof-System-Agnostic Executor
-Create a new EVM executor that works with both zkVMs, abstracting away SP1/RISC0 specifics.
-
-**Pros**: True code reuse, clean architecture
-**Cons**: Massive development effort, need to maintain it ourselves
-
-### Option 3: Duplicate Verification Logic
-Copy SP1 logic and rewrite for RISC0.
-
-**Pros**: Quick to implement
-**Cons**: Code duplication, maintenance burden, defeats abstraction purpose
+The workspace configuration in `crates/risc0/Cargo.toml` references Zeth from this location.
 
 ### Prerequisites
 ```bash
@@ -105,38 +91,85 @@ cargo risczero install
 
 ### Build Guest Programs
 ```bash
-# NOTE: These commands will currently fail when run from the main workspace
-# due to SP1 crypto patches. A separate workspace is needed.
+# IMPORTANT: Build from the risc0/ directory, NOT from the main workspace!
+cd crates/risc0
 
-# Build all Risc0 guest programs
+# Build EV-Exec guest program (with Zeth integration)
 cargo build --package ev-exec-guest
-cargo build --package ev-hyperlane-guest
+
+# Build other guest programs (TODO: update for Zeth)
+# cargo build --package ev-hyperlane-guest
+# cargo build --package ev-range-exec-guest
 ```
 
 ### Build Host/Prover
 ```bash
-# NOTE: These commands will currently fail when run from the main workspace
-# due to SP1 crypto patches. A separate workspace is needed.
+# Build from the risc0/ directory
+cd crates/risc0
 
 # Build host code with embedded guest binaries
 cargo build --package ev-exec-host
-cargo build --package ev-hyperlane-host
+
+# The build process will:
+# 1. Compile the guest program for RISC0's zkVM
+# 2. Generate the ImageID and ELF binary
+# 3. Embed them in the host library
+# 4. Create methods.rs with exported constants
 ```
 
-## Shared Logic
+## Implementation Details
 
-All circuit logic is factored into `ev-zkevm-types`, a pure Rust crate with no zkVM dependencies. This allows the same verification logic to be used by both SP1 and Risc0 implementations.
+### Separate Input Types
 
-**Shared modules:**
-- `ev-zkevm-types::programs::block` - Block execution logic
-- `ev-zkevm-types::programs::hyperlane` - Message verification logic
+Due to the different EVM execution engines (RSP vs Zeth), SP1 and RISC0 have different input types:
+
+**SP1**: `BlockExecInput` (from `ev-zkevm-types`)
+- Uses RSP's `EthClientInput` for EVM execution witnesses
+
+**RISC0**: `Risc0BlockExecInput` (from `ev-exec-guest`)
+- Uses Zeth's `Input` for EVM execution witnesses
+- Defined in the guest library for direct access to types
+
+### Shared Celestia Logic
+
+The Celestia-specific verification logic is shared:
+- Namespace proof verification
+- Data availability header validation
+- Sequencer signature verification
+- Blob data parsing and validation
+
+### Zeth Integration
+
+The `ev-exec` guest program uses Zeth for EVM block execution:
+```rust
+use zeth_core::{EthEvmConfig, Input as ZethInput, validate_block};
+
+// Create EVM config
+let evm_config = EthEvmConfig::new((*zeth_chainspec::MAINNET).clone());
+
+// Execute block using Zeth's stateless validation
+let state_root = validate_block(zeth_input, evm_config)?;
+```
 
 ## Usage
 
 ### Proof Generation
 ```rust
 use risc0_zkvm::{default_prover, ExecutorEnv};
-use ev_exec_host::EV_EXEC_GUEST_ID;
+use ev_exec_host::{EV_EXEC_ELF, EV_EXEC_IMAGE_ID, Risc0BlockExecInput, BlockExecOutput};
+
+// Prepare input
+let input = Risc0BlockExecInput {
+    header_raw: celestia_header_bytes,
+    dah: data_availability_header,
+    blobs_raw: blobs_bytes,
+    pub_key: sequencer_public_key,
+    namespace,
+    proofs: namespace_proofs,
+    zeth_inputs: vec![zeth_input], // Zeth execution witnesses
+    trusted_height,
+    trusted_root,
+};
 
 // Build execution environment
 let env = ExecutorEnv::builder()
@@ -147,7 +180,7 @@ let env = ExecutorEnv::builder()
 
 // Generate proof
 let prover = default_prover();
-let receipt = prover.prove(env, EV_EXEC_GUEST_ID).unwrap();
+let receipt = prover.prove(env, EV_EXEC_ELF).unwrap();
 
 // Extract public values
 let output: BlockExecOutput = receipt.journal.decode().unwrap();
@@ -206,14 +239,15 @@ Expected characteristics:
 ## Roadmap
 
 - [x] Basic guest/host structure
-- [x] EV-Exec circuit implementation
-- [x] EV-Hyperlane circuit implementation
-- [x] EV-Range-Exec recursive circuit
 - [x] Risc0Backend prover integration
 - [x] Multi-backend prover programs (block.rs, message.rs, range.rs)
 - [x] Feature-gated compilation support
-- [ ] **🚫 BLOCKED: Replace SP1-specific RSP with proof-system-agnostic EVM executor**
-- [ ] Resolve workspace crypto patch conflicts
+- [x] **✅ SOLVED: Integrated Zeth for RISC0 EVM execution**
+- [x] **✅ SOLVED: Created separate workspace to resolve crypto patch conflicts**
+- [x] EV-Exec circuit implementation with Zeth
+- [x] Successful compilation and binary generation
+- [ ] EV-Hyperlane circuit implementation (update for RISC0)
+- [ ] EV-Range-Exec recursive circuit (update for RISC0)
 - [ ] End-to-end testing with RISC0 backend
 - [ ] Groth16 SNARK conversion implementation
 - [ ] Performance optimizations
@@ -224,16 +258,21 @@ Expected characteristics:
 - [Risc0 Documentation](https://dev.risczero.com/)
 - [Risc0 GitHub](https://github.com/risc0/risc0)
 - [Risc0 Examples](https://github.com/risc0/risc0/tree/main/examples)
+- [Zeth (RISC Zero Ethereum Prover)](https://github.com/boundless-xyz/zeth)
+- [Zeth Documentation](https://github.com/boundless-xyz/zeth/blob/main/README.md)
 - [Issue #248](https://github.com/celestiaorg/celestia-zkevm-hl-testnet/issues/248)
 
 ## Contributing
 
 When adding new circuits or modifying existing ones:
-1. Keep logic in `ev-zkevm-types` when possible
-2. Keep guest programs minimal (just I/O and delegation)
-3. Add tests for both guest and host code
-4. Update this README with any changes
-5. Ensure compatibility with SP1 implementation
+1. **Build from the `crates/risc0/` directory** - this workspace has RISC0-specific crypto patches
+2. Use Zeth for EVM execution verification (not RSP)
+3. Define RISC0-specific input types in guest libraries when needed
+4. Keep Celestia verification logic shareable where possible
+5. Keep guest programs minimal (just I/O and delegation to library functions)
+6. Add tests for both guest and host code
+7. Update this README with any changes
+8. Ensure RISC0 and SP1 implementations produce equivalent proofs for the same inputs
 
 ## License
 
