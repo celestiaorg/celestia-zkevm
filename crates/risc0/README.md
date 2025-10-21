@@ -67,10 +67,30 @@ Will aggregate multiple compressed proofs into a single Groth16 proof.
 - ❌ **Cannot build or run** due to RSP's SP1 dependency
 - ❌ Shared `ev-zkevm-types` crate is SP1-specific
 
-**Required Changes for RISC0 Support**:
-- Replace RSP with a proof-system-agnostic EVM executor, OR
-- Create separate RISC0-specific verification logic (duplicating EVM execution code), OR
-- Wait for RSP to add RISC0 support (unlikely - it's a Succinct/SP1 project)
+**Possible Solutions**:
+
+### Option 1: Use Zeth for RISC0 (Recommended)
+[Zeth](https://github.com/boundless-xyz/zeth) is RISC Zero's equivalent of RSP - it proves Ethereum block execution using RISC Zero's zkVM.
+
+**Approach**: Create dual implementations:
+- Keep RSP for SP1 backend
+- Use Zeth for RISC0 backend
+- Abstract the EVM executor interface in `ev-zkevm-types`
+
+**Pros**: Both RSP and Zeth are production-quality, actively maintained
+**Cons**: Some code duplication, need to maintain two execution paths
+
+### Option 2: Build Proof-System-Agnostic Executor
+Create a new EVM executor that works with both zkVMs, abstracting away SP1/RISC0 specifics.
+
+**Pros**: True code reuse, clean architecture
+**Cons**: Massive development effort, need to maintain it ourselves
+
+### Option 3: Duplicate Verification Logic
+Copy SP1 logic and rewrite for RISC0.
+
+**Pros**: Quick to implement
+**Cons**: Code duplication, maintenance burden, defeats abstraction purpose
 
 ### Prerequisites
 ```bash
