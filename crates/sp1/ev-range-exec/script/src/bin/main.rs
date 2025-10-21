@@ -102,6 +102,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             .run()
             .expect("failed to generate proof");
 
+        fs::write("proof.bin", proof.bytes())?;
+        fs::write("public_values.bin", proof.public_values.as_slice())?;
+        let public_values: BlockRangeExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
+        let prev_header_hash = hex::encode(public_values.prev_celestia_header_hash);
+        let prev_height = public_values.prev_celestia_height;
+        println!("Prev header hash: {prev_header_hash}, Prev height: {prev_height}");
+        println!("Public values: {public_values:?}");
+
         println!("Successfully generated proof!");
 
         // Save the proof and reload.

@@ -71,23 +71,6 @@ pub fn main() {
     // ------------------------------
     println!("cycle-tracker-report-start: verify sequential headers");
 
-    let anchor_block = outputs.first().expect("No outputs provided");
-    assert_eq!(
-        anchor_block.prev_celestia_height, inputs.trusted_celestia_height,
-        "verify sequential Celestia heights failed at index {}: expected {:?}, got {:?}",
-        0, anchor_block.prev_celestia_height, inputs.trusted_celestia_height
-    );
-
-    // TODO: This is currently bugged because the hyp cmd client deploys the ISM
-    // with the wrong initial Celestia header hash. We have to update it to
-    // use the correct header hash, potentially by querying the entire header and
-    // hashing it in Go.
-    /*assert_eq!(
-        anchor_block.prev_celestia_header_hash, inputs.trusted_celestia_root,
-        "verify sequential Celestia roots failed at index {}: expected {:?}, got {:?}",
-        0, anchor_block.prev_celestia_header_hash, inputs.trusted_celestia_root
-    );*/
-
     for window in outputs.windows(2).enumerate() {
         let (i, pair) = window;
         let (prev, curr) = (&pair[0], &pair[1]);
@@ -142,8 +125,8 @@ pub fn main() {
     let last = outputs.last().expect("No outputs provided");
 
     let output = BlockRangeExecOutput {
-        prev_celestia_height: inputs.trusted_celestia_height,
-        prev_celestia_header_hash: inputs.trusted_celestia_root,
+        prev_celestia_height: first.prev_celestia_height,
+        prev_celestia_header_hash: first.prev_celestia_header_hash,
         new_celestia_height: inputs.trusted_celestia_height + inputs.public_values.len() as u64,
         celestia_header_hash: last.celestia_header_hash,
         trusted_height: first.prev_height,
