@@ -50,13 +50,27 @@ Will aggregate multiple compressed proofs into a single Groth16 proof.
 
 ## Building
 
-### ⚠️ Important: Workspace Limitation
+### ⚠️ Critical Limitation: SP1-Specific Architecture
 
-**RISC0 guest/host crates are currently excluded from the main workspace** due to conflicting cryptographic library patches between SP1 and RISC0. Both proof systems use patched versions of `k256`, `sha2`, and other crypto libraries, but the patches are incompatible.
+**RISC0 support is currently blocked by fundamental architectural constraints:**
 
-**Current Status**: The RISC0 backend implementation in `ev-prover` is complete and functional, but building RISC0 guest programs requires a separate workspace setup.
+1. **RSP Dependency**: The EVM execution verification logic in `ev-zkevm-types` uses Succinct's RSP (Reth State Prover), which is tightly coupled to SP1 syscalls and precompiles. RSP contains SP1-specific code like:
+   - `sp1_lib` for I/O operations
+   - `sp1_bls12_381` for cryptographic operations
+   - SP1-specific syscalls (`syscall_write`, `syscall_bls12381_*`, etc.)
 
-**Workaround**: Create a separate Cargo workspace for RISC0 crates or build them individually with manual dependency management.
+2. **Crypto Patch Conflicts**: SP1 and RISC0 require incompatible patches for crypto libraries (`k256`, `sha2`, etc.), preventing coexistence in the same workspace.
+
+**Current Status**:
+- ✅ RISC0 backend interface is implemented in `ev-prover`
+- ✅ RISC0 guest program structure is configured
+- ❌ **Cannot build or run** due to RSP's SP1 dependency
+- ❌ Shared `ev-zkevm-types` crate is SP1-specific
+
+**Required Changes for RISC0 Support**:
+- Replace RSP with a proof-system-agnostic EVM executor, OR
+- Create separate RISC0-specific verification logic (duplicating EVM execution code), OR
+- Wait for RSP to add RISC0 support (unlikely - it's a Succinct/SP1 project)
 
 ### Prerequisites
 ```bash
@@ -178,7 +192,8 @@ Expected characteristics:
 - [x] Risc0Backend prover integration
 - [x] Multi-backend prover programs (block.rs, message.rs, range.rs)
 - [x] Feature-gated compilation support
-- [ ] **Resolve workspace crypto patch conflicts** (blocking)
+- [ ] **🚫 BLOCKED: Replace SP1-specific RSP with proof-system-agnostic EVM executor**
+- [ ] Resolve workspace crypto patch conflicts
 - [ ] End-to-end testing with RISC0 backend
 - [ ] Groth16 SNARK conversion implementation
 - [ ] Performance optimizations
