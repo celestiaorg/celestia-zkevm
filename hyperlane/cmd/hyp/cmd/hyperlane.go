@@ -52,7 +52,7 @@ func SetupZKIsm(ctx context.Context, broadcaster *Broadcaster, ethClient *ethcli
 	stateTransitionVkey := readStateTransitionVkey()
 	stateMembershipVkey := readStateMembershipVkey()
 
-	root, height := GetCelestiaRootAndHeight(ctx, "http://celestia-validator:26657")
+	root, height := GetCelestiaBlockHashAndHeight(ctx, "http://celestia-validator:26657")
 
 	fmt.Printf("successfully got celestia root and height: %x, %d\n", root, height)
 
@@ -240,26 +240,36 @@ func writeConfig(cfg *HyperlaneConfig) {
 	fmt.Printf("successfully deployed Hyperlane: \n%s\n", string(out))
 }
 
-func GetCelestiaRootAndHeight(ctx context.Context, rpcAddr string) ([32]byte, uint64) {
+func GetCelestiaBlockHashAndHeight(ctx context.Context, rpcAddr string) ([32]byte, uint64) {
 	client, err := rpcclient.New(rpcAddr, "/websocket")
 	if err != nil {
-		log.Fatalf("failed to connect to celestia RPC: %v", err)
+		log.Fatalf("failed to connect to Celestia RPC: %v", err)
 	}
+	defer client.Stop()
 
 	status, err := client.Status(ctx)
 	if err != nil {
-		log.Fatalf("failed to get celestia status: %v", err)
+		log.Fatalf("failed to get Celestia status: %v", err)
 	}
 
 	height := uint64(status.SyncInfo.LatestBlockHeight)
-	rootHash := status.SyncInfo.LatestBlockHash
+	heightInt64 := int64(height)
 
-	var root [32]byte
-	if len(rootHash) != 32 {
-		log.Fatalf("unexpected app hash length: %d", len(rootHash))
+	block, err := client.Block(ctx, &heightInt64)
+	if err != nil {
+		log.Fatalf("failed to fetch block at height %d: %v", height, err)
 	}
-	copy(root[:], rootHash)
 
-	fmt.Printf("Celestia node height: %d\nAppHash (root): 0x%s\n", height, hex.EncodeToString(root[:]))
-	return root, height
+	blockHash := block.BlockID.Hash.Bytes()
+
+	var hash [32]byte
+	if len(blockHash) != 32 {
+		log.Fatalf("unexpected block hash length: %d", len(blockHash))
+	}
+	copy(hash[:], blockHash)
+
+	fmt.Printf("Celestia node height: %d\nBlock header hash: 0x%s\n",
+		height, hex.EncodeToString(hash[:]))
+
+	return hash, height
 }

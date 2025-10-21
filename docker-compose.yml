@@ -1,6 +1,6 @@
 services:
   celestia-init:
-    image: ghcr.io/celestiaorg/celestia-app-standalone:local
+    image: ghcr.io/celestiaorg/celestia-app-standalone:c52e4c6@sha256:6cea11b8d3ca23eb7469d2aafc986c43d80ff03cc1008ac0f141cb2bb6ad0a18
     container_name: celestia-init
     entrypoint: /scripts/init.sh
     volumes:
@@ -9,7 +9,7 @@ services:
     restart: "no"
 
   celestia-validator:
-    image: ghcr.io/celestiaorg/celestia-app-standalone:local
+    image: ghcr.io/celestiaorg/celestia-app-standalone:c52e4c6@sha256:6cea11b8d3ca23eb7469d2aafc986c43d80ff03cc1008ac0f141cb2bb6ad0a18
     container_name: celestia-validator
     ports:
       - "26656:26656"
