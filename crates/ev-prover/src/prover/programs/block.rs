@@ -43,11 +43,14 @@ use storage::proofs::{ProofStorage, RocksDbProofStorage};
 #[cfg(feature = "sp1")]
 pub const EV_EXEC_PROGRAM_ID: &[u8] = include_elf!("ev-exec-program");
 
-// NOTE: RISC0 ImageID would be loaded from ev-exec-host, but that crate
-// is excluded from workspace due to crypto patch conflicts.
-// For RISC0 support, the ImageID must be provided via ProverConfig.
+// For RISC0: Use the ImageID from the generated constants file
 #[cfg(all(feature = "risc0", not(feature = "sp1")))]
-pub const EV_EXEC_PROGRAM_ID: &[u8] = &[];  // Placeholder - use config.program_id instead
+mod risc0_constants {
+    include!("../../../risc0/RISC0_CONSTANTS.rs");
+}
+
+#[cfg(all(feature = "risc0", not(feature = "sp1")))]
+pub const EV_EXEC_PROGRAM_ID: &[u8] = &risc0_constants::RISC0_EV_EXEC_ID_BYTES;
 
 // Compatibility alias for existing code
 pub const EV_EXEC_ELF: &[u8] = EV_EXEC_PROGRAM_ID;
