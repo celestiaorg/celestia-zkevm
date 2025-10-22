@@ -1,16 +1,16 @@
-//! RISC0 Program Constants
-//!
-//! This file contains the ImageIDs for RISC0 guest programs.
-//! It is auto-generated from the RISC0 build process and should be included
-//! by the main workspace to access RISC0 program identifiers.
-//!
-//! **IMPORTANT**: This file must be regenerated whenever the guest programs change.
-//! Run: `cd crates/risc0 && cargo build --package ev-exec-host`
-//!
-//! ## Usage in main workspace:
-//! ```rust
-//! include!("../risc0/RISC0_CONSTANTS.rs");
-//! ```
+// RISC0 Program Constants
+//
+// This file contains the ImageIDs for RISC0 guest programs.
+// It is auto-generated from the RISC0 build process and should be included
+// by the main workspace to access RISC0 program identifiers.
+//
+// **IMPORTANT**: This file must be regenerated whenever the guest programs change.
+// Run: `cd crates/risc0 && cargo build --package ev-exec-host`
+//
+// ## Usage in main workspace:
+// ```rust
+// include!("../risc0/RISC0_CONSTANTS.rs");
+// ```
 
 /// EV-Exec ImageID (32-byte digest) for RISC0
 /// This uniquely identifies the ev-exec guest program

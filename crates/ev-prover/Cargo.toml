@@ -8,7 +8,7 @@ default = ["sp1"]
 sp1 = ["dep:sp1-sdk", "sp1-build"]
 # NOTE: RISC0 support is currently limited due to workspace crypto patch conflicts
 # The RISC0 backend is implemented but guest/host crates must be built separately
-risc0 = ["dep:risc0-zkvm"]
+risc0 = ["dep:risc0-zkvm", "dep:zeth-host", "dep:zeth-core"]
 
 [dependencies]
 alloy = { workspace = true }
@@ -47,6 +47,9 @@ rsp-primitives = { workspace = true }
 rsp-rpc-db = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_cbor = { workspace = true }
+# Zeth dependencies for RISC0 backend
+zeth-host = { path = "../../../zeth/crates/host", optional = true }
+zeth-core = { path = "../../../zeth/crates/core", optional = true }
 serde_json = { workspace = true }
 serde_yaml = "0.9"
 sha3 = { workspace = true }

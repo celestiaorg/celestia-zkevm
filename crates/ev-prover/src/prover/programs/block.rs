@@ -24,6 +24,26 @@ use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
 
+#[cfg(feature = "risc0")]
+use zeth_host::BlockProcessor;
+#[cfg(feature = "risc0")]
+use zeth_core::Input as ZethInput;
+
+/// RISC0-specific input type that combines Celestia DA data with Zeth EVM execution witnesses
+#[cfg(feature = "risc0")]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub struct Risc0BlockExecInput {
+    pub header_raw: Vec<u8>,
+    pub dah: celestia_types::DataAvailabilityHeader,
+    pub blobs_raw: Vec<u8>,
+    pub pub_key: Vec<u8>,
+    pub namespace: celestia_types::nmt::Namespace,
+    pub proofs: Vec<celestia_types::nmt::NamespaceProof>,
+    pub zeth_inputs: Vec<ZethInput>,
+    pub trusted_height: u64,
+    pub trusted_root: FixedBytes<32>,
+}
+
 #[cfg(feature = "sp1")]
 use sp1_sdk::include_elf;
 
@@ -46,7 +66,7 @@ pub const EV_EXEC_PROGRAM_ID: &[u8] = include_elf!("ev-exec-program");
 // For RISC0: Use the ImageID from the generated constants file
 #[cfg(all(feature = "risc0", not(feature = "sp1")))]
 mod risc0_constants {
-    include!("../../../risc0/RISC0_CONSTANTS.rs");
+    include!("../../../../risc0/RISC0_CONSTANTS.rs");
 }
 
 #[cfg(all(feature = "risc0", not(feature = "sp1")))]
@@ -156,7 +176,10 @@ struct ProofJob {
     extended_header: ExtendedHeader,
     proofs: Vec<NamespaceProof>,
     blobs: Vec<Blob>,
+    #[cfg(feature = "sp1")]
     executor_inputs: Vec<EthClientExecutorInput>,
+    #[cfg(feature = "risc0")]
+    zeth_inputs: Vec<ZethInput>,
 }
 
 struct ScheduledProofJob {
@@ -240,6 +263,28 @@ impl BlockExecProver {
         Ok((proof, output))
     }
 
+    /// Generates a RISC0 proof for the given block execution input
+    #[cfg(feature = "risc0")]
+    async fn prove_risc0(&self, input: Risc0BlockExecInput) -> Result<(crate::proof_system::UnifiedProof, BlockExecOutput)> {
+        // Serialize input to bytes
+        let input_bytes = bincode::serialize(&input)
+            .context("Failed to serialize Risc0BlockExecInput")?;
+
+        // Use program ID from config
+        let program_id = self.config.program_id;
+        let proof_mode = self.config.proof_mode;
+
+        // Generate proof using the abstraction layer
+        let proof = self.prover.prove(program_id, &input_bytes, proof_mode).await
+            .context("Failed to generate RISC0 proof")?;
+
+        // Deserialize public values to output
+        let output: BlockExecOutput = bincode::deserialize(&proof.public_values)
+            .context("Failed to deserialize BlockExecOutput from public values")?;
+
+        Ok((proof, output))
+    }
+
     async fn connect_and_subscribe(&self) -> Result<(Arc<Client>, Subscription<BlobsAtHeight>)> {
         let addr = format!("ws://{}", self.app.celestia_rpc);
         let client = Arc::new(Client::new(&addr, None).await.context("celestia ws connect")?);
@@ -262,6 +307,22 @@ impl BlockExecProver {
             .await?;
 
         Ok(executor_input)
+    }
+
+    /// Generates Zeth input for RISC0 backend (requires debug_executionWitness RPC method)
+    #[cfg(feature = "risc0")]
+    async fn zeth_input(&self, block_number: u64) -> Result<ZethInput> {
+        let provider = ProviderBuilder::new().connect_http(self.app.evm_rpc.parse()?);
+        let block_processor = BlockProcessor::new(provider)
+            .await
+            .context("Failed to create Zeth BlockProcessor")?;
+
+        let (input, _block_hash) = block_processor
+            .create_input(block_number)
+            .await
+            .context("Failed to create Zeth input")?;
+
+        Ok(input)
     }
 
     /// Runs the block prover loop with a 3-stage pipeline:
@@ -353,11 +414,25 @@ impl BlockExecProver {
                         };
 
                         // Optimistically advance global trusted_state monotonically for FUTURE jobs
-                        if let Some(next) = job.executor_inputs.last() {
-                            let mut s = prover.app.trusted_state.write().await;
-                            if next.current_block.number > s.height {
-                                s.height = next.current_block.number;
-                                s.root = next.current_block.state_root;
+                        #[cfg(all(feature = "sp1", not(feature = "risc0")))]
+                        {
+                            if let Some(next) = job.executor_inputs.last() {
+                                let mut s = prover.app.trusted_state.write().await;
+                                if next.current_block.number > s.height {
+                                    s.height = next.current_block.number;
+                                    s.root = next.current_block.state_root;
+                                }
+                            }
+                        }
+
+                        #[cfg(all(feature = "risc0", not(feature = "sp1")))]
+                        {
+                            if let Some(next) = job.zeth_inputs.last() {
+                                let mut s = prover.app.trusted_state.write().await;
+                                if next.block.header.number > s.height {
+                                    s.height = next.block.header.number;
+                                    s.root = next.block.header.state_root;
+                                }
                             }
                         }
 
@@ -438,72 +513,145 @@ impl BlockExecProver {
             .filter_map(|blob| SignedData::decode(Bytes::from(blob.data.clone())).ok())
             .collect();
 
-        let mut executor_inputs = Vec::with_capacity(signed_data.len());
-        for data in signed_data {
-            let block_number = data
-                .data
-                .as_ref()
-                .and_then(|d| d.metadata.as_ref())
-                .map(|m| m.height)
-                .ok_or_else(|| anyhow!("missing height for SignedData"))?;
+        // SP1 backend: Use RSP executor inputs
+        #[cfg(all(feature = "sp1", not(feature = "risc0")))]
+        {
+            let mut executor_inputs = Vec::with_capacity(signed_data.len());
+            for data in signed_data {
+                let block_number = data
+                    .data
+                    .as_ref()
+                    .and_then(|d| d.metadata.as_ref())
+                    .map(|m| m.height)
+                    .ok_or_else(|| anyhow!("missing height for SignedData"))?;
 
-            executor_inputs.push(self.eth_client_executor_input(block_number).await?);
+                executor_inputs.push(self.eth_client_executor_input(block_number).await?);
+            }
+
+            debug!("Got {} evm inputs (RSP) at height {}", executor_inputs.len(), event.height);
+
+            return Ok(ProofJob {
+                height: event.height,
+                extended_header,
+                proofs,
+                blobs: event.blobs,
+                executor_inputs,
+            });
         }
 
-        debug!("Got {} evm inputs at height {}", executor_inputs.len(), event.height);
+        // RISC0 backend: Use Zeth inputs
+        #[cfg(all(feature = "risc0", not(feature = "sp1")))]
+        {
+            let mut zeth_inputs = Vec::with_capacity(signed_data.len());
+            for data in signed_data {
+                let block_number = data
+                    .data
+                    .as_ref()
+                    .and_then(|d| d.metadata.as_ref())
+                    .map(|m| m.height)
+                    .ok_or_else(|| anyhow!("missing height for SignedData"))?;
 
-        Ok(ProofJob {
-            height: event.height,
-            extended_header,
-            proofs,
-            blobs: event.blobs,
-            executor_inputs,
-        })
+                zeth_inputs.push(self.zeth_input(block_number).await?);
+            }
+
+            debug!("Got {} evm inputs (Zeth) at height {}", zeth_inputs.len(), event.height);
+
+            return Ok(ProofJob {
+                height: event.height,
+                extended_header,
+                proofs,
+                blobs: event.blobs,
+                zeth_inputs,
+            });
+        }
     }
 
     async fn prove_and_store(self: Arc<Self>, scheduled: ScheduledProofJob) -> Result<()> {
         let extended_header = &scheduled.job.extended_header;
 
-        let inputs = BlockExecInput {
-            header_raw: serde_cbor::to_vec(&extended_header.header)?,
-            dah: extended_header.dah.clone(),
-            blobs_raw: serde_cbor::to_vec(&scheduled.job.blobs)?,
-            pub_key: self.app.pub_key.clone(),
-            namespace: self.app.namespace,
-            proofs: scheduled.job.proofs.clone(),
-            executor_inputs: scheduled.job.executor_inputs.clone(),
-            trusted_height: scheduled.trusted_height,
-            trusted_root: scheduled.trusted_root,
-        };
-
-        let (proof, outputs) = self.prove(inputs).await?;
-
-        // UnifiedProof already contains proof_bytes and public_values
-        let proof_data = proof.proof_bytes.clone();
-        let public_values = proof.public_values.clone();
-
-        if let Err(e) = self
-            .storage
-            .store_block_proof(
-                scheduled.job.height,
-                storage::proofs::ProofSystem::SP1,
-                &proof_data,
-                &public_values,
-                &outputs
-            )
-            .await
+        // SP1 backend: Use BlockExecInput with RSP executor inputs
+        #[cfg(all(feature = "sp1", not(feature = "risc0")))]
         {
-            error!(
-                "Failed to store proof for block {}: {} - error: {e:#}",
+            let inputs = BlockExecInput {
+                header_raw: serde_cbor::to_vec(&extended_header.header)?,
+                dah: extended_header.dah.clone(),
+                blobs_raw: serde_cbor::to_vec(&scheduled.job.blobs)?,
+                pub_key: self.app.pub_key.clone(),
+                namespace: self.app.namespace,
+                proofs: scheduled.job.proofs.clone(),
+                executor_inputs: scheduled.job.executor_inputs.clone(),
+                trusted_height: scheduled.trusted_height,
+                trusted_root: scheduled.trusted_root,
+            };
+
+            let (proof, outputs) = self.prove(inputs).await?;
+            let proof_data = proof.proof_bytes.clone();
+            let public_values = proof.public_values.clone();
+
+            if let Err(e) = self
+                .storage
+                .store_block_proof(
+                    scheduled.job.height,
+                    storage::proofs::ProofSystem::SP1,
+                    &proof_data,
+                    &public_values,
+                    &outputs
+                )
+                .await
+            {
+                error!(
+                    "Failed to store proof for block {}: {} - error: {e:#}",
+                    scheduled.job.height, outputs,
+                );
+            }
+
+            info!(
+                "Successfully created and stored proof for block {}. Outputs: {}",
                 scheduled.job.height, outputs,
             );
-            // Note: We continue execution even if storage fails to avoid breaking the proving pipeline
         }
 
-        info!(
-            "Successfully created and stored proof for block {}. Outputs: {}",
-            scheduled.job.height, outputs,
-        );
+        // RISC0 backend: Use Risc0BlockExecInput with Zeth inputs
+        #[cfg(all(feature = "risc0", not(feature = "sp1")))]
+        {
+            let inputs = Risc0BlockExecInput {
+                header_raw: serde_cbor::to_vec(&extended_header.header)?,
+                dah: extended_header.dah.clone(),
+                blobs_raw: serde_cbor::to_vec(&scheduled.job.blobs)?,
+                pub_key: self.app.pub_key.clone(),
+                namespace: self.app.namespace,
+                proofs: scheduled.job.proofs.clone(),
+                zeth_inputs: scheduled.job.zeth_inputs.clone(),
+                trusted_height: scheduled.trusted_height,
+                trusted_root: scheduled.trusted_root,
+            };
+
+            let (proof, outputs) = self.prove_risc0(inputs).await?;
+            let proof_data = proof.proof_bytes.clone();
+            let public_values = proof.public_values.clone();
+
+            if let Err(e) = self
+                .storage
+                .store_block_proof(
+                    scheduled.job.height,
+                    storage::proofs::ProofSystem::Risc0,
+                    &proof_data,
+                    &public_values,
+                    &outputs
+                )
+                .await
+            {
+                error!(
+                    "Failed to store proof for block {}: {} - error: {e:#}",
+                    scheduled.job.height, outputs,
+                );
+            }
+
+            info!(
+                "Successfully created and stored proof for block {}. Outputs: {}",
+                scheduled.job.height, outputs,
+            );
+        }
 
         Ok(())
     }

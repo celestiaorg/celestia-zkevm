@@ -1,4 +1,4 @@
-#[cfg(test)]
+#[cfg(all(test, feature = "sp1"))]
 mod tests {
     use crate::prover::programs::block::EV_EXEC_ELF;
     use celestia_types::nmt::Namespace;
