@@ -64,7 +64,7 @@ async fn main() {
     info!("Bridging Tia from Celestia to Evolve...");
     let response = ism_client.send_tx(transfer_msg).await.unwrap();
     assert!(response.success);
-    // we can choose this as our start heihgt, because the state root has not changed in between the hyperlane deployments
+    // we can choose this as our start height, because the state root has not changed in between the hyperlane deployments
     // and this transfer.
     let celestia_start_height = ism.celestia_height + 1;
     info!("Celestia start height: {}", celestia_start_height);
