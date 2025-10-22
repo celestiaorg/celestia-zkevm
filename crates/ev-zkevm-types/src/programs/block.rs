@@ -3,20 +3,23 @@ use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::sync::Arc;
 
-use alloy_consensus::{proofs, BlockHeader};
+use alloy_consensus::{BlockHeader, proofs};
 use alloy_primitives::{B256, FixedBytes};
 use alloy_rlp::Decodable;
 use bytes::Bytes;
 use celestia_types::{
     Blob, DataAvailabilityHeader,
-    nmt::{Namespace, NamespaceProof, NamespacedHash, EMPTY_LEAVES},
+    nmt::{EMPTY_LEAVES, Namespace, NamespaceProof, NamespacedHash},
 };
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use hex::encode;
 use nmt_rs::NamespacedSha2Hasher;
 use prost::Message as ProstMessage;
 use reth_primitives::TransactionSigned;
-use rsp_client_executor::{executor::EthClientExecutor, io::{EthClientExecutorInput, WitnessInput}};
+use rsp_client_executor::{
+    executor::EthClientExecutor,
+    io::{EthClientExecutorInput, WitnessInput},
+};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tendermint::block::Header;
 
@@ -335,7 +338,11 @@ impl BlockExecInput {
     }
 
     /// Filter SignedData blobs and verify signatures
-    fn verify_signed_data(&self, blobs: Vec<Blob>, headers: &[alloy_consensus::Header]) -> Result<Vec<Data>, Box<dyn Error>> {
+    fn verify_signed_data(
+        &self,
+        blobs: Vec<Blob>,
+        headers: &[alloy_consensus::Header],
+    ) -> Result<Vec<Data>, Box<dyn Error>> {
         let signed_data: Vec<SignedData> = blobs
             .into_iter()
             .filter_map(|blob| SignedData::decode(Bytes::from(blob.data)).ok())
@@ -375,7 +382,11 @@ impl BlockExecInput {
     }
 
     /// Verify blob equivalency between headers and transaction data
-    fn verify_blob_equivalency(&self, headers: &[alloy_consensus::Header], tx_data: Vec<Data>) -> Result<(), Box<dyn Error>> {
+    fn verify_blob_equivalency(
+        &self,
+        headers: &[alloy_consensus::Header],
+        tx_data: Vec<Data>,
+    ) -> Result<(), Box<dyn Error>> {
         for (header, data) in headers.iter().zip(tx_data) {
             let mut txs = Vec::with_capacity(data.txs.len());
             for tx_bytes in data.txs {
@@ -403,11 +414,9 @@ fn verify_signature(public_key: &[u8], message: &[u8], signature: &[u8]) -> Resu
         .try_into()
         .map_err(|_| "Public key must be 32 bytes for Ed25519")?;
 
-    let verifying_key = VerifyingKey::from_bytes(&pub_key)
-        .map_err(|e| format!("Invalid Ed25519 public key: {e}"))?;
+    let verifying_key = VerifyingKey::from_bytes(&pub_key).map_err(|e| format!("Invalid Ed25519 public key: {e}"))?;
 
-    let signature = Signature::from_slice(signature)
-        .map_err(|e| format!("Invalid Ed25519 signature: {e}"))?;
+    let signature = Signature::from_slice(signature).map_err(|e| format!("Invalid Ed25519 signature: {e}"))?;
 
     verifying_key
         .verify(message, &signature)

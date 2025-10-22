@@ -25,9 +25,9 @@ use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
 
 #[cfg(feature = "risc0")]
-use zeth_host::BlockProcessor;
-#[cfg(feature = "risc0")]
 use zeth_core::Input as ZethInput;
+#[cfg(feature = "risc0")]
+use zeth_host::BlockProcessor;
 
 /// RISC0-specific input type that combines Celestia DA data with Zeth EVM execution witnesses
 #[cfg(feature = "risc0")]
@@ -47,7 +47,7 @@ pub struct Risc0BlockExecInput {
 #[cfg(feature = "sp1")]
 use sp1_sdk::include_elf;
 
-use crate::proof_system::{ProofSystemBackend, ProofMode, ProverFactory};
+use crate::proof_system::{ProofMode, ProofSystemBackend, ProverFactory};
 use tokio::{
     sync::{mpsc, RwLock, Semaphore},
     task::JoinSet,
@@ -245,15 +245,17 @@ impl BlockExecProver {
     /// Generates a proof for the given block execution input using the configured proof system.
     async fn prove(&self, input: BlockExecInput) -> Result<(crate::proof_system::UnifiedProof, BlockExecOutput)> {
         // Serialize input to bytes
-        let input_bytes = bincode::serialize(&input)
-            .context("Failed to serialize BlockExecInput")?;
+        let input_bytes = bincode::serialize(&input).context("Failed to serialize BlockExecInput")?;
 
         // Use program ID from config (works for both SP1 ELF and Risc0 ImageID)
         let program_id = self.config.program_id;
         let proof_mode = self.config.proof_mode;
 
         // Generate proof using the abstraction layer
-        let proof = self.prover.prove(program_id, &input_bytes, proof_mode).await
+        let proof = self
+            .prover
+            .prove(program_id, &input_bytes, proof_mode)
+            .await
             .context("Failed to generate proof")?;
 
         // Deserialize public values to output
@@ -265,17 +267,22 @@ impl BlockExecProver {
 
     /// Generates a RISC0 proof for the given block execution input
     #[cfg(feature = "risc0")]
-    async fn prove_risc0(&self, input: Risc0BlockExecInput) -> Result<(crate::proof_system::UnifiedProof, BlockExecOutput)> {
+    async fn prove_risc0(
+        &self,
+        input: Risc0BlockExecInput,
+    ) -> Result<(crate::proof_system::UnifiedProof, BlockExecOutput)> {
         // Serialize input to bytes
-        let input_bytes = bincode::serialize(&input)
-            .context("Failed to serialize Risc0BlockExecInput")?;
+        let input_bytes = bincode::serialize(&input).context("Failed to serialize Risc0BlockExecInput")?;
 
         // Use program ID from config
         let program_id = self.config.program_id;
         let proof_mode = self.config.proof_mode;
 
         // Generate proof using the abstraction layer
-        let proof = self.prover.prove(program_id, &input_bytes, proof_mode).await
+        let proof = self
+            .prover
+            .prove(program_id, &input_bytes, proof_mode)
+            .await
             .context("Failed to generate RISC0 proof")?;
 
         // Deserialize public values to output
@@ -528,7 +535,11 @@ impl BlockExecProver {
                 executor_inputs.push(self.eth_client_executor_input(block_number).await?);
             }
 
-            debug!("Got {} evm inputs (RSP) at height {}", executor_inputs.len(), event.height);
+            debug!(
+                "Got {} evm inputs (RSP) at height {}",
+                executor_inputs.len(),
+                event.height
+            );
 
             return Ok(ProofJob {
                 height: event.height,
@@ -595,7 +606,7 @@ impl BlockExecProver {
                     storage::proofs::ProofSystem::SP1,
                     &proof_data,
                     &public_values,
-                    &outputs
+                    &outputs,
                 )
                 .await
             {
@@ -637,7 +648,7 @@ impl BlockExecProver {
                     storage::proofs::ProofSystem::Risc0,
                     &proof_data,
                     &public_values,
-                    &outputs
+                    &outputs,
                 )
                 .await
             {

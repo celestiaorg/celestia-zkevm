@@ -1,5 +1,4 @@
 /// Risc0 proof system backend implementation
-
 use super::{ProofMode, ProofSystemBackend, ProofSystemType, UnifiedProof};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -53,11 +52,7 @@ impl Risc0Backend {
         // Extract journal (public outputs) from receipt
         let public_values = receipt.journal.bytes.clone();
 
-        Ok(UnifiedProof::new(
-            ProofSystemType::Risc0,
-            proof_bytes,
-            public_values,
-        ))
+        Ok(UnifiedProof::new(ProofSystemType::Risc0, proof_bytes, public_values))
     }
 
     /// Convert UnifiedProof back to Risc0 Receipt
@@ -76,12 +71,7 @@ impl ProofSystemBackend for Risc0Backend {
         ProofSystemType::Risc0
     }
 
-    async fn prove(
-        &self,
-        program_id: &[u8],
-        input: &[u8],
-        proof_mode: ProofMode,
-    ) -> Result<UnifiedProof> {
+    async fn prove(&self, program_id: &[u8], input: &[u8], proof_mode: ProofMode) -> Result<UnifiedProof> {
         // Build execution environment with input data
         let env = ExecutorEnv::builder()
             .write_slice(input)

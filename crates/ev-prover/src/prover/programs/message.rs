@@ -17,7 +17,7 @@ use reqwest::Url;
 #[cfg(feature = "sp1")]
 use sp1_sdk::include_elf;
 
-use crate::proof_system::{ProofSystemBackend, ProofMode, ProverFactory};
+use crate::proof_system::{ProofMode, ProofSystemBackend, ProverFactory};
 use std::{
     str::FromStr,
     sync::{Arc, RwLock},
@@ -39,7 +39,7 @@ pub const EV_HYPERLANE_PROGRAM_ID: &[u8] = include_elf!("ev-hyperlane-program");
 // is excluded from workspace due to crypto patch conflicts.
 // For RISC0 support, the ImageID must be provided via ProverConfig.
 #[cfg(all(feature = "risc0", not(feature = "sp1")))]
-pub const EV_HYPERLANE_PROGRAM_ID: &[u8] = &[];  // Placeholder - use config.program_id instead
+pub const EV_HYPERLANE_PROGRAM_ID: &[u8] = &[]; // Placeholder - use config.program_id instead
 
 // Compatibility alias
 pub const EV_HYPERLANE_ELF: &[u8] = EV_HYPERLANE_PROGRAM_ID;
@@ -117,7 +117,10 @@ impl HyperlaneMessageProver {
     }
 
     /// Generates a proof for the given Hyperlane message input using the configured proof system.
-    async fn prove(&self, input: HyperlaneMessageInputs) -> Result<(crate::proof_system::UnifiedProof, HyperlaneMessageOutputs)> {
+    async fn prove(
+        &self,
+        input: HyperlaneMessageInputs,
+    ) -> Result<(crate::proof_system::UnifiedProof, HyperlaneMessageOutputs)> {
         // Serialize input to bytes
         let input_bytes = bincode::serialize(&input)?;
 
@@ -285,7 +288,7 @@ impl HyperlaneMessageProver {
                 storage::proofs::ProofSystem::SP1,
                 &proof_data,
                 &public_values,
-                &output
+                &output,
             )
             .await
             .expect("Failed to store proof");

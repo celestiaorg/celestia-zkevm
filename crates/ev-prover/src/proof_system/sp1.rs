@@ -1,5 +1,4 @@
 /// SP1 proof system backend implementation
-
 use super::{ProofMode, ProofSystemBackend, ProofSystemType, UnifiedProof};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -44,11 +43,7 @@ impl SP1Backend {
     fn to_unified_proof(proof: SP1ProofWithPublicValues) -> Result<UnifiedProof> {
         let proof_bytes = bincode::serialize(&proof.proof)?;
         let public_values = proof.public_values.to_vec();
-        Ok(UnifiedProof::new(
-            ProofSystemType::SP1,
-            proof_bytes,
-            public_values,
-        ))
+        Ok(UnifiedProof::new(ProofSystemType::SP1, proof_bytes, public_values))
     }
 
     /// Convert UnifiedProof back to SP1ProofWithPublicValues
@@ -56,8 +51,7 @@ impl SP1Backend {
         if proof.system != ProofSystemType::SP1 {
             anyhow::bail!("Proof is not from SP1 system");
         }
-        bincode::deserialize(&proof.proof_bytes)
-            .map_err(|e| anyhow::anyhow!("Failed to deserialize SP1 proof: {}", e))
+        bincode::deserialize(&proof.proof_bytes).map_err(|e| anyhow::anyhow!("Failed to deserialize SP1 proof: {}", e))
     }
 }
 
@@ -67,12 +61,7 @@ impl ProofSystemBackend for SP1Backend {
         ProofSystemType::SP1
     }
 
-    async fn prove(
-        &self,
-        program_id: &[u8],
-        input: &[u8],
-        proof_mode: ProofMode,
-    ) -> Result<UnifiedProof> {
+    async fn prove(&self, program_id: &[u8], input: &[u8], proof_mode: ProofMode) -> Result<UnifiedProof> {
         // Deserialize input as SP1Stdin
         let stdin: SP1Stdin = bincode::deserialize(input)?;
 
@@ -94,10 +83,7 @@ impl ProofSystemBackend for SP1Backend {
     fn verify(&self, program_id: &[u8], proof: &UnifiedProof) -> Result<bool> {
         let sp1_proof = Self::from_unified_proof(proof)?;
         let (_pk, vk) = self.client.setup(program_id);
-        self.client
-            .verify(&sp1_proof, &vk)
-            .map(|_| true)
-            .or(Ok(false))
+        self.client.verify(&sp1_proof, &vk).map(|_| true).or(Ok(false))
     }
 
     fn public_values(&self, proof: &UnifiedProof) -> Result<Vec<u8>> {

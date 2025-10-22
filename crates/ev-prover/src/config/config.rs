@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::proof_system::ProofSystemType;
+use serde::{Deserialize, Serialize};
 
 pub const APP_HOME: &str = ".ev-prover";
 

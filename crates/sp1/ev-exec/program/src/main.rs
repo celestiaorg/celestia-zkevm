@@ -42,7 +42,9 @@ pub fn main() {
     println!("cycle-tracker-report-end: read inputs");
 
     println!("cycle-tracker-report-start: verify and execute");
-    let output = inputs.verify_and_execute().expect("Block execution verification failed");
+    let output = inputs
+        .verify_and_execute()
+        .expect("Block execution verification failed");
     println!("cycle-tracker-report-end: verify and execute");
 
     println!("cycle-tracker-report-start: commit outputs");

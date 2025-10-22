@@ -1,7 +1,6 @@
 /// Proof system abstraction layer for supporting multiple zkVM backends (SP1, Risc0, etc.)
 ///
 /// This module provides a unified interface for working with different proof systems.
-
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -63,11 +62,7 @@ impl std::str::FromStr for ProofSystemType {
                 #[cfg(all(feature = "risc0", not(feature = "sp1")))]
                 let available = "risc0";
 
-                anyhow::bail!(
-                    "Unknown proof system '{}'. Available options: {}",
-                    s,
-                    available
-                )
+                anyhow::bail!("Unknown proof system '{}'. Available options: {}", s, available)
             }
         }
     }
@@ -122,12 +117,7 @@ pub trait ProofSystemBackend: Send + Sync {
     fn system_type(&self) -> ProofSystemType;
 
     /// Prove a program with the given input
-    async fn prove(
-        &self,
-        program_id: &[u8],
-        input: &[u8],
-        proof_mode: ProofMode,
-    ) -> Result<UnifiedProof>;
+    async fn prove(&self, program_id: &[u8], input: &[u8], proof_mode: ProofMode) -> Result<UnifiedProof>;
 
     /// Verify a proof
     fn verify(&self, program_id: &[u8], proof: &UnifiedProof) -> Result<bool>;

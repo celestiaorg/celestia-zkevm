@@ -8,8 +8,8 @@ use ev_zkevm_types::programs::block::{BlockRangeExecInput, BlockRangeExecOutput}
 #[cfg(feature = "sp1")]
 use sp1_sdk::include_elf;
 
-use crate::prover::ProverConfig;
 use crate::proof_system::{ProofMode, ProofSystemBackend, ProverFactory, UnifiedProof};
+use crate::prover::ProverConfig;
 
 // Program IDs for different proof systems
 #[cfg(feature = "sp1")]
@@ -19,7 +19,7 @@ pub const EV_RANGE_EXEC_PROGRAM_ID: &[u8] = include_elf!("ev-range-exec-program"
 // is excluded from workspace due to crypto patch conflicts.
 // For RISC0 support, the ImageID must be provided via ProverConfig.
 #[cfg(all(feature = "risc0", not(feature = "sp1")))]
-pub const EV_RANGE_EXEC_PROGRAM_ID: &[u8] = &[];  // Placeholder - use config.program_id instead
+pub const EV_RANGE_EXEC_PROGRAM_ID: &[u8] = &[]; // Placeholder - use config.program_id instead
 
 // Compatibility alias
 pub const EV_RANGE_EXEC_ELF: &[u8] = EV_RANGE_EXEC_PROGRAM_ID;
@@ -99,10 +99,7 @@ impl BlockRangeExecProver {
         // Generate the aggregated proof
         // For Risc0: This works directly
         // For SP1: Would need special handling of compressed proofs
-        let proof = self
-            .prover
-            .prove(program_id, &input_bytes, proof_mode)
-            .await?;
+        let proof = self.prover.prove(program_id, &input_bytes, proof_mode).await?;
 
         // Deserialize output
         let output: BlockRangeExecOutput = bincode::deserialize(&proof.public_values)?;

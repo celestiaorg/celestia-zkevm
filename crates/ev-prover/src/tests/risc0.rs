@@ -7,7 +7,7 @@
 mod tests {
     use crate::prover::programs::block::{Risc0BlockExecInput, EV_EXEC_PROGRAM_ID};
     use alloy_primitives::FixedBytes;
-    use celestia_types::{nmt::Namespace, DataAvailabilityHeader, AppVersion};
+    use celestia_types::{nmt::Namespace, AppVersion, DataAvailabilityHeader};
     use ev_zkevm_types::programs::block::BlockExecOutput;
     use storage::proofs::{ProofStorage, ProofStorageError, RocksDbProofStorage};
     use tempfile::TempDir;
@@ -25,14 +25,8 @@ mod tests {
 
         // Create minimal valid DAH with at least 2 row_roots and 2 col_roots
         // Use Default to create empty NamespacedHash instances
-        let row_roots = vec![
-            NamespacedHash::default(),
-            NamespacedHash::default(),
-        ];
-        let col_roots = vec![
-            NamespacedHash::default(),
-            NamespacedHash::default(),
-        ];
+        let row_roots = vec![NamespacedHash::default(), NamespacedHash::default()];
+        let col_roots = vec![NamespacedHash::default(), NamespacedHash::default()];
         let dah = DataAvailabilityHeader::new(row_roots, col_roots, AppVersion::V3).unwrap();
 
         // For testing, we use an empty zeth_inputs vec
@@ -72,8 +66,8 @@ mod tests {
         assert!(!serialized.is_empty(), "Serialized input should not be empty");
 
         // Test that we can deserialize it back
-        let deserialized: Risc0BlockExecInput = bincode::deserialize(&serialized)
-            .expect("Failed to deserialize Risc0BlockExecInput");
+        let deserialized: Risc0BlockExecInput =
+            bincode::deserialize(&serialized).expect("Failed to deserialize Risc0BlockExecInput");
 
         // Verify basic fields match
         assert_eq!(deserialized.header_raw, input.header_raw);
@@ -106,13 +100,16 @@ mod tests {
         let mock_public_values = bincode::serialize(&output).unwrap();
 
         // Store the RISC0 proof
-        storage.store_block_proof(
-            42,
-            storage::proofs::ProofSystem::Risc0,
-            &mock_proof_data,
-            &mock_public_values,
-            &output
-        ).await.unwrap();
+        storage
+            .store_block_proof(
+                42,
+                storage::proofs::ProofSystem::Risc0,
+                &mock_proof_data,
+                &mock_public_values,
+                &output,
+            )
+            .await
+            .unwrap();
 
         // Retrieve the proof
         let retrieved_proof = storage.get_block_proof(42).await.unwrap();
@@ -132,13 +129,16 @@ mod tests {
 
         // Store multiple RISC0 proofs
         for height in [10, 15, 20, 25, 30] {
-            storage.store_block_proof(
-                height,
-                storage::proofs::ProofSystem::Risc0,
-                &mock_proof_data,
-                &mock_public_values,
-                &output
-            ).await.unwrap();
+            storage
+                .store_block_proof(
+                    height,
+                    storage::proofs::ProofSystem::Risc0,
+                    &mock_proof_data,
+                    &mock_public_values,
+                    &output,
+                )
+                .await
+                .unwrap();
         }
 
         // Retrieve proofs in range
@@ -163,9 +163,36 @@ mod tests {
         let mock_public_values = bincode::serialize(&output).unwrap();
 
         // Store RISC0 proofs
-        storage.store_block_proof(10, storage::proofs::ProofSystem::Risc0, &mock_proof_data, &mock_public_values, &output).await.unwrap();
-        storage.store_block_proof(20, storage::proofs::ProofSystem::Risc0, &mock_proof_data, &mock_public_values, &output).await.unwrap();
-        storage.store_block_proof(15, storage::proofs::ProofSystem::Risc0, &mock_proof_data, &mock_public_values, &output).await.unwrap();
+        storage
+            .store_block_proof(
+                10,
+                storage::proofs::ProofSystem::Risc0,
+                &mock_proof_data,
+                &mock_public_values,
+                &output,
+            )
+            .await
+            .unwrap();
+        storage
+            .store_block_proof(
+                20,
+                storage::proofs::ProofSystem::Risc0,
+                &mock_proof_data,
+                &mock_public_values,
+                &output,
+            )
+            .await
+            .unwrap();
+        storage
+            .store_block_proof(
+                15,
+                storage::proofs::ProofSystem::Risc0,
+                &mock_proof_data,
+                &mock_public_values,
+                &output,
+            )
+            .await
+            .unwrap();
 
         // Should return the highest height proof
         let latest = storage.get_latest_block_proof().await.unwrap();
@@ -183,14 +210,8 @@ mod tests {
 
         // Create minimal valid DAH with at least 2 row_roots and 2 col_roots
         // Use Default to create empty NamespacedHash instances
-        let row_roots = vec![
-            NamespacedHash::default(),
-            NamespacedHash::default(),
-        ];
-        let col_roots = vec![
-            NamespacedHash::default(),
-            NamespacedHash::default(),
-        ];
+        let row_roots = vec![NamespacedHash::default(), NamespacedHash::default()];
+        let col_roots = vec![NamespacedHash::default(), NamespacedHash::default()];
         let dah = DataAvailabilityHeader::new(row_roots, col_roots, AppVersion::V3).unwrap();
 
         let input = Risc0BlockExecInput {
@@ -235,14 +256,8 @@ mod tests {
 
         // Create minimal valid DAH with at least 2 row_roots and 2 col_roots
         // Use Default to create empty NamespacedHash instances
-        let row_roots = vec![
-            NamespacedHash::default(),
-            NamespacedHash::default(),
-        ];
-        let col_roots = vec![
-            NamespacedHash::default(),
-            NamespacedHash::default(),
-        ];
+        let row_roots = vec![NamespacedHash::default(), NamespacedHash::default()];
+        let col_roots = vec![NamespacedHash::default(), NamespacedHash::default()];
         let dah = DataAvailabilityHeader::new(row_roots, col_roots, AppVersion::V3).unwrap();
 
         let input = Risc0BlockExecInput {
