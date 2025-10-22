@@ -25,7 +25,7 @@ async fn main() {
 
     let ism = resp.ism.expect("ZKISM not found");
     let trusted_celestia_height = ism.celestia_height;
-    let trusted_celestia_root = ism.celestia_state_root;
+    let trusted_celestia_root = ism.celestia_header_hash;
     let trusted_inclusion_height = inclusion_height(TRUSTED_HEIGHT).await.unwrap() + 1;
     let target_inclusion_height = inclusion_height(TARGET_HEIGHT).await.unwrap();
     let num_blocks = target_inclusion_height - trusted_inclusion_height + 1;
