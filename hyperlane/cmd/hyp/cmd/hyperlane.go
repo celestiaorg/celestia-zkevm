@@ -60,7 +60,7 @@ func SetupZKIsm(ctx context.Context, broadcaster *Broadcaster, ethClient *ethcli
 		Creator:             broadcaster.address.String(),
 		StateRoot:           block.Header().Root.Bytes(),
 		Height:              block.NumberU64(),
-		CelestiaStateRoot:   root[:],
+		CelestiaHeaderHash:  root[:],
 		CelestiaHeight:      height,
 		Namespace:           namespace,
 		SequencerPublicKey:  pubKey,

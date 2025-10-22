@@ -70,8 +70,6 @@ impl Display for BlockExecOutput {
 pub struct BlockRangeExecInput {
     pub vkeys: Vec<[u32; 8]>,
     pub public_values: Vec<Vec<u8>>,
-    pub trusted_celestia_height: u64,
-    pub trusted_celestia_root: [u8; 32],
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -83,7 +81,7 @@ pub struct BlockRangeExecOutput {
     // celestia_header_hash is the hash of the celestia header at which new_height is available.
     pub celestia_header_hash: [u8; 32],
     // new_celestia_height is the height of the new Celestia block.
-    pub new_celestia_height: u64,
+    pub celestia_height: u64,
     // trusted_height is the trusted height of the EVM application.
     pub trusted_height: u64,
     // trusted_state_root is the state commitment root of the EVM application at trusted_height.

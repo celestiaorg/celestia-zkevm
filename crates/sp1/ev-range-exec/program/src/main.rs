@@ -127,7 +127,7 @@ pub fn main() {
     let output = BlockRangeExecOutput {
         prev_celestia_height: first.prev_celestia_height,
         prev_celestia_header_hash: first.prev_celestia_header_hash,
-        new_celestia_height: inputs.trusted_celestia_height + inputs.public_values.len() as u64,
+        celestia_height: first.prev_celestia_height + inputs.public_values.len() as u64,
         celestia_header_hash: last.celestia_header_hash,
         trusted_height: first.prev_height,
         trusted_state_root: first.prev_state_root,

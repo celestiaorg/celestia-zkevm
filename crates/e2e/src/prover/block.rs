@@ -83,8 +83,6 @@ async fn get_sequencer_pubkey() -> Result<Vec<u8>, Box<dyn Error>> {
 pub async fn prove_blocks(
     start_height: u64,
     trusted_height: u64,
-    trusted_celestia_height: u64,
-    trusted_celestia_root: [u8; 32],
     num_blocks: u64,
     trusted_root: &mut FixedBytes<32>,
     client: Arc<EnvProver>,
@@ -94,16 +92,7 @@ pub async fn prove_blocks(
     let proof = {
         // parallel mode (network)
         if prover_mode == "network" {
-            parallel_prover(
-                start_height,
-                &mut trusted_height,
-                trusted_celestia_height,
-                trusted_celestia_root,
-                num_blocks,
-                trusted_root,
-                client,
-            )
-            .await?
+            parallel_prover(start_height, &mut trusted_height, num_blocks, trusted_root, client).await?
         }
         // mock mode is not possible for recursive groth16 proofs
         else if prover_mode == "mock" {
@@ -111,16 +100,7 @@ pub async fn prove_blocks(
         }
         // synchronous mode (cuda, cpu)
         else {
-            synchronous_prover(
-                start_height,
-                &mut trusted_height,
-                trusted_celestia_height,
-                trusted_celestia_root,
-                num_blocks,
-                trusted_root,
-                client,
-            )
-            .await?
+            synchronous_prover(start_height, &mut trusted_height, num_blocks, trusted_root, client).await?
         }
     };
     Ok(proof)
@@ -129,8 +109,6 @@ pub async fn prove_blocks(
 pub async fn parallel_prover(
     start_height: u64,
     trusted_height: &mut u64,
-    trusted_celestia_height: u64,
-    trusted_celestia_root: [u8; 32],
     num_blocks: u64,
     trusted_root: &mut FixedBytes<32>,
     client: Arc<EnvProver>,
@@ -329,8 +307,6 @@ pub async fn parallel_prover(
     let input = BlockRangeExecInput {
         vkeys,
         public_values: public_inputs,
-        trusted_celestia_height,
-        trusted_celestia_root,
     };
     stdin.write(&input);
 
@@ -364,8 +340,6 @@ pub async fn parallel_prover(
 pub async fn synchronous_prover(
     start_height: u64,
     trusted_height: &mut u64,
-    trusted_celestia_height: u64,
-    trusted_celestia_root: [u8; 32],
     num_blocks: u64,
     trusted_root: &mut FixedBytes<32>,
     client: Arc<EnvProver>,
@@ -435,8 +409,6 @@ pub async fn synchronous_prover(
     let input = BlockRangeExecInput {
         vkeys,
         public_values: public_inputs,
-        trusted_celestia_height,
-        trusted_celestia_root,
     };
     stdin.write(&input);
 

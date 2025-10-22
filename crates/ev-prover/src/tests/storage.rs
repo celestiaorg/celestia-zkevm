@@ -38,7 +38,7 @@ mod tests {
             celestia_header_hash: [6; 32],
             prev_celestia_height: 90,
             prev_celestia_header_hash: [6; 32],
-            new_celestia_height: 100,
+            celestia_height: 100,
             trusted_height: 90,
             trusted_state_root: [7; 32],
             new_height: 100,
