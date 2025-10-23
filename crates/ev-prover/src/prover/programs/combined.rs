@@ -1,11 +1,12 @@
-use std::{env, fs, sync::Arc};
+use std::{env, fs, sync::Arc, time::Duration};
 
+use alloy::hex::FromHex;
 use alloy_genesis::Genesis as AlloyGenesis;
 use alloy_primitives::FixedBytes;
-use alloy_provider::ProviderBuilder;
-use anyhow::Result as AnyhowResult;
+use alloy_provider::{Provider, ProviderBuilder};
+use anyhow::{Context, Result};
 use async_trait::async_trait;
-use celestia_grpc_client::{types::ClientConfig, CelestiaIsmClient, QueryIsmRequest};
+use celestia_grpc_client::{types::ClientConfig, CelestiaIsmClient, MsgUpdateZkExecutionIsm, QueryIsmRequest};
 use celestia_rpc::{BlobClient, Client, HeaderClient, ShareClient};
 use celestia_types::{
     nmt::{Namespace, NamespaceProof},
@@ -14,9 +15,7 @@ use celestia_types::{
 use ev_types::v1::{
     get_block_request::Identifier, store_service_client::StoreServiceClient, GetBlockRequest, SignedData,
 };
-use ev_zkevm_types::programs::block::{BlockExecInput, BlockRangeExecOutput, EvCombinedInput};
-use eyre::Context;
-use eyre::Result;
+use ev_zkevm_types::programs::block::{BlockExecInput, BlockExecOutput, BlockRangeExecOutput, EvCombinedInput};
 use prost::Message;
 use reth_chainspec::ChainSpec;
 use rsp_client_executor::io::EthClientExecutorInput;
@@ -24,7 +23,8 @@ use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
 use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
-use tracing::{debug, info};
+use tokio::time::sleep;
+use tracing::{debug, info, warn};
 
 use crate::prover::ProgramProver;
 use crate::prover::{config::CombinedProverConfig, prover_from_env, SP1Prover};
@@ -55,12 +55,12 @@ impl ProgramProver for EvCombinedProver {
         &self.config
     }
 
-    fn build_stdin(&self, input: Self::Input) -> AnyhowResult<SP1Stdin> {
+    fn build_stdin(&self, input: Self::Input) -> Result<SP1Stdin> {
         let mut stdin = SP1Stdin::new();
         stdin.write(&input);
         Ok(stdin)
     }
-    fn post_process(&self, proof: SP1ProofWithPublicValues) -> AnyhowResult<Self::Output> {
+    fn post_process(&self, proof: SP1ProofWithPublicValues) -> Result<Self::Output> {
         Ok(bincode::deserialize::<BlockRangeExecOutput>(
             proof.public_values.as_slice(),
         )?)
@@ -86,21 +86,51 @@ impl EvCombinedProver {
     pub async fn run(self) -> Result<()> {
         let config = ClientConfig::from_env()?;
         let ism_client = CelestiaIsmClient::new(config).await?;
-        let rpc_url = "http://localhost:26658";
-        let client = Client::new(rpc_url, None).await?;
+        let client = Client::new(config::CELESTIA_RPC_URL, None).await?;
+
+        let mut known_celestia_header: [u8; 32] = [0; 32];
+
         loop {
             let resp = ism_client.ism(QueryIsmRequest { id: ISM_ID.to_string() }).await?;
-
-            let ism = resp.ism.ok_or_else(|| eyre::eyre!("ZKISM not found"))?;
+            let ism = resp.ism.ok_or_else(|| anyhow::anyhow!("ZKISM not found"))?;
             let trusted_root_hex = alloy::hex::encode(ism.state_root);
             let latest_celestia_header = client.header_local_head().await?;
-            let trusted_height = ism.height;
-            let trusted_celestia_height = ism.celestia_height;
-            let trusted_celestia_header_hash = ism.celestia_header_hash;
+            let mut trusted_height = ism.height;
+            let mut trusted_root = FixedBytes::from_hex(&trusted_root_hex)?;
+            let trusted_celestia_header = ism.celestia_header_hash;
+            if trusted_celestia_header == known_celestia_header {
+                warn!("Celestia header has not changed, waiting for 1 second");
+                sleep(Duration::from_secs(1)).await;
+            }
 
             let celestia_start_height = ism.celestia_height + 1;
-            let num_blocks = latest_celestia_header.height().value() - celestia_start_height;
-            info!("Celestia start height: {}", celestia_start_height);
+            let mut num_blocks = latest_celestia_header.height().value() - celestia_start_height;
+            num_blocks = num_blocks.min(MAX_PROOF_RANGE);
+            let stdin = prepare_combined_inputs(
+                &client,
+                celestia_start_height,
+                &mut trusted_height,
+                num_blocks,
+                &mut trusted_root,
+            )
+            .await?;
+            let proof = self
+                .prover
+                .prove(&self.config.pk, &stdin, SP1ProofMode::Groth16)
+                .context("Failed to prove")?;
+            let block_proof_msg = MsgUpdateZkExecutionIsm::new(
+                ISM_ID.to_string(),
+                celestia_start_height + num_blocks,
+                proof.bytes(),
+                proof.public_values.as_slice().to_vec(),
+                ism_client.signer_address().to_string(),
+            );
+            info!("Updating ZKISM on Celestia...");
+            let response = ism_client.send_tx(block_proof_msg).await.unwrap();
+            assert!(response.success);
+            info!("[Done] ZKISM was updated successfully");
+            let public_values: BlockExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
+            known_celestia_header = public_values.celestia_header_hash;
         }
     }
 }
@@ -109,20 +139,18 @@ async fn prepare_combined_inputs(
     celestia_client: &Client,
     start_height: u64,
     trusted_height: &mut u64,
-    trusted_celestia_height: u64,
-    trusted_celestia_header_hash: [u8; 32],
     num_blocks: u64,
     trusted_root: &mut FixedBytes<32>,
 ) -> Result<SP1Stdin> {
     let genesis_path = dirs::home_dir()
-        .ok_or_else(|| eyre::eyre!("cannot find home directory"))?
+        .ok_or_else(|| anyhow::anyhow!("cannot find home directory"))?
         .join(".ev-prover")
         .join("config")
         .join("genesis.json");
     let (genesis, chain_spec) = load_chain_spec_from_genesis(
         genesis_path
             .to_str()
-            .ok_or_else(|| eyre::eyre!("Invalid genesis path"))?,
+            .ok_or_else(|| anyhow::anyhow!("Invalid genesis path"))?,
     )?;
     let namespace_hex = env::var("CELESTIA_NAMESPACE")?;
     let namespace = Namespace::new_v0(&hex::decode(namespace_hex)?)?;
@@ -134,8 +162,8 @@ async fn prepare_combined_inputs(
                 &celestia_client,
                 block_number,
                 namespace,
-                *trusted_height,
-                *trusted_root,
+                trusted_height,
+                trusted_root,
                 chain_spec.clone(),
                 genesis.clone(),
                 pub_key.clone(),
@@ -146,8 +174,6 @@ async fn prepare_combined_inputs(
 
     // reinitialize the prover client
     let mut stdin = SP1Stdin::new();
-    let range_prover_elf = fs::read("elfs/ev-range-exec-elf")?;
-
     let input = EvCombinedInput {
         blocks: block_inputs,
         trusted_height: *trusted_height,
@@ -181,11 +207,11 @@ async fn get_sequencer_pubkey() -> Result<Vec<u8>> {
     let pub_key = resp
         .into_inner()
         .block
-        .ok_or_else(|| eyre::eyre!("Block not found"))?
+        .ok_or_else(|| anyhow::anyhow!("Block not found"))?
         .header
-        .ok_or_else(|| eyre::eyre!("Header not found"))?
+        .ok_or_else(|| anyhow::anyhow!("Header not found"))?
         .signer
-        .ok_or_else(|| eyre::eyre!("Signer not found"))?
+        .ok_or_else(|| anyhow::anyhow!("Signer not found"))?
         .pub_key;
 
     Ok(pub_key[4..].to_vec())
@@ -196,8 +222,8 @@ async fn get_block_inputs(
     celestia_client: &Client,
     block_number: u64,
     namespace: Namespace,
-    trusted_height: u64,
-    trusted_root: FixedBytes<32>,
+    trusted_height: &mut u64,
+    trusted_root: &mut FixedBytes<32>,
     chain_spec: Arc<ChainSpec>,
     genesis: Genesis,
     pub_key: Vec<u8>,
@@ -219,12 +245,18 @@ async fn get_block_inputs(
     debug!("Got NamespaceProofs, total: {}", proofs.len());
 
     let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
+    let mut last_height = 0;
     for blob in blobs.as_slice() {
-        let data = match SignedData::decode(blob.data.as_slice()) {
-            Ok(data) => data.data.ok_or_else(|| eyre::eyre!("Data not found"))?,
+        let signed_data = match SignedData::decode(blob.data.as_slice()) {
+            Ok(data) => data,
             Err(_) => continue,
         };
-        let height = data.metadata.ok_or_else(|| eyre::eyre!("Metadata not found"))?.height;
+        let data = signed_data.data.ok_or_else(|| anyhow::anyhow!("Data not found"))?;
+        let height = data
+            .metadata
+            .ok_or_else(|| anyhow::anyhow!("Metadata not found"))?
+            .height;
+        last_height = height;
         debug!("Got SignedData for EVM block {height}");
 
         let client_executor_input =
@@ -240,9 +272,25 @@ async fn get_block_inputs(
         namespace,
         proofs,
         executor_inputs: executor_inputs.clone(),
-        trusted_height,
-        trusted_root,
+        trusted_height: *trusted_height,
+        trusted_root: *trusted_root,
     };
+
+    // Update trusted height and root to last processed height
+    if last_height > 0 {
+        let provider = ProviderBuilder::new().connect_http(config::EVM_RPC_URL.parse()?);
+        let block = provider
+            .get_block_by_number(last_height.into())
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Block {} not found", last_height))?;
+
+        *trusted_height = last_height;
+        *trusted_root = block.header.state_root;
+        debug!(
+            "Updated trusted_height to {} and trusted_root to {:?}",
+            trusted_height, trusted_root
+        );
+    }
 
     Ok(input)
 }
@@ -262,7 +310,7 @@ async fn generate_client_executor_input(
     let client_input = host_executor
         .execute(block_number, &rpc_db, &provider, genesis, None, false)
         .await
-        .wrap_err_with(|| format!("Failed to execute block {block_number}"))?;
+        .with_context(|| format!("Failed to execute block {block_number}"))?;
 
     Ok(client_input)
 }
