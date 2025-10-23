@@ -302,21 +302,18 @@ async fn get_block_inputs(
         trusted_root: *trusted_root,
     };
 
-    // Update trusted height and root to last processed height
-    if last_height > 0 {
-        let provider = ProviderBuilder::new().connect_http(config::EVM_RPC_URL.parse()?);
-        let block = provider
-            .get_block_by_number(last_height.into())
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Block {} not found", last_height))?;
+    let provider = ProviderBuilder::new().connect_http(config::EVM_RPC_URL.parse()?);
+    let block = provider
+        .get_block_by_number(last_height.into())
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Block {} not found", last_height))?;
 
-        *trusted_height = last_height;
-        *trusted_root = block.header.state_root;
-        debug!(
-            "Updated trusted_height to {} and trusted_root to {:?}",
-            trusted_height, trusted_root
-        );
-    }
+    *trusted_height = last_height;
+    *trusted_root = block.header.state_root;
+    debug!(
+        "Updated trusted_height to {} and trusted_root to {:?}",
+        trusted_height, trusted_root
+    );
 
     Ok(input)
 }
