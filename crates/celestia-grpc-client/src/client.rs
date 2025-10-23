@@ -14,6 +14,7 @@ use tonic::{
 use tracing::{debug, info, warn};
 
 /// Celestia gRPC client for proof submission
+#[derive(Clone)]
 pub struct CelestiaIsmClient {
     pub config: ClientConfig,
     channel: Channel,

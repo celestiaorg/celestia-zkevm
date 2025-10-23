@@ -106,6 +106,13 @@ pub struct RangeProofCommitted {
 }
 
 impl RangeProofCommitted {
+    pub fn new(trusted_height: u64, trusted_root: [u8; 32]) -> Self {
+        Self {
+            trusted_height,
+            trusted_root,
+        }
+    }
+
     pub fn trusted_height(&self) -> u64 {
         self.trusted_height
     }

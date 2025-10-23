@@ -5,13 +5,15 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{anyhow, Ok, Result};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use celestia_grpc_client::{CelestiaIsmClient, StateTransitionProofMsg};
 use ev_zkevm_types::programs::block::{BlockRangeExecInput, BlockRangeExecOutput};
 use sp1_sdk::{include_elf, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
 use storage::proofs::ProofStorage;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::{debug, info};
+use tokio::sync::Semaphore;
+use tracing::{debug, error, info};
 
 use crate::prover::{
     programs::block::EV_EXEC_ELF, BlockProofCommitted, ProgramProver, ProgramVerifyingKey, RangeProofCommitted,
@@ -21,27 +23,6 @@ use crate::prover::{prover_from_env, SP1Prover};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_RANGE_EXEC_ELF: &[u8] = include_elf!("ev-range-exec-program");
-
-/// A prover for verifying and aggregating SP1 proofs over a range of blocks.
-///
-/// This struct is responsible for preparing the standard input (`SP1Stdin`)
-/// for a zkVM program that takes a sequence of SP1 proofs, their corresponding
-/// public inputs, and verifier key digests. The program then verifies them
-/// reducing the result to a single groth16 proof.
-///
-///
-/// - All SP1 proofs must be in compressed format (`SP1Proof::Compressed`).
-/// - The number of `vkeys` must exactly match the number of `proofs`.
-pub struct BlockRangeExecProver {
-    config: RecursiveProverConfig,
-    prover: Arc<SP1Prover>,
-    pending: BTreeSet<BlockProofCommitted>,
-    block_rx: Receiver<BlockProofCommitted>,
-    range_tx: Sender<RangeProofCommitted>,
-    storage: Arc<dyn ProofStorage>,
-    next_expected: Option<u64>, // TODO: consider persisting this; initialize to last_aggregated_end + 1
-    batch_size: usize,
-}
 
 /// ProofInput is a convenience type used for proof aggregation inputs within the BlockRangeExecProver program.
 pub struct ProofInput {
@@ -118,26 +99,31 @@ impl ProgramProver for BlockRangeExecProver {
     }
 }
 
+/// A prover for verifying and aggregating SP1 proofs over a range of blocks.
+///
+/// This struct is responsible for preparing the standard input (`SP1Stdin`)
+/// for a zkVM program that takes a sequence of SP1 proofs, their corresponding
+/// public inputs, and verifier key digests. The program then verifies them
+/// reducing the result to a single groth16 proof.
+///
+///
+/// - All SP1 proofs must be in compressed format (`SP1Proof::Compressed`).
+/// - The number of `vkeys` must exactly match the number of `proofs`.
+pub struct BlockRangeExecProver {
+    config: RecursiveProverConfig,
+    prover: Arc<SP1Prover>,
+    storage: Arc<dyn ProofStorage>,
+}
+
 impl BlockRangeExecProver {
-    pub fn new(
-        batch_size: usize,
-        block_rx: Receiver<BlockProofCommitted>,
-        range_tx: Sender<RangeProofCommitted>,
-        storage: Arc<dyn ProofStorage>,
-    ) -> Result<Self> {
+    pub fn new(storage: Arc<dyn ProofStorage>) -> Result<Self> {
         let prover = prover_from_env();
         let config = BlockRangeExecProver::default_config(prover.as_ref());
-        let pending = BTreeSet::new();
 
         Ok(Self {
             config,
             prover,
-            pending,
-            block_rx,
-            range_tx,
             storage,
-            batch_size,
-            next_expected: None, // TODO: initialise from db (maybe field here isn't needed)
         })
     }
 
@@ -153,22 +139,76 @@ impl BlockRangeExecProver {
             HashMap::from([("block-exec", ProgramVerifyingKey::new(Arc::new(inner_vk)))]),
         )
     }
+}
 
-    /// Starts the range prover loop.
+pub struct BlockRangeExecService {
+    client: CelestiaIsmClient,
+    prover: Arc<BlockRangeExecProver>,
+    rx_block: Receiver<BlockProofCommitted>,
+    tx_range: Sender<RangeProofCommitted>,
+
+    batch_size: usize,
+    concurrency: Arc<Semaphore>,
+
+    pending: BTreeSet<BlockProofCommitted>,
+    next_expected: Option<u64>,
+}
+
+impl BlockRangeExecService {
+    pub fn new(
+        client: CelestiaIsmClient,
+        prover: Arc<BlockRangeExecProver>,
+        rx_block: Receiver<BlockProofCommitted>,
+        tx_range: Sender<RangeProofCommitted>,
+        batch_size: usize,
+        concurrency: usize,
+    ) -> Self {
+        Self {
+            client,
+            prover,
+            rx_block,
+            tx_range,
+            batch_size,
+            concurrency: Arc::new(Semaphore::new(concurrency)),
+            pending: BTreeSet::new(),
+            next_expected: None,
+        }
+    }
+
     pub async fn run(mut self) -> Result<()> {
-        while let Some(event) = self.block_rx.recv().await {
-            info!("ProofCommitted for height: {}", event);
-            self.pending.insert(event);
+        while let Some(ev) = self.rx_block.recv().await {
+            info!("ProofCommitted for height: {}", ev);
+            self.pending.insert(ev);
             debug!("Block execution proofs pending: {}", self.pending.len());
 
-            // Drain as many batches as are ready from the set.
             while let Some((start, end)) = self.next_provable_range()? {
-                // TODO: consider handing off to a separate task
-                info!("Ready to aggregate complete batch in range: ({start}-{end})");
-                self.aggregate_range(start, end).await?;
+                let permit = self.concurrency.clone().acquire_owned().await?;
+
+                let client = self.client.clone();
+                let prover = self.prover.clone();
+                let tx = self.tx_range.clone();
+
+                tokio::spawn(async move {
+                    let _permit = permit;
+
+                    match Self::aggregate_range(start, end, prover).await {
+                        Ok((proof, output)) => {
+                            if let Err(e) = Self::submit_range_proof(&client, &proof).await {
+                                error!(?e, "failed to submit tx to ism");
+                            }
+
+                            let event = RangeProofCommitted::new(output.new_height, output.new_state_root);
+                            if let Err(e) = tx.send(event).await {
+                                error!(?e, "failed to send RangeProofCommitted event on channel");
+                            }
+                        }
+                        Err(e) => {
+                            error!(?e, %start, %end, "range aggregation failed");
+                        }
+                    }
+                });
             }
         }
-
         Ok(())
     }
 
@@ -220,9 +260,13 @@ impl BlockRangeExecProver {
     }
 
     /// Aggregates a range of block proofs, start and end inclusive.
-    async fn aggregate_range(&mut self, start: u64, end: u64) -> Result<()> {
-        let block_proofs = self.storage.get_block_proofs_in_range(start, end).await?;
-        let inner = self.cfg().inner.get("block-exec").unwrap();
+    async fn aggregate_range(
+        start: u64,
+        end: u64,
+        prover: Arc<BlockRangeExecProver>,
+    ) -> Result<(SP1ProofWithPublicValues, BlockRangeExecOutput)> {
+        let block_proofs = prover.storage.get_block_proofs_in_range(start, end).await?;
+        let inner = prover.cfg().inner.get("block-exec").unwrap();
         let vkeys = vec![inner.digest; block_proofs.len()];
 
         let mut public_values = Vec::with_capacity(block_proofs.len());
@@ -235,6 +279,10 @@ impl BlockRangeExecProver {
         }
 
         let input = (BlockRangeExecInput { vkeys, public_values }, proofs);
+        let (res, output) = prover.prove(input).await?;
+        prover.storage.store_range_proof(start, end, &res, &output).await?;
+
+        info!("Successfull created and stored proof for range {start}-{end}. Outputs: {output}");
 
         // NOTE: temporarily to allow local testing in mock mode
         // let prover = ProverClient::builder().mock().build();
@@ -242,12 +290,25 @@ impl BlockRangeExecProver {
         //     .prove(&self.cfg().pk(), &self.build_stdin(input)?)
         //     .deferred_proof_verification(false)
         //     .run()?;
-
         // let output = self.post_process(res)?;
+        Ok((res, output))
+    }
 
-        let (res, output) = self.prove(input).await?;
-        self.storage.store_range_proof(start, end, &res, &output).await?;
-        info!("Successfully run range prover with result: {output}");
+    async fn submit_range_proof(client: &CelestiaIsmClient, proof: &SP1ProofWithPublicValues) -> Result<()> {
+        let public_values = proof.public_values.to_vec();
+        let signer_address = client.signer_address().to_string();
+
+        // TODO: replace hardcoded fields with real ids/nonce
+        let proof_msg = StateTransitionProofMsg::new(
+            "id.clone()".to_string(),
+            100,
+            proof.bytes(),
+            public_values,
+            signer_address,
+        );
+
+        let res = client.send_tx(proof_msg).await?;
+        info!("Proof tx submitted to ism with hash: {}", res.tx_hash);
 
         Ok(())
     }

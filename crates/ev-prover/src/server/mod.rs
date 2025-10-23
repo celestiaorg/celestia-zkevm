@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use celestia_grpc_client::types::ClientConfig;
+use celestia_grpc_client::CelestiaIsmClient;
 use ev_types::v1::get_block_request::Identifier;
 use ev_types::v1::store_service_client::StoreServiceClient;
 use ev_types::v1::GetBlockRequest;
@@ -15,7 +17,7 @@ use tracing::{debug, error};
 use crate::config::config::{Config, APP_HOME};
 use crate::proto::celestia::prover::v1::prover_server::ProverServer;
 use crate::prover::programs::block::{AppContext, BlockExecProver};
-use crate::prover::programs::range::BlockRangeExecProver;
+use crate::prover::programs::range::{BlockRangeExecProver, BlockRangeExecService};
 use crate::prover::service::ProverService;
 
 pub async fn start_server(config: Config) -> Result<()> {
@@ -63,10 +65,14 @@ pub async fn start_server(config: Config) -> Result<()> {
         }
     });
 
+    let client_config = ClientConfig::from_env()?;
+    let client = CelestiaIsmClient::new(client_config).await?;
+
     tokio::spawn({
-        let range_prover = BlockRangeExecProver::new(batch_size, block_rx, range_tx, storage.clone())?;
+        let prover = Arc::new(BlockRangeExecProver::new(storage.clone())?);
+        let svc = BlockRangeExecService::new(client, prover, block_rx, range_tx, batch_size, 16);
         async move {
-            if let Err(e) = range_prover.run().await {
+            if let Err(e) = svc.run().await {
                 error!("Block prover task failed: {e:?}");
             }
         }
