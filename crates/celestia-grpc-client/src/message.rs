@@ -8,10 +8,9 @@ pub type HyperlaneMessage = MsgProcessMessage;
 
 impl MsgUpdateZkExecutionIsm {
     /// Create a new ZK execution ISM update message
-    pub fn new(id: String, height: u64, proof: Vec<u8>, public_values: Vec<u8>, signer: String) -> Self {
+    pub fn new(id: String, proof: Vec<u8>, public_values: Vec<u8>, signer: String) -> Self {
         Self {
             id,
-            height,
             proof,
             public_values,
             signer,
