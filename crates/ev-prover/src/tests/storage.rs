@@ -22,7 +22,8 @@ mod tests {
     fn create_mock_block_output() -> BlockExecOutput {
         BlockExecOutput {
             celestia_header_hash: [1; 32],
-            prev_celestia_header_hash: [2; 32],
+            prev_celestia_height: 99,
+            prev_celestia_header_hash: [1; 32],
             new_height: 100,
             new_state_root: [3; 32],
             prev_height: 99,
@@ -35,6 +36,9 @@ mod tests {
     fn create_mock_range_output() -> BlockRangeExecOutput {
         BlockRangeExecOutput {
             celestia_header_hash: [6; 32],
+            prev_celestia_height: 90,
+            prev_celestia_header_hash: [6; 32],
+            celestia_height: 100,
             trusted_height: 90,
             trusted_state_root: [7; 32],
             new_height: 100,

@@ -236,6 +236,7 @@ pub fn main() {
             .as_bytes()
             .try_into()
             .expect("celestia_header_hash must be exactly 32 bytes"),
+        prev_celestia_height: celestia_header.height.value() - 1,
         prev_celestia_header_hash: celestia_header
             .last_block_id
             .unwrap()
