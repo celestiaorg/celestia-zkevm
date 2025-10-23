@@ -154,7 +154,6 @@ mod tests {
         // Test the new message structure based on actual Celestia PR #5788
         let proof_msg = StateTransitionProofMsg::new(
             "".to_string(),            // Empty ISM ID should be validated
-            100,                       // height
             vec![1, 2, 3],             // proof
             vec![4, 5, 6],             // public_values
             "test_signer".to_string(), // signer
@@ -162,7 +161,6 @@ mod tests {
 
         // Test the new field structure
         assert_eq!(proof_msg.id, "");
-        assert_eq!(proof_msg.height, 100);
         assert_eq!(proof_msg.proof, vec![1, 2, 3]);
         assert_eq!(proof_msg.public_values, vec![4, 5, 6]);
         assert_eq!(proof_msg.signer, "test_signer");
@@ -191,7 +189,6 @@ mod tests {
     fn test_message_serialization() {
         let proof_msg = StateTransitionProofMsg::new(
             "test-ism-123".to_string(),
-            1000,
             vec![0xff, 0xee, 0xdd],
             vec![0x01, 0x02, 0x03],
             "test_signer".to_string(),
@@ -206,7 +203,6 @@ mod tests {
             StateTransitionProofMsg::decode(serialized.as_slice()).expect("failed to decode");
 
         assert_eq!(deserialized.id, proof_msg.id);
-        assert_eq!(deserialized.height, proof_msg.height);
         assert_eq!(deserialized.proof, proof_msg.proof);
         assert_eq!(deserialized.public_values, proof_msg.public_values);
         assert_eq!(deserialized.signer, proof_msg.signer);
