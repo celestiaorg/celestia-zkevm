@@ -42,10 +42,10 @@ mod config {
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_COMBINED_ELF: &[u8] = include_elf!("ev-combined-program");
 pub const ISM_ID: &str = "0x726f757465725f69736d000000000000000000000000002a0000000000000001";
-pub const BATCH_SIZE: u64 = 60;
+pub const BATCH_SIZE: u64 = 10;
 //pub const PARALLELISM: u64 = 1;
-pub const WARN_DISTANCE: u64 = 120;
-pub const ERR_DISTANCE: u64 = 240;
+pub const WARN_DISTANCE: u64 = 30;
+pub const ERR_DISTANCE: u64 = 60;
 pub struct EvCombinedProver {
     config: CombinedProverConfig,
     prover: Arc<SP1Prover>,
@@ -94,7 +94,7 @@ impl EvCombinedProver {
         let ism_client = CelestiaIsmClient::new(config).await?;
         let client = Client::new(config::CELESTIA_RPC_URL, None).await?;
 
-        let mut known_celestia_header: [u8; 32] = [0; 32];
+        let mut known_celestia_height: u64 = 0;
 
         loop {
             let resp = ism_client.ism(QueryIsmRequest { id: ISM_ID.to_string() }).await?;
@@ -103,14 +103,10 @@ impl EvCombinedProver {
             let latest_celestia_header = client.header_local_head().await?;
             let mut trusted_height = ism.height;
             let mut trusted_root = FixedBytes::from_hex(&trusted_root_hex)?;
-            let trusted_celestia_header = ism.celestia_header_hash;
             let trusted_celestia_height = ism.celestia_height;
             let latest_celestia_height = latest_celestia_header.height().value();
-            if trusted_celestia_header == known_celestia_header {
-                warn!(
-                    "Celestia header {:?} has not changed, waiting for 1 second",
-                    latest_celestia_header
-                );
+            if latest_celestia_height == known_celestia_height {
+                info!("Celestia height has not changed, waiting for 1 second");
                 sleep(Duration::from_secs(1)).await;
                 continue;
             }
@@ -161,7 +157,7 @@ impl EvCombinedProver {
             info!("[Done] ZKISM was updated successfully");
             // todo: notify message prover
             let public_values: BlockRangeExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
-            known_celestia_header = public_values.celestia_header_hash;
+            known_celestia_height = public_values.celestia_height;
         }
     }
 }
