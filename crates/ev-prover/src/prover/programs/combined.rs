@@ -114,8 +114,11 @@ impl EvCombinedProver {
                 sleep(Duration::from_secs(1)).await;
                 continue;
             }
-            if trusted_celestia_height + BATCH_SIZE < latest_celestia_height {
-                let blocks_needed = trusted_celestia_height + BATCH_SIZE - latest_celestia_height;
+
+            if trusted_celestia_height + BATCH_SIZE > latest_celestia_height {
+                println!("trusted_celestia_height: {trusted_celestia_height}");
+                println!("latest_celestia_height: {latest_celestia_height}");
+                let blocks_needed = (trusted_celestia_height + BATCH_SIZE).saturating_sub(latest_celestia_height);
                 warn!("Waiting for {blocks_needed} more blocks to reach required batch size");
                 sleep(Duration::from_secs(5)).await;
                 continue;
@@ -275,6 +278,24 @@ async fn get_block_inputs(
     debug!("Got NamespaceProofs, total: {}", proofs.len());
 
     let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
+    if blobs.is_empty() {
+        debug!(
+            "No blobs for Celestia height {}, keeping trusted_height={} and trusted_root unchanged",
+            block_number, trusted_height
+        );
+        return Ok(BlockExecInput {
+            header_raw: serde_cbor::to_vec(&extended_header.header)?,
+            dah: extended_header.dah,
+            blobs_raw: serde_cbor::to_vec(&blobs)?,
+            pub_key: pub_key.clone(),
+            namespace,
+            proofs,
+            executor_inputs: vec![],
+            trusted_height: *trusted_height,
+            trusted_root: *trusted_root,
+        });
+    }
+
     let mut last_height = 0;
     for blob in blobs.as_slice() {
         let signed_data = match SignedData::decode(blob.data.as_slice()) {
