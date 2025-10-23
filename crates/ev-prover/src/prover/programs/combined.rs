@@ -42,10 +42,10 @@ mod config {
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_COMBINED_ELF: &[u8] = include_elf!("ev-combined-program");
 pub const ISM_ID: &str = "0x726f757465725f69736d000000000000000000000000002a0000000000000001";
-pub const BATCH_SIZE: u64 = 20;
+pub const BATCH_SIZE: u64 = 60;
 //pub const PARALLELISM: u64 = 1;
-pub const WARN_DISTANCE: u64 = 50;
-pub const ERR_DISTANCE: u64 = 100;
+pub const WARN_DISTANCE: u64 = 120;
+pub const ERR_DISTANCE: u64 = 240;
 pub struct EvCombinedProver {
     config: CombinedProverConfig,
     prover: Arc<SP1Prover>,
@@ -106,10 +106,18 @@ impl EvCombinedProver {
             let trusted_celestia_header = ism.celestia_header_hash;
             let trusted_celestia_height = ism.celestia_height;
             let latest_celestia_height = latest_celestia_header.height().value();
-            if trusted_celestia_header == known_celestia_header || latest_celestia_height < trusted_height + BATCH_SIZE
-            {
-                warn!("Celestia header has not changed, waiting for 1 second");
+            if trusted_celestia_header == known_celestia_header {
+                warn!(
+                    "Celestia header {:?} has not changed, waiting for 1 second",
+                    latest_celestia_header
+                );
                 sleep(Duration::from_secs(1)).await;
+                continue;
+            }
+            if trusted_celestia_height + BATCH_SIZE < latest_celestia_height {
+                let blocks_needed = trusted_celestia_height + BATCH_SIZE - latest_celestia_height;
+                warn!("Waiting for {blocks_needed} more blocks to reach required batch size");
+                sleep(Duration::from_secs(5)).await;
                 continue;
             }
 
