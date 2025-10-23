@@ -7,7 +7,6 @@ use ev_types::v1::store_service_client::StoreServiceClient;
 use ev_types::v1::GetBlockRequest;
 use storage::proofs::RocksDbProofStorage;
 use tokio::net::TcpListener;
-use tokio::sync::mpsc;
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server;
 use tonic_reflection::server::Builder as ReflectionBuilder;
@@ -15,11 +14,16 @@ use tracing::{debug, error};
 
 use crate::config::config::{Config, APP_HOME};
 use crate::proto::celestia::prover::v1::prover_server::ProverServer;
-use crate::prover::programs::block::{AppContext, BlockExecProver};
+use crate::prover::service::ProverService;
+
 #[cfg(feature = "combined")]
 use crate::prover::programs::combined::EvCombinedProver;
-use crate::prover::programs::range::BlockRangeExecProver;
-use crate::prover::service::ProverService;
+#[cfg(not(feature = "combined"))]
+use {
+    crate::prover::programs::block::{AppContext, BlockExecProver},
+    crate::prover::programs::range::BlockRangeExecProver,
+    tokio::sync::mpsc,
+};
 
 pub async fn start_server(config: Config) -> Result<()> {
     let listener = TcpListener::bind(config.grpc_address.clone()).await?;
