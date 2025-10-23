@@ -3329,24 +3329,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ev-combined-script"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives",
- "bincode",
- "clap",
- "dotenvy",
- "ev-zkevm-types",
- "hashbrown 0.14.5",
- "hex",
- "serde",
- "serde_json",
- "sp1-build",
- "sp1-sdk",
- "tracing",
-]
-
-[[package]]
 name = "ev-exec-program"
 version = "0.1.0"
 dependencies = [
