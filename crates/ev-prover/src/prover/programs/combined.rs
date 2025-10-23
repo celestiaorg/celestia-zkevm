@@ -1,4 +1,8 @@
-use std::{env, fs, sync::Arc, time::Duration};
+use std::{
+    env, fs,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use alloy::hex::FromHex;
 use alloy_genesis::Genesis as AlloyGenesis;
@@ -38,7 +42,7 @@ mod config {
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_COMBINED_ELF: &[u8] = include_elf!("ev-combined-program");
 pub const ISM_ID: &str = "0x726f757465725f69736d000000000000000000000000002a0000000000000001";
-pub const PROOF_RANGE: u64 = 10;
+pub const BATCH_SIZE: u64 = 10;
 pub const PARALLELISM: u64 = 1;
 pub const WARN_DISTANCE: u64 = 50;
 pub const ERR_DISTANCE: u64 = 100;
@@ -102,7 +106,7 @@ impl EvCombinedProver {
             let trusted_celestia_header = ism.celestia_header_hash;
             let trusted_celestia_height = ism.celestia_height;
             let latest_celestia_height = latest_celestia_header.height().value();
-            if trusted_celestia_header == known_celestia_header || latest_celestia_height < trusted_height + PROOF_RANGE
+            if trusted_celestia_header == known_celestia_header || latest_celestia_height < trusted_height + BATCH_SIZE
             {
                 warn!("Celestia header has not changed, waiting for 1 second");
                 sleep(Duration::from_secs(1)).await;
@@ -128,17 +132,21 @@ impl EvCombinedProver {
                 &client,
                 celestia_start_height,
                 &mut trusted_height,
-                PROOF_RANGE,
+                BATCH_SIZE,
                 &mut trusted_root,
             )
             .await?;
+
+            let start_time = Instant::now();
             let proof = self
                 .prover
                 .prove(&self.config.pk, &stdin, SP1ProofMode::Groth16)
                 .context("Failed to prove")?;
+            info!("Proof generation time: {}", start_time.elapsed().as_millis());
+
             let block_proof_msg = MsgUpdateZkExecutionIsm::new(
                 ISM_ID.to_string(),
-                celestia_start_height + PROOF_RANGE,
+                celestia_start_height + BATCH_SIZE,
                 proof.bytes(),
                 proof.public_values.as_slice().to_vec(),
                 ism_client.signer_address().to_string(),
