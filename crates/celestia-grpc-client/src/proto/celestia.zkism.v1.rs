@@ -11,28 +11,34 @@ pub struct EventCreateZkExecutionIsm {
     /// the owner or creator of the ism
     #[prost(string, tag="2")]
     pub owner: ::prost::alloc::string::String,
-    /// state commitment root of the remote chain (hex encoded)
+    /// state commitment root of the remote chain
     #[prost(string, tag="3")]
     pub state_root: ::prost::alloc::string::String,
     /// latest tracked height of the remote chain
     #[prost(uint64, tag="4")]
     pub height: u64,
-    /// the celestia namespace identifier used by the application (hex-encoded)
+    /// trusted celestia header hash
     #[prost(string, tag="5")]
+    pub celestia_header_hash: ::prost::alloc::string::String,
+    /// trusted celestia height
+    #[prost(uint64, tag="6")]
+    pub celestia_height: u64,
+    /// the celestia namespace identifier used by the application (hex-encoded)
+    #[prost(string, tag="7")]
     pub namespace: ::prost::alloc::string::String,
     /// the public key of the sequencer (hex-encoded)
-    #[prost(string, tag="6")]
+    #[prost(string, tag="8")]
     pub sequencer_public_key: ::prost::alloc::string::String,
     /// the sp1 groth16 verifier key (hex-encoded)
-    #[prost(string, tag="7")]
+    #[prost(string, tag="9")]
     pub groth16_vkey: ::prost::alloc::string::String,
     /// hash-based commitment to the verifier key used for state transition
     /// (hex-encoded)
-    #[prost(string, tag="8")]
+    #[prost(string, tag="10")]
     pub state_transition_vkey: ::prost::alloc::string::String,
     /// hash-based commitment to the verifier key used for state membership
     /// (hex-encoded)
-    #[prost(string, tag="9")]
+    #[prost(string, tag="11")]
     pub state_membership_vkey: ::prost::alloc::string::String,
 }
 /// EventUpdateZKExecutionISM defines the event type emitted when updating a
@@ -43,12 +49,18 @@ pub struct EventUpdateZkExecutionIsm {
     /// unique hyperlane identifier
     #[prost(string, tag="1")]
     pub id: ::prost::alloc::string::String,
-    /// new state commitment root of the remote chain (hex-encoded)
+    /// state commitment root of the remote chain
     #[prost(string, tag="2")]
     pub state_root: ::prost::alloc::string::String,
-    /// new latest height of the remote chain
+    /// latest tracked height of the remote chain
     #[prost(uint64, tag="3")]
     pub height: u64,
+    /// trusted celestia header hash
+    #[prost(string, tag="4")]
+    pub celestia_header_hash: ::prost::alloc::string::String,
+    /// trusted celestia height
+    #[prost(uint64, tag="5")]
+    pub celestia_height: u64,
 }
 /// EventSubmitMessages defines the event type emitted after successful message
 /// submission.
@@ -81,20 +93,26 @@ pub struct ZkExecutionIsm {
     /// latest tracked height of the remote chain
     #[prost(uint64, tag="4")]
     pub height: u64,
-    /// the celestia namespace identifier used by the application
+    /// trusted celestia header hash
     #[prost(bytes="vec", tag="5")]
+    pub celestia_header_hash: ::prost::alloc::vec::Vec<u8>,
+    /// trusted celestia height
+    #[prost(uint64, tag="6")]
+    pub celestia_height: u64,
+    /// the celestia namespace identifier used by the application
+    #[prost(bytes="vec", tag="7")]
     pub namespace: ::prost::alloc::vec::Vec<u8>,
     /// the public key of the sequencer
-    #[prost(bytes="vec", tag="6")]
+    #[prost(bytes="vec", tag="8")]
     pub sequencer_public_key: ::prost::alloc::vec::Vec<u8>,
     /// the sp1 groth16 verifier key
-    #[prost(bytes="vec", tag="7")]
+    #[prost(bytes="vec", tag="9")]
     pub groth16_vkey: ::prost::alloc::vec::Vec<u8>,
     /// hash-based commitment to the verifier key used for state transition
-    #[prost(bytes="vec", tag="8")]
+    #[prost(bytes="vec", tag="10")]
     pub state_transition_vkey: ::prost::alloc::vec::Vec<u8>,
     /// hash-based commitment to the verifier key used for state membership
-    #[prost(bytes="vec", tag="9")]
+    #[prost(bytes="vec", tag="11")]
     pub state_membership_vkey: ::prost::alloc::vec::Vec<u8>,
 }
 /// Params defines the zk ism module parameters.
@@ -175,20 +193,26 @@ pub struct MsgCreateZkExecutionIsm {
     /// latest tracked height of the remote chain
     #[prost(uint64, tag="3")]
     pub height: u64,
-    /// the celestia namespace identifier used by the application
+    /// trusted celestia header hash
     #[prost(bytes="vec", tag="4")]
+    pub celestia_header_hash: ::prost::alloc::vec::Vec<u8>,
+    /// trusted celestia height
+    #[prost(uint64, tag="5")]
+    pub celestia_height: u64,
+    /// the celestia namespace identifier used by the application
+    #[prost(bytes="vec", tag="6")]
     pub namespace: ::prost::alloc::vec::Vec<u8>,
     /// the public key of the sequencer
-    #[prost(bytes="vec", tag="5")]
+    #[prost(bytes="vec", tag="7")]
     pub sequencer_public_key: ::prost::alloc::vec::Vec<u8>,
     /// the sp1 groth16 verifier key
-    #[prost(bytes="vec", tag="6")]
+    #[prost(bytes="vec", tag="8")]
     pub groth16_vkey: ::prost::alloc::vec::Vec<u8>,
     /// hash-based commitment to the verifier key used for state transition
-    #[prost(bytes="vec", tag="7")]
+    #[prost(bytes="vec", tag="9")]
     pub state_transition_vkey: ::prost::alloc::vec::Vec<u8>,
     /// hash-based commitment to the verifier key used for state membership
-    #[prost(bytes="vec", tag="8")]
+    #[prost(bytes="vec", tag="10")]
     pub state_membership_vkey: ::prost::alloc::vec::Vec<u8>,
 }
 /// MsgCreateZKExecutionISMResponse is the response type for
@@ -224,12 +248,18 @@ pub struct MsgUpdateZkExecutionIsm {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MsgUpdateZkExecutionIsmResponse {
-    /// updated ism trusted state root (hex-encoded)
+    /// state commitment root of the remote chain
     #[prost(string, tag="1")]
     pub state_root: ::prost::alloc::string::String,
-    /// updated ism trusted height
+    /// latest tracked height of the remote chain
     #[prost(uint64, tag="2")]
     pub height: u64,
+    /// trusted celestia header hash
+    #[prost(string, tag="3")]
+    pub celestia_header_hash: ::prost::alloc::string::String,
+    /// trusted celestia height
+    #[prost(uint64, tag="4")]
+    pub celestia_height: u64,
 }
 /// MsgSubmitMessages is the request type for SubmitMessages.
 #[allow(clippy::derive_partial_eq_without_eq)]

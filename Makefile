@@ -96,3 +96,8 @@ spamoor:
 e2e:
 	cargo run --bin e2e -p e2e --release
 .PHONY: e2e
+
+docker-build-hyperlane:
+	@echo "--> Building hyperlane-init image"
+	@docker build -t ghcr.io/celestiaorg/hyperlane-init:local -f hyperlane/Dockerfile .
+.PHONY: docker-build-hyperlane
