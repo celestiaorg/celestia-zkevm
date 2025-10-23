@@ -15,6 +15,7 @@ import (
 	coretypes "github.com/bcp-innovations/hyperlane-cosmos/x/core/types"
 	warptypes "github.com/bcp-innovations/hyperlane-cosmos/x/warp/types"
 	zkismtypes "github.com/celestiaorg/celestia-app/v6/x/zkism/types"
+	rpcclient "github.com/cometbft/cometbft/rpc/client/http"
 	"github.com/ethereum/go-ethereum/ethclient"
 	evclient "github.com/evstack/ev-node/pkg/rpc/client"
 )
@@ -51,10 +52,16 @@ func SetupZKIsm(ctx context.Context, broadcaster *Broadcaster, ethClient *ethcli
 	stateTransitionVkey := readStateTransitionVkey()
 	stateMembershipVkey := readStateMembershipVkey()
 
+	root, height := GetCelestiaBlockHashAndHeight(ctx, "http://celestia-validator:26657")
+
+	fmt.Printf("successfully got celestia root and height: %x, %d\n", root, height)
+
 	msgCreateZkExecutionISM := zkismtypes.MsgCreateZKExecutionISM{
 		Creator:             broadcaster.address.String(),
 		StateRoot:           block.Header().Root.Bytes(),
 		Height:              block.NumberU64(),
+		CelestiaHeaderHash:  root[:],
+		CelestiaHeight:      height,
 		Namespace:           namespace,
 		SequencerPublicKey:  pubKey,
 		Groth16Vkey:         groth16Vkey,
@@ -63,6 +70,7 @@ func SetupZKIsm(ctx context.Context, broadcaster *Broadcaster, ethClient *ethcli
 	}
 
 	res := broadcaster.BroadcastTx(ctx, &msgCreateZkExecutionISM)
+
 	ismID := parseIsmIDFromZkISMEvents(res.Events)
 
 	return ismID
@@ -230,4 +238,38 @@ func writeConfig(cfg *HyperlaneConfig) {
 	}
 
 	fmt.Printf("successfully deployed Hyperlane: \n%s\n", string(out))
+}
+
+func GetCelestiaBlockHashAndHeight(ctx context.Context, rpcAddr string) ([32]byte, uint64) {
+	client, err := rpcclient.New(rpcAddr, "/websocket")
+	if err != nil {
+		log.Fatalf("failed to connect to Celestia RPC: %v", err)
+	}
+	defer client.Stop()
+
+	status, err := client.Status(ctx)
+	if err != nil {
+		log.Fatalf("failed to get Celestia status: %v", err)
+	}
+
+	height := uint64(status.SyncInfo.LatestBlockHeight)
+	heightInt64 := int64(height)
+
+	block, err := client.Block(ctx, &heightInt64)
+	if err != nil {
+		log.Fatalf("failed to fetch block at height %d: %v", height, err)
+	}
+
+	blockHash := block.BlockID.Hash.Bytes()
+
+	var hash [32]byte
+	if len(blockHash) != 32 {
+		log.Fatalf("unexpected block hash length: %d", len(blockHash))
+	}
+	copy(hash[:], blockHash)
+
+	fmt.Printf("Celestia node height: %d\nBlock header hash: 0x%s\n",
+		height, hex.EncodeToString(hash[:]))
+
+	return hash, height
 }
