@@ -147,7 +147,7 @@ impl EvCombinedProver {
                 ism_client.signer_address().to_string(),
             );
             info!("Updating ZKISM on Celestia...");
-            let response = ism_client.send_tx(block_proof_msg).await.unwrap();
+            let response = ism_client.send_tx(block_proof_msg).await?;
             assert!(response.success);
             info!("[Done] ZKISM was updated successfully");
             // todo: notify message prover
