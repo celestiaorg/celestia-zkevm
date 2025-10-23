@@ -24,7 +24,7 @@ use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
 use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 use tokio::time::sleep;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::prover::ProgramProver;
 use crate::prover::{config::CombinedProverConfig, prover_from_env, SP1Prover};
@@ -38,8 +38,10 @@ mod config {
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_COMBINED_ELF: &[u8] = include_elf!("ev-combined-program");
 pub const ISM_ID: &str = "0x726f757465725f69736d000000000000000000000000002a0000000000000001";
-pub const MAX_PROOF_RANGE: u64 = 10;
+pub const PROOF_RANGE: u64 = 10;
 pub const PARALLELISM: u64 = 1;
+pub const WARN_DISTANCE: u64 = 50;
+pub const ERR_DISTANCE: u64 = 100;
 pub struct EvCombinedProver {
     config: CombinedProverConfig,
     prover: Arc<SP1Prover>,
@@ -91,46 +93,52 @@ impl EvCombinedProver {
         let mut known_celestia_header: [u8; 32] = [0; 32];
 
         loop {
-            println!("Checkpoint 1");
             let resp = ism_client.ism(QueryIsmRequest { id: ISM_ID.to_string() }).await?;
-            println!("Checkpoint 2");
             let ism = resp.ism.ok_or_else(|| anyhow::anyhow!("ZKISM not found"))?;
-            println!("Checkpoint 3");
             let trusted_root_hex = alloy::hex::encode(ism.state_root);
-            println!("Checkpoint 4");
             let latest_celestia_header = client.header_local_head().await?;
-            println!("Checkpoint 5");
             let mut trusted_height = ism.height;
-            println!("Checkpoint 6");
             let mut trusted_root = FixedBytes::from_hex(&trusted_root_hex)?;
-            println!("Checkpoint 7");
             let trusted_celestia_header = ism.celestia_header_hash;
-            println!("Checkpoint 8");
-            if trusted_celestia_header == known_celestia_header {
+            let trusted_celestia_height = ism.celestia_height;
+            let latest_celestia_height = latest_celestia_header.height().value();
+            if trusted_celestia_header == known_celestia_header || latest_celestia_height < trusted_height + PROOF_RANGE
+            {
                 warn!("Celestia header has not changed, waiting for 1 second");
                 sleep(Duration::from_secs(1)).await;
             }
-            println!("Checkpoint 9");
+            if trusted_celestia_height < latest_celestia_height - WARN_DISTANCE {
+                warn!(
+                    "Prover is {} blocks behind Celestia head",
+                    latest_celestia_height - trusted_celestia_height
+                );
+            } else if trusted_celestia_height < latest_celestia_height - ERR_DISTANCE {
+                error!(
+                    "Prover is {} blocks behind Celestia head",
+                    latest_celestia_height - trusted_celestia_height
+                );
+            } else {
+                info!(
+                    "Prover is {} blocks behind Celestia head",
+                    latest_celestia_height - trusted_celestia_height
+                );
+            }
             let celestia_start_height = ism.celestia_height + 1;
-            let mut num_blocks = latest_celestia_header.height().value() - celestia_start_height;
-            num_blocks = num_blocks.min(MAX_PROOF_RANGE);
-            println!("Checkpoint 10");
             let stdin = prepare_combined_inputs(
                 &client,
                 celestia_start_height,
                 &mut trusted_height,
-                num_blocks,
+                PROOF_RANGE,
                 &mut trusted_root,
             )
             .await?;
-            println!("Checkpoint 11");
             let proof = self
                 .prover
                 .prove(&self.config.pk, &stdin, SP1ProofMode::Groth16)
                 .context("Failed to prove")?;
             let block_proof_msg = MsgUpdateZkExecutionIsm::new(
                 ISM_ID.to_string(),
-                celestia_start_height + num_blocks,
+                celestia_start_height + PROOF_RANGE,
                 proof.bytes(),
                 proof.public_values.as_slice().to_vec(),
                 ism_client.signer_address().to_string(),
