@@ -10,11 +10,14 @@ alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 alloy-rpc-types = { workspace = true }
 anyhow = "1.0"
+eyre = { workspace = true }
 async-trait = "0.1.88"
 bincode = { workspace = true }
 bytes = { workspace = true }
+celestia-grpc-client = { path = "../celestia-grpc-client" }
 celestia-rpc = { workspace = true }
 celestia-types = { workspace = true }
+celestia-client = "0.2.0"
 clap = { version = "4", features = ["derive"] }
 dirs = { workspace = true }
 dotenvy = { workspace = true }

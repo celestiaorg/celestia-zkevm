@@ -10,7 +10,7 @@ use rsp_client_executor::io::EthClientExecutorInput;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 /// BlockExecInput is the input for the BlockExec circuit.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BlockExecInput {
     pub header_raw: Vec<u8>,
     pub dah: DataAvailabilityHeader,
@@ -70,6 +70,13 @@ impl Display for BlockExecOutput {
 pub struct BlockRangeExecInput {
     pub vkeys: Vec<[u32; 8]>,
     pub public_values: Vec<Vec<u8>>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EvCombinedInput {
+    pub blocks: Vec<BlockExecInput>,
+    pub trusted_height: u64,
+    pub trusted_root: FixedBytes<32>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

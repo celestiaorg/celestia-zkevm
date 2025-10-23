@@ -10,6 +10,8 @@ members = [
     "crates/sp1/ev-hyperlane/script",
     "crates/sp1/ev-range-exec/program",
     "crates/sp1/ev-range-exec/script",
+    "crates/sp1/ev-combined/program",
+    "crates/sp1/ev-combined/script",
     "crates/storage",
 ]
 resolver = "2"

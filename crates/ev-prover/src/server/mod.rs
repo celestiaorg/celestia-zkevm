@@ -15,6 +15,7 @@ use tracing::{debug, error};
 use crate::config::config::{Config, APP_HOME};
 use crate::proto::celestia::prover::v1::prover_server::ProverServer;
 use crate::prover::programs::block::{AppContext, BlockExecProver};
+use crate::prover::programs::combined::EvCombinedProver;
 use crate::prover::programs::range::BlockRangeExecProver;
 use crate::prover::service::ProverService;
 
@@ -29,6 +30,7 @@ pub async fn start_server(config: Config) -> Result<()> {
 
     // TODO: Remove this config cloning when we can rely on the public key from config
     // https://github.com/evstack/ev-node/issues/2603
+
     let mut config_clone = config.clone();
     config_clone.pub_key = public_key().await?;
     debug!("Successfully got pubkey from evnode: {}", config_clone.pub_key);
@@ -41,7 +43,7 @@ pub async fn start_server(config: Config) -> Result<()> {
         .join("proofs.db");
 
     let storage = Arc::new(RocksDbProofStorage::new(storage_path)?);
-    let (block_tx, block_rx) = mpsc::channel(256);
+    /*let (block_tx, block_rx) = mpsc::channel(256);
     let (range_tx, _range_rx) = mpsc::channel(256);
 
     let batch_size = config_clone.batch_size;
@@ -68,6 +70,15 @@ pub async fn start_server(config: Config) -> Result<()> {
         async move {
             if let Err(e) = range_prover.run().await {
                 error!("Block prover task failed: {e:?}");
+            }
+        }
+    });*/
+
+    tokio::spawn({
+        let combined_prover = EvCombinedProver::new().unwrap();
+        async move {
+            if let Err(e) = combined_prover.run().await {
+                error!("Combined prover task failed: {e:?}");
             }
         }
     });

@@ -111,6 +111,33 @@ impl BaseProverConfig for RecursiveProverConfig {
     }
 }
 
+#[derive(Clone)]
+pub struct CombinedProverConfig {
+    pub pk: Arc<SP1ProvingKey>,
+    pub vk: Arc<SP1VerifyingKey>,
+    pub proof_mode: SP1ProofMode,
+}
+impl CombinedProverConfig {
+    pub fn new(pk: SP1ProvingKey, vk: SP1VerifyingKey, mode: SP1ProofMode) -> Self {
+        CombinedProverConfig {
+            pk: Arc::new(pk),
+            vk: Arc::new(vk),
+            proof_mode: mode,
+        }
+    }
+}
+impl BaseProverConfig for CombinedProverConfig {
+    fn pk(&self) -> Arc<SP1ProvingKey> {
+        Arc::clone(&self.pk)
+    }
+    fn vk(&self) -> Arc<SP1VerifyingKey> {
+        Arc::clone(&self.vk)
+    }
+    fn proof_mode(&self) -> SP1ProofMode {
+        self.proof_mode
+    }
+}
+
 pub type ProgramId = &'static str; // TODO: maybe enum...
 
 #[derive(Clone)]
