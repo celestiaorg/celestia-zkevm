@@ -11,6 +11,7 @@ alloy-provider = { workspace = true }
 alloy-rpc-types = { workspace = true }
 anyhow = "1.0"
 eyre = { workspace = true }
+rustls = "0.23.31"
 async-trait = "0.1.88"
 bincode = { workspace = true }
 bytes = { workspace = true }

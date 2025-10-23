@@ -29,6 +29,11 @@ pub async fn start_server(config: Config) -> Result<()> {
         .build()
         .unwrap();
 
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("Failed to set default crypto provider");
+    dotenvy::dotenv().ok();
+
     // TODO: Remove this config cloning when we can rely on the public key from config
     // https://github.com/evstack/ev-node/issues/2603
 

@@ -15,7 +15,7 @@ use celestia_types::{
 use ev_types::v1::{
     get_block_request::Identifier, store_service_client::StoreServiceClient, GetBlockRequest, SignedData,
 };
-use ev_zkevm_types::programs::block::{BlockExecInput, BlockExecOutput, BlockRangeExecOutput, EvCombinedInput};
+use ev_zkevm_types::programs::block::{BlockExecInput, BlockRangeExecOutput, EvCombinedInput};
 use prost::Message;
 use reth_chainspec::ChainSpec;
 use rsp_client_executor::io::EthClientExecutorInput;
@@ -91,21 +91,30 @@ impl EvCombinedProver {
         let mut known_celestia_header: [u8; 32] = [0; 32];
 
         loop {
+            println!("Checkpoint 1");
             let resp = ism_client.ism(QueryIsmRequest { id: ISM_ID.to_string() }).await?;
+            println!("Checkpoint 2");
             let ism = resp.ism.ok_or_else(|| anyhow::anyhow!("ZKISM not found"))?;
+            println!("Checkpoint 3");
             let trusted_root_hex = alloy::hex::encode(ism.state_root);
+            println!("Checkpoint 4");
             let latest_celestia_header = client.header_local_head().await?;
+            println!("Checkpoint 5");
             let mut trusted_height = ism.height;
+            println!("Checkpoint 6");
             let mut trusted_root = FixedBytes::from_hex(&trusted_root_hex)?;
+            println!("Checkpoint 7");
             let trusted_celestia_header = ism.celestia_header_hash;
+            println!("Checkpoint 8");
             if trusted_celestia_header == known_celestia_header {
                 warn!("Celestia header has not changed, waiting for 1 second");
                 sleep(Duration::from_secs(1)).await;
             }
-
+            println!("Checkpoint 9");
             let celestia_start_height = ism.celestia_height + 1;
             let mut num_blocks = latest_celestia_header.height().value() - celestia_start_height;
             num_blocks = num_blocks.min(MAX_PROOF_RANGE);
+            println!("Checkpoint 10");
             let stdin = prepare_combined_inputs(
                 &client,
                 celestia_start_height,
@@ -114,6 +123,7 @@ impl EvCombinedProver {
                 &mut trusted_root,
             )
             .await?;
+            println!("Checkpoint 11");
             let proof = self
                 .prover
                 .prove(&self.config.pk, &stdin, SP1ProofMode::Groth16)
@@ -129,7 +139,7 @@ impl EvCombinedProver {
             let response = ism_client.send_tx(block_proof_msg).await.unwrap();
             assert!(response.success);
             info!("[Done] ZKISM was updated successfully");
-            let public_values: BlockExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
+            let public_values: BlockRangeExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
             known_celestia_header = public_values.celestia_header_hash;
         }
     }
