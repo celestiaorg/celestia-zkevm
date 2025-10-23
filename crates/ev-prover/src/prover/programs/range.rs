@@ -298,14 +298,8 @@ impl BlockRangeExecService {
         let public_values = proof.public_values.to_vec();
         let signer_address = client.signer_address().to_string();
 
-        // TODO: replace hardcoded fields with real ids/nonce
-        let proof_msg = StateTransitionProofMsg::new(
-            "id.clone()".to_string(),
-            100,
-            proof.bytes(),
-            public_values,
-            signer_address,
-        );
+        let ism_id = "todo: or add a configurable to client".to_string();
+        let proof_msg = StateTransitionProofMsg::new(ism_id, proof.bytes(), public_values, signer_address);
 
         let res = client.send_tx(proof_msg).await?;
         info!("Proof tx submitted to ism with hash: {}", res.tx_hash);
