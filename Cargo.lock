@@ -4400,6 +4400,7 @@ dependencies = [
 [[package]]
 name = "guests"
 version = "0.3.0"
+source = "git+https://github.com/boundless-xyz/zeth?rev=db4c2d45233b59bdd2a85fcb7f9d36a12bebe0c1#db4c2d45233b59bdd2a85fcb7f9d36a12bebe0c1"
 dependencies = [
  "risc0-build",
 ]
@@ -12684,6 +12685,7 @@ dependencies = [
 [[package]]
 name = "zeth-core"
 version = "0.3.0"
+source = "git+https://github.com/boundless-xyz/zeth?rev=db4c2d45233b59bdd2a85fcb7f9d36a12bebe0c1#db4c2d45233b59bdd2a85fcb7f9d36a12bebe0c1"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
@@ -12707,6 +12709,7 @@ dependencies = [
 [[package]]
 name = "zeth-host"
 version = "0.3.0"
+source = "git+https://github.com/boundless-xyz/zeth?rev=db4c2d45233b59bdd2a85fcb7f9d36a12bebe0c1#db4c2d45233b59bdd2a85fcb7f9d36a12bebe0c1"
 dependencies = [
  "alloy",
  "alloy-chains",
