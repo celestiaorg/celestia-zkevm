@@ -16,6 +16,7 @@ use tracing::{debug, error};
 use crate::config::config::{Config, APP_HOME};
 use crate::proto::celestia::prover::v1::prover_server::ProverServer;
 use crate::prover::programs::block::{AppContext, BlockExecProver};
+#[cfg(feature = "combined")]
 use crate::prover::programs::combined::EvCombinedProver;
 use crate::prover::programs::range::BlockRangeExecProver;
 use crate::prover::service::ProverService;
@@ -49,45 +50,53 @@ pub async fn start_server(config: Config) -> Result<()> {
         .join("proofs.db");
 
     let storage = Arc::new(RocksDbProofStorage::new(storage_path)?);
-    /*let (block_tx, block_rx) = mpsc::channel(256);
-    let (range_tx, _range_rx) = mpsc::channel(256);
 
-    let batch_size = config_clone.batch_size;
-    let concurrency = config_clone.concurrency;
-    let queue_capacity = config_clone.queue_capacity;
+    #[cfg(not(feature = "combined"))]
+    {
+        let (block_tx, block_rx) = mpsc::channel(256);
+        let (range_tx, _range_rx) = mpsc::channel(256);
 
-    tokio::spawn({
-        let block_prover = BlockExecProver::new(
-            AppContext::from_config(config_clone)?,
-            block_tx,
-            storage.clone(),
-            queue_capacity,
-            concurrency,
-        );
-        async move {
-            if let Err(e) = block_prover.run().await {
-                error!("Block prover task failed: {e:?}");
+        let batch_size = config_clone.batch_size;
+        let concurrency = config_clone.concurrency;
+        let queue_capacity = config_clone.queue_capacity;
+
+        tokio::spawn({
+            let block_prover = BlockExecProver::new(
+                AppContext::from_config(config_clone)?,
+                block_tx,
+                storage.clone(),
+                queue_capacity,
+                concurrency,
+            );
+            async move {
+                if let Err(e) = block_prover.run().await {
+                    error!("Block prover task failed: {e:?}");
+                }
             }
-        }
-    });
+        });
 
-    tokio::spawn({
-        let range_prover = BlockRangeExecProver::new(batch_size, block_rx, range_tx, storage.clone())?;
-        async move {
-            if let Err(e) = range_prover.run().await {
-                error!("Block prover task failed: {e:?}");
+        tokio::spawn({
+            let range_prover = BlockRangeExecProver::new(batch_size, block_rx, range_tx, storage.clone())?;
+            async move {
+                if let Err(e) = range_prover.run().await {
+                    error!("Block prover task failed: {e:?}");
+                }
             }
-        }
-    });*/
+        });
+    }
 
-    tokio::spawn({
-        let combined_prover = EvCombinedProver::new().unwrap();
-        async move {
-            if let Err(e) = combined_prover.run().await {
-                error!("Combined prover task failed: {e:?}");
+    // combined
+    #[cfg(feature = "combined")]
+    {
+        tokio::spawn({
+            let combined_prover = EvCombinedProver::new().unwrap();
+            async move {
+                if let Err(e) = combined_prover.run().await {
+                    error!("Combined prover task failed: {e:?}");
+                }
             }
-        }
-    });
+        });
+    }
 
     // Todo: Integrate message prover and supply trusted_root, trusted_height from block prover
     // First generate the block proof, then generate the message proof inside a joined service.

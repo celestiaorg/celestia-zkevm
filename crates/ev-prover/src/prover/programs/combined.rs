@@ -42,7 +42,7 @@ mod config {
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_COMBINED_ELF: &[u8] = include_elf!("ev-combined-program");
 pub const ISM_ID: &str = "0x726f757465725f69736d000000000000000000000000002a0000000000000001";
-pub const BATCH_SIZE: u64 = 10;
+pub const BATCH_SIZE: u64 = 20;
 pub const PARALLELISM: u64 = 1;
 pub const WARN_DISTANCE: u64 = 50;
 pub const ERR_DISTANCE: u64 = 100;
