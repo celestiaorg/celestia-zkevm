@@ -1,0 +1,16 @@
+[package]
+version = "0.1.0"
+name = "ev-combined-script"
+edition = "2021"
+default-run = "vkey-ev-combined"
+
+[[bin]]
+name = "vkey-ev-combined"
+path = "src/bin/vkey.rs"
+
+[dependencies]
+sp1-sdk = { workspace = true }
+bincode = { workspace = true }
+
+[build-dependencies]
+sp1-build = { workspace = true }

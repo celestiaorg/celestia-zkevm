@@ -3329,6 +3329,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ev-combined-script"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "sp1-build",
+ "sp1-sdk",
+]
+
+[[package]]
 name = "ev-exec-program"
 version = "0.1.0"
 dependencies = [
