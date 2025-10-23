@@ -110,23 +110,18 @@ impl EvCombinedProver {
             {
                 warn!("Celestia header has not changed, waiting for 1 second");
                 sleep(Duration::from_secs(1)).await;
+                continue;
             }
-            if trusted_celestia_height < latest_celestia_height - WARN_DISTANCE {
-                warn!(
-                    "Prover is {} blocks behind Celestia head",
-                    latest_celestia_height - trusted_celestia_height
-                );
-            } else if trusted_celestia_height < latest_celestia_height - ERR_DISTANCE {
-                error!(
-                    "Prover is {} blocks behind Celestia head",
-                    latest_celestia_height - trusted_celestia_height
-                );
+
+            let distance = latest_celestia_height.saturating_sub(trusted_celestia_height);
+            if distance >= ERR_DISTANCE {
+                error!("Prover is {distance} blocks behind Celestia head");
+            } else if distance >= WARN_DISTANCE {
+                warn!("Prover is {distance} blocks behind Celestia head");
             } else {
-                info!(
-                    "Prover is {} blocks behind Celestia head",
-                    latest_celestia_height - trusted_celestia_height
-                );
+                info!("Prover is {distance} blocks behind Celestia head");
             }
+
             let celestia_start_height = ism.celestia_height + 1;
             let stdin = prepare_combined_inputs(
                 &client,
@@ -155,6 +150,7 @@ impl EvCombinedProver {
             let response = ism_client.send_tx(block_proof_msg).await.unwrap();
             assert!(response.success);
             info!("[Done] ZKISM was updated successfully");
+            // todo: notify message prover
             let public_values: BlockRangeExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
             known_celestia_header = public_values.celestia_header_hash;
         }
