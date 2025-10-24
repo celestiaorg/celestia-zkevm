@@ -9,7 +9,9 @@ pub mod tests;
 use alloy_genesis::Genesis as AlloyGenesis;
 use alloy_provider::ProviderBuilder;
 use anyhow::{Context, Result};
-use ev_types::v1::{get_block_request::Identifier, store_service_client::StoreServiceClient, GetBlockRequest};
+use ev_types::v1::{
+    get_block_request::Identifier, store_service_client::StoreServiceClient, GetBlockRequest, GetMetadataRequest,
+};
 use reth_chainspec::ChainSpec;
 use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_host_executor::EthHostExecutor;
@@ -76,4 +78,16 @@ pub async fn get_sequencer_pubkey(sequencer_url: String) -> Result<Vec<u8>> {
         .pub_key;
 
     Ok(pub_key[4..].to_vec())
+}
+
+// Get the Celestia inclusion height for a given Evolve block number
+pub async fn inclusion_height(block_number: u64) -> anyhow::Result<u64> {
+    let mut client = StoreServiceClient::connect(rpc_config::SEQUENCER_URL).await?;
+    let req = GetMetadataRequest {
+        key: format!("rhb/{block_number}/d"),
+    };
+
+    let resp = client.get_metadata(req).await?;
+    let height = u64::from_le_bytes(resp.into_inner().value[..8].try_into()?);
+    Ok(height)
 }

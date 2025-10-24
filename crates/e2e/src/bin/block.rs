@@ -5,7 +5,7 @@ use e2e::{
     config::debug::{TARGET_HEIGHT, TRUSTED_HEIGHT, TRUSTED_ROOT},
     prover::block::prove_blocks,
 };
-use ev_types::v1::{GetMetadataRequest, store_service_client::StoreServiceClient};
+use ev_prover::inclusion_height;
 use sp1_sdk::ProverClient;
 
 #[tokio::main]
@@ -24,17 +24,4 @@ async fn main() {
     )
     .await
     .expect("Failed to prove blocks");
-}
-
-// todo: find a place for this function and remove it from the binaries
-async fn inclusion_height(block_number: u64) -> anyhow::Result<u64> {
-    let mut client = StoreServiceClient::connect(e2e::config::debug::SEQUENCER_URL).await?;
-    let req = GetMetadataRequest {
-        key: format!("rhb/{block_number}/d"),
-    };
-
-    let resp = client.get_metadata(req).await?;
-    let height = u64::from_le_bytes(resp.into_inner().value[..8].try_into()?);
-
-    Ok(height)
 }

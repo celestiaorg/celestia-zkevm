@@ -10,8 +10,8 @@ use e2e::config::e2e::{CELESTIA_MAILBOX_ID, CELESTIA_TOKEN_ID, EV_RECIPIENT_ADDR
 use e2e::prover::block::prove_blocks;
 use e2e::prover::helpers::transfer_back;
 use e2e::prover::message::prove_messages;
+use ev_prover::inclusion_height;
 use ev_state_queries::MockStateQueryProvider;
-use ev_types::v1::{GetMetadataRequest, store_service_client::StoreServiceClient};
 use ev_zkevm_types::hyperlane::encode_hyperlane_message;
 use sp1_sdk::{EnvProver, ProverClient};
 use std::time::Duration;
@@ -151,18 +151,6 @@ async fn main() {
         assert!(response.success);
     }
     info!("[Done] Tia was bridged back to Celestia");
-}
-
-// todo: find a place for this function and remove it from the binaries
-async fn inclusion_height(block_number: u64) -> anyhow::Result<u64> {
-    let mut client = StoreServiceClient::connect(e2e::config::e2e::SEQUENCER_URL).await?;
-    let req = GetMetadataRequest {
-        key: format!("rhb/{block_number}/d"),
-    };
-
-    let resp = client.get_metadata(req).await?;
-    let height = u64::from_le_bytes(resp.into_inner().value[..8].try_into()?);
-    Ok(height)
 }
 
 async fn retry_async<F, Fut, T, E>(mut f: F, label: &str) -> T
