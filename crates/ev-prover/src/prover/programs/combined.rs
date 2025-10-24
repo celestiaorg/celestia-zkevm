@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{generate_client_executor_input, get_sequencer_pubkey, load_chain_spec_from_genesis};
+use crate::{generate_client_executor_input, get_sequencer_pubkey, load_chain_spec_from_genesis, ISM_ID};
 use alloy::hex::FromHex;
 use alloy_primitives::FixedBytes;
 use alloy_provider::{Provider, ProviderBuilder};
@@ -31,7 +31,6 @@ use crate::prover::{config::CombinedProverConfig, prover_from_env, SP1Prover};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_COMBINED_ELF: &[u8] = include_elf!("ev-combined-program");
-pub const ISM_ID: &str = "0x726f757465725f69736d000000000000000000000000002a0000000000000001";
 pub const BATCH_SIZE: u64 = 120;
 //pub const PARALLELISM: u64 = 1;
 pub const WARN_DISTANCE: u64 = 240;
@@ -145,7 +144,7 @@ impl EvCombinedProver {
             let response = ism_client.send_tx(block_proof_msg).await?;
             assert!(response.success);
             info!("[Done] ZKISM was updated successfully");
-            // todo: notify message prover
+            // todo: trigger message prover here
             let public_values: BlockRangeExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
             known_celestia_height = public_values.celestia_height;
         }

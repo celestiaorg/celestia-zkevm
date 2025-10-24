@@ -20,6 +20,8 @@ use rsp_rpc_db::RpcDb;
 use std::{fs, sync::Arc};
 use tracing::debug;
 
+pub const ISM_ID: &str = "0x726f757465725f69736d000000000000000000000000002a0000000000000001";
+
 pub mod rpc_config {
     pub const CELESTIA_RPC_URL: &str = "http://localhost:26658";
     pub const EVM_RPC_URL: &str = "http://localhost:8545";
