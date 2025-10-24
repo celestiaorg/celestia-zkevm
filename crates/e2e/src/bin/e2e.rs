@@ -92,7 +92,6 @@ async fn main() {
 
     let block_proof_msg = MsgUpdateZkExecutionIsm::new(
         ISM_ID.to_string(),
-        target_inclusion_height,
         block_proof.bytes(),
         block_proof.public_values.as_slice().to_vec(),
         ism_client.signer_address().to_string(),

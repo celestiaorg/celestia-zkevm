@@ -230,17 +230,14 @@ pub struct MsgUpdateZkExecutionIsm {
     /// ism identifier
     #[prost(string, tag="1")]
     pub id: ::prost::alloc::string::String,
-    /// height is the Celestia height associated with the state transition update.
-    #[prost(uint64, tag="2")]
-    pub height: u64,
     /// proof is the ZK proof bytes (groth16).
-    #[prost(bytes="vec", tag="3")]
+    #[prost(bytes="vec", tag="2")]
     pub proof: ::prost::alloc::vec::Vec<u8>,
     /// the public values used for proof verification.
-    #[prost(bytes="vec", tag="4")]
+    #[prost(bytes="vec", tag="3")]
     pub public_values: ::prost::alloc::vec::Vec<u8>,
     /// the tx signer address
-    #[prost(string, tag="5")]
+    #[prost(string, tag="4")]
     pub signer: ::prost::alloc::string::String,
 }
 /// MsgUpdateZKExecutionISMResponse is the response type for
@@ -251,14 +248,11 @@ pub struct MsgUpdateZkExecutionIsmResponse {
     /// state commitment root of the remote chain
     #[prost(string, tag="1")]
     pub state_root: ::prost::alloc::string::String,
-    /// latest tracked height of the remote chain
-    #[prost(uint64, tag="2")]
-    pub height: u64,
     /// trusted celestia header hash
-    #[prost(string, tag="3")]
+    #[prost(string, tag="2")]
     pub celestia_header_hash: ::prost::alloc::string::String,
     /// trusted celestia height
-    #[prost(uint64, tag="4")]
+    #[prost(uint64, tag="3")]
     pub celestia_height: u64,
 }
 /// MsgSubmitMessages is the request type for SubmitMessages.
