@@ -1,11 +1,11 @@
 use std::{
-    env, fs,
+    env,
     sync::Arc,
     time::{Duration, Instant},
 };
 
+use crate::{generate_client_executor_input, get_sequencer_pubkey, load_chain_spec_from_genesis};
 use alloy::hex::FromHex;
-use alloy_genesis::Genesis as AlloyGenesis;
 use alloy_primitives::FixedBytes;
 use alloy_provider::{Provider, ProviderBuilder};
 use anyhow::{Context, Result};
@@ -16,28 +16,18 @@ use celestia_types::{
     nmt::{Namespace, NamespaceProof},
     Blob,
 };
-use ev_types::v1::{
-    get_block_request::Identifier, store_service_client::StoreServiceClient, GetBlockRequest, SignedData,
-};
+use ev_types::v1::SignedData;
 use ev_zkevm_types::programs::block::{BlockExecInput, BlockRangeExecOutput, EvCombinedInput};
 use prost::Message;
 use reth_chainspec::ChainSpec;
 use rsp_client_executor::io::EthClientExecutorInput;
-use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
-use rsp_rpc_db::RpcDb;
 use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 
 use crate::prover::ProgramProver;
 use crate::prover::{config::CombinedProverConfig, prover_from_env, SP1Prover};
-
-mod config {
-    pub const CELESTIA_RPC_URL: &str = "http://localhost:26658";
-    pub const EVM_RPC_URL: &str = "http://localhost:8545";
-    pub const SEQUENCER_URL: &str = "http://localhost:7331";
-}
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_COMBINED_ELF: &[u8] = include_elf!("ev-combined-program");
@@ -92,7 +82,7 @@ impl EvCombinedProver {
     pub async fn run(self) -> Result<()> {
         let config = ClientConfig::from_env()?;
         let ism_client = CelestiaIsmClient::new(config).await?;
-        let client = Client::new(config::CELESTIA_RPC_URL, None).await?;
+        let client = Client::new(crate::rpc_config::CELESTIA_RPC_URL, None).await?;
 
         let mut known_celestia_height: u64 = 0;
 
@@ -181,12 +171,12 @@ async fn prepare_combined_inputs(
     )?;
     let namespace_hex = env::var("CELESTIA_NAMESPACE")?;
     let namespace = Namespace::new_v0(&hex::decode(namespace_hex)?)?;
-    let pub_key = get_sequencer_pubkey().await?;
+    let pub_key = get_sequencer_pubkey(crate::rpc_config::SEQUENCER_URL.to_string()).await?;
     let mut block_inputs: Vec<BlockExecInput> = Vec::new();
     for block_number in start_height..=(start_height + num_blocks) {
         block_inputs.push(
             get_block_inputs(
-                &celestia_client,
+                celestia_client,
                 block_number,
                 namespace,
                 trusted_height,
@@ -206,42 +196,8 @@ async fn prepare_combined_inputs(
     Ok(stdin)
 }
 
-/// Loads the genesis file from disk and converts it into a ChainSpec
-fn load_chain_spec_from_genesis(path: &str) -> Result<(Genesis, Arc<ChainSpec>)> {
-    let genesis_json = fs::read_to_string(path).with_context(|| format!("Failed to read genesis file at {path}"))?;
-    let alloy_genesis: AlloyGenesis = serde_json::from_str(&genesis_json)?;
-
-    let genesis = Genesis::Custom(alloy_genesis.config);
-    let chain_spec: Arc<ChainSpec> = Arc::new((&genesis).try_into()?);
-
-    Ok((genesis, chain_spec))
-}
-
-async fn get_sequencer_pubkey() -> Result<Vec<u8>> {
-    debug!("Connecting to sequencer url: {}", config::SEQUENCER_URL);
-    let mut sequencer_client = StoreServiceClient::connect(config::SEQUENCER_URL).await?;
-    debug!("Connected to sequencer url: {}", config::SEQUENCER_URL);
-    let block_req = GetBlockRequest {
-        identifier: Some(Identifier::Height(1)),
-    };
-    debug!("Getting block from sequencer url: {}", config::SEQUENCER_URL);
-    let resp = sequencer_client.get_block(block_req).await?;
-    debug!("Got block from sequencer url: {}", config::SEQUENCER_URL);
-    let pub_key = resp
-        .into_inner()
-        .block
-        .ok_or_else(|| anyhow::anyhow!("Block not found"))?
-        .header
-        .ok_or_else(|| anyhow::anyhow!("Header not found"))?
-        .signer
-        .ok_or_else(|| anyhow::anyhow!("Signer not found"))?
-        .pub_key;
-
-    Ok(pub_key[4..].to_vec())
-}
-
 #[allow(clippy::too_many_arguments)]
-async fn get_block_inputs(
+pub async fn get_block_inputs(
     celestia_client: &Client,
     block_number: u64,
     namespace: Namespace,
@@ -300,8 +256,13 @@ async fn get_block_inputs(
         last_height = height;
         debug!("Got SignedData for EVM block {height}");
 
-        let client_executor_input =
-            generate_client_executor_input(config::EVM_RPC_URL, height, chain_spec.clone(), genesis.clone()).await?;
+        let client_executor_input = generate_client_executor_input(
+            crate::rpc_config::EVM_RPC_URL,
+            height,
+            chain_spec.clone(),
+            genesis.clone(),
+        )
+        .await?;
         executor_inputs.push(client_executor_input);
     }
 
@@ -317,7 +278,7 @@ async fn get_block_inputs(
         trusted_root: *trusted_root,
     };
 
-    let provider = ProviderBuilder::new().connect_http(config::EVM_RPC_URL.parse()?);
+    let provider = ProviderBuilder::new().connect_http(crate::rpc_config::EVM_RPC_URL.parse()?);
     let block = provider
         .get_block_by_number(last_height.into())
         .await?
@@ -331,24 +292,4 @@ async fn get_block_inputs(
     );
 
     Ok(input)
-}
-
-/// Generates the client executor input (STF) for an EVM block.
-async fn generate_client_executor_input(
-    rpc_url: &str,
-    block_number: u64,
-    chain_spec: Arc<ChainSpec>,
-    genesis: Genesis,
-) -> Result<EthClientExecutorInput> {
-    let host_executor = EthHostExecutor::eth(chain_spec.clone(), None);
-
-    let provider = ProviderBuilder::new().connect_http(rpc_url.parse()?);
-    let rpc_db = RpcDb::new(provider.clone(), block_number - 1);
-
-    let client_input = host_executor
-        .execute(block_number, &rpc_db, &provider, genesis, None, false)
-        .await
-        .with_context(|| format!("Failed to execute block {block_number}"))?;
-
-    Ok(client_input)
 }
