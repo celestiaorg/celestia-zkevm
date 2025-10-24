@@ -2,6 +2,7 @@
 // and wraps it recursively into a single groth16 proof using the ev-range-exec program.
 
 use alloy_primitives::{FixedBytes, hex};
+use alloy_provider::{Provider, ProviderBuilder};
 use anyhow::Result;
 use celestia_rpc::{BlobClient, Client, HeaderClient, ShareClient};
 use celestia_types::Blob;
@@ -10,7 +11,7 @@ use ev_prover::prover::programs::combined::get_block_inputs;
 use ev_prover::rpc_config;
 use ev_prover::{generate_client_executor_input, get_sequencer_pubkey, load_chain_spec_from_genesis};
 use ev_types::v1::SignedData;
-use ev_zkevm_types::programs::block::{BlockExecInput, BlockExecOutput, BlockRangeExecInput, BlockRangeExecOutput};
+use ev_zkevm_types::programs::block::{BlockExecOutput, BlockRangeExecInput, BlockRangeExecOutput};
 use eyre::Context;
 use prost::Message;
 use rsp_client_executor::io::EthClientExecutorInput;
@@ -86,9 +87,6 @@ pub async fn parallel_prover(
     trusted_heights.push(*trusted_height);
     trusted_roots.push(*trusted_root);
 
-    let mut current_trusted_height = *trusted_height;
-    let mut current_trusted_root = *trusted_root;
-
     // before we generate proofs in parallel mode, we execute all blocks to
     // collect the trusted height and root to then supply them optimistically to the prover
     for block_number in start_height..=(start_height + num_blocks) {
@@ -115,12 +113,14 @@ pub async fn parallel_prover(
         debug!("Got NamespaceProofs, total: {}", proofs.len());
 
         let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
+        let mut last_height = *trusted_height;
         for blob in blobs.as_slice() {
             let data = match SignedData::decode(blob.data.as_slice()) {
                 Ok(data) => data.data.unwrap(),
                 Err(_) => continue,
             };
             let height = data.metadata.unwrap().height;
+            last_height = height;
             debug!("Got SignedData for EVM block {height}");
 
             let client_executor_input =
@@ -130,34 +130,14 @@ pub async fn parallel_prover(
             executor_inputs.push(client_executor_input);
         }
 
-        let mut stdin = SP1Stdin::new();
-        let input = BlockExecInput {
-            header_raw: serde_cbor::to_vec(&extended_header.header).expect("Failed to serialize header"),
-            dah: extended_header.dah,
-            blobs_raw: serde_cbor::to_vec(&blobs).expect("Failed to serialize blobs"),
-            pub_key: pub_key.clone(),
-            namespace,
-            proofs,
-            executor_inputs: executor_inputs.clone(),
-            trusted_height: current_trusted_height,
-            trusted_root: current_trusted_root,
-        };
+        let provider = ProviderBuilder::new().connect_http(rpc_config::EVM_RPC_URL.parse()?);
+        let block: alloy_rpc_types::Block = provider
+            .get_block_by_number(last_height.into())
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Block {} not found", last_height))?;
 
-        stdin.write(&input);
-        debug!("Generating proof for block: {block_number}, trusted height: {current_trusted_height}");
-        let outputs = client
-            .execute(&block_prover_elf, &stdin)
-            .run()
-            .expect("failed to generate proof")
-            .0;
-
-        let public_values: BlockExecOutput =
-            bincode::deserialize(outputs.as_slice()).expect("Failed to deserialize public values");
-
-        current_trusted_height = public_values.new_height;
-        current_trusted_root = public_values.new_state_root.into();
-        trusted_heights.push(public_values.new_height);
-        trusted_roots.push(public_values.new_state_root.into());
+        trusted_heights.push(last_height);
+        trusted_roots.push(block.header.state_root.into());
     }
 
     // now we can generate proofs in parallel

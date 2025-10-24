@@ -3,7 +3,7 @@ use std::sync::Arc;
 use alloy_primitives::{FixedBytes, hex::FromHex};
 use e2e::{
     config::debug::{TARGET_HEIGHT, TRUSTED_HEIGHT, TRUSTED_ROOT},
-    prover::block::prove_blocks,
+    utils::block::prove_blocks,
 };
 use ev_prover::inclusion_height;
 use sp1_sdk::ProverClient;

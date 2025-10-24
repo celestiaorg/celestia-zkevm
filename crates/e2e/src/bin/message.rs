@@ -1,7 +1,7 @@
 use alloy_provider::ProviderBuilder;
 use e2e::{
     config::debug::{EV_RPC, TARGET_HEIGHT},
-    prover::message::prove_messages,
+    utils::message::prove_messages,
 };
 use ev_state_queries::MockStateQueryProvider;
 use sp1_sdk::{EnvProver, ProverClient};

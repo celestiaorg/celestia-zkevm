@@ -7,9 +7,9 @@ use celestia_grpc_client::{
 };
 use e2e::config::debug::EV_RPC;
 use e2e::config::e2e::{CELESTIA_MAILBOX_ID, CELESTIA_TOKEN_ID, EV_RECIPIENT_ADDRESS, ISM_ID};
-use e2e::prover::block::prove_blocks;
-use e2e::prover::helpers::transfer_back;
-use e2e::prover::message::prove_messages;
+use e2e::utils::block::prove_blocks;
+use e2e::utils::helpers::transfer_back;
+use e2e::utils::message::prove_messages;
 use ev_prover::inclusion_height;
 use ev_state_queries::MockStateQueryProvider;
 use ev_zkevm_types::hyperlane::encode_hyperlane_message;
