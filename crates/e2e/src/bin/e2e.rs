@@ -33,10 +33,10 @@ async fn main() {
         .expect("Failed to set default crypto provider");
     dotenvy::dotenv().ok();
     let mut filter = EnvFilter::new("sp1_core=warn,sp1_runtime=warn,sp1_sdk=warn,sp1_vm=warn");
-    if let Ok(env_filter) = std::env::var("RUST_LOG") {
-        if let Ok(parsed) = env_filter.parse() {
-            filter = filter.add_directive(parsed);
-        }
+    if let Ok(env_filter) = std::env::var("RUST_LOG")
+        && let Ok(parsed) = env_filter.parse()
+    {
+        filter = filter.add_directive(parsed);
     }
     tracing_subscriber::fmt().with_env_filter(filter).init();
 

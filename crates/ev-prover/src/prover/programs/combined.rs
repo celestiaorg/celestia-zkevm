@@ -42,10 +42,10 @@ mod config {
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_COMBINED_ELF: &[u8] = include_elf!("ev-combined-program");
 pub const ISM_ID: &str = "0x726f757465725f69736d000000000000000000000000002a0000000000000001";
-pub const BATCH_SIZE: u64 = 10;
+pub const BATCH_SIZE: u64 = 120;
 //pub const PARALLELISM: u64 = 1;
-pub const WARN_DISTANCE: u64 = 30;
-pub const ERR_DISTANCE: u64 = 60;
+pub const WARN_DISTANCE: u64 = 240;
+pub const ERR_DISTANCE: u64 = 480;
 pub struct EvCombinedProver {
     config: CombinedProverConfig,
     prover: Arc<SP1Prover>,
@@ -201,11 +201,7 @@ async fn prepare_combined_inputs(
 
     // reinitialize the prover client
     let mut stdin = SP1Stdin::new();
-    let input = EvCombinedInput {
-        blocks: block_inputs,
-        trusted_height: *trusted_height,
-        trusted_root: *trusted_root,
-    };
+    let input = EvCombinedInput { blocks: block_inputs };
     stdin.write(&input);
     Ok(stdin)
 }

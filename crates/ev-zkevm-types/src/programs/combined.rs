@@ -1,49 +1,11 @@
-//! An SP1 program that verifies a sequence of N `ev-exec` proofs.
-//!
-//! It accepts:
-//! - N verification keys
-//! - N serialized public values (each from a `EvmBlockExecOutput`)
-//!
-//! It performs:
-//! 1. Proof verification for each input
-//! 2. Sequential header verification (i.e., block continuity)
-//! 3. Aggregation of metadata into a `EvmRangeExecOutput`
-//!
-//! It commits:
-//! - The trusted block height and state root
-//! - The new block height and state root
-//! - The latest Celestia header hash from the sequence
+use crate::programs::block::{BlockExecOutput, BlockRangeExecOutput, EvCombinedInput, verify_block};
+use std::error::Error;
 
-#![no_main]
-sp1_zkvm::entrypoint!(main);
-
-use ev_zkevm_types::programs::block::{BlockExecOutput, BlockRangeExecInput, BlockRangeExecOutput, Buffer};
-use sha2::{Digest, Sha256};
-
-pub fn main() {
-    let inputs: BlockRangeExecInput = sp1_zkvm::io::read::<BlockRangeExecInput>();
-
-    assert_eq!(
-        inputs.vkeys.len(),
-        inputs.public_values.len(),
-        "mismatch between number of verification keys and public value blobs"
-    );
-
-    let proof_count = inputs.vkeys.len();
-
-    for i in 0..proof_count {
-        let digest = Sha256::digest(&inputs.public_values[i]);
-        sp1_zkvm::lib::verify::verify_sp1_proof(&inputs.vkeys[i], &digest.into());
+pub fn verify_combined(inputs: EvCombinedInput) -> Result<BlockRangeExecOutput, Box<dyn Error>> {
+    let mut outputs: Vec<BlockExecOutput> = Vec::new();
+    for block in inputs.blocks {
+        outputs.push(verify_block(block).expect("failed to verify block"));
     }
-
-    let outputs: Vec<BlockExecOutput> = inputs
-        .public_values
-        .iter()
-        .map(|bytes| {
-            let mut buffer = Buffer::from(bytes);
-            buffer.read::<BlockExecOutput>()
-        })
-        .collect();
 
     for window in outputs.windows(2).enumerate() {
         let (i, pair) = window;
@@ -94,7 +56,7 @@ pub fn main() {
     let output = BlockRangeExecOutput {
         prev_celestia_height: first.prev_celestia_height,
         prev_celestia_header_hash: first.prev_celestia_header_hash,
-        celestia_height: first.prev_celestia_height + inputs.public_values.len() as u64,
+        celestia_height: first.prev_celestia_height + outputs.len() as u64,
         celestia_header_hash: last.celestia_header_hash,
         trusted_height: first.prev_height,
         trusted_state_root: first.prev_state_root,
@@ -107,6 +69,5 @@ pub fn main() {
             .expect("namespace must be 29 bytes"),
         public_key: last.public_key,
     };
-
-    sp1_zkvm::io::commit(&output);
+    Ok(output)
 }
