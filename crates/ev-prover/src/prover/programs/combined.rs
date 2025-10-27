@@ -42,7 +42,7 @@ pub const ERR_DISTANCE: u64 = 120;
 pub struct AppContext {
     // reth http, for example http://127.0.0.1:8545
     pub evm_rpc: String,
-    // celestia rpc, for example http://127.0.0.1:26657
+    // celestia rpc, for example http://127.0.0.1:26658
     pub celestia_rpc: String,
 }
 impl AppContext {
@@ -54,7 +54,7 @@ impl Default for AppContext {
     fn default() -> Self {
         Self::new(
             "http://127.0.0.1:8545".to_string(),
-            "http://127.0.0.1:26657".to_string(),
+            "http://127.0.0.1:26658".to_string(),
         )
     }
 }
