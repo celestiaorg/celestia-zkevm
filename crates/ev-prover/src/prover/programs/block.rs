@@ -2,6 +2,7 @@
 use celestia_types::ExtendedHeader;
 use std::collections::BTreeMap;
 use std::env;
+use std::fmt::Display;
 use std::fs;
 use std::result::Result::{Err, Ok};
 use std::sync::Arc;
@@ -70,8 +71,14 @@ impl TrustedState {
     }
 }
 
+impl Display for TrustedState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "height={}, root={}", self.height, self.root)
+    }
+}
+
 impl AppContext {
-    pub fn from_config(config: Config) -> Result<Self> {
+    pub fn new(config: Config, trusted_state: TrustedState) -> Result<Self> {
         let genesis = AppContext::load_genesis().context("Error loading app genesis")?;
         let chain_spec: Arc<ChainSpec> = Arc::new(
             (&genesis)
@@ -82,7 +89,7 @@ impl AppContext {
         let raw_ns = hex::decode(config.namespace_hex)?;
         let namespace = Namespace::new_v0(raw_ns.as_ref()).context("Failed to construct Namespace")?;
         let pub_key = hex::decode(config.pub_key)?;
-        let trusted_state = RwLock::new(TrustedState::new(0, chain_spec.genesis_header().state_root));
+        let trusted_state = RwLock::new(trusted_state);
 
         Ok(AppContext {
             chain_spec,

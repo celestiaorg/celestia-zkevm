@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
+use alloy_primitives::FixedBytes;
 use anyhow::Result;
 use celestia_grpc_client::types::ClientConfig;
-use celestia_grpc_client::CelestiaIsmClient;
+use celestia_grpc_client::{CelestiaIsmClient, QueryIsmRequest};
 use ev_types::v1::get_block_request::Identifier;
 use ev_types::v1::store_service_client::StoreServiceClient;
 use ev_types::v1::GetBlockRequest;
@@ -12,11 +13,11 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server;
 use tonic_reflection::server::Builder as ReflectionBuilder;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use crate::config::config::{Config, APP_HOME};
 use crate::proto::celestia::prover::v1::prover_server::ProverServer;
-use crate::prover::programs::block::{AppContext, BlockExecProver};
+use crate::prover::programs::block::{AppContext, BlockExecProver, TrustedState};
 use crate::prover::programs::range::{BlockRangeExecProver, BlockRangeExecService};
 use crate::prover::service::ProverService;
 
@@ -35,6 +36,12 @@ pub async fn start_server(config: Config) -> Result<()> {
     config_clone.pub_key = public_key().await?;
     debug!("Successfully got pubkey from evnode: {}", config_clone.pub_key);
 
+    let client_config = ClientConfig::from_env()?;
+    let client = CelestiaIsmClient::new(client_config).await?;
+
+    let trusted_state = get_trusted_state(&client).await?;
+    debug!("Successfully got trusted state from ism: {}", trusted_state);
+
     // Initialize RocksDB storage in the default data directory
     let storage_path = dirs::home_dir()
         .expect("cannot find home directory")
@@ -44,7 +51,7 @@ pub async fn start_server(config: Config) -> Result<()> {
 
     let storage = Arc::new(RocksDbProofStorage::new(storage_path)?);
     let (tx_block, rx_block) = mpsc::channel(256);
-    let (tx_range, _rx_range) = mpsc::channel(256);
+    let (tx_range, mut rx_range) = mpsc::channel(256);
 
     let batch_size = config_clone.batch_size;
     let concurrency = config_clone.concurrency;
@@ -52,7 +59,7 @@ pub async fn start_server(config: Config) -> Result<()> {
 
     tokio::spawn({
         let block_prover = BlockExecProver::new(
-            AppContext::from_config(config_clone)?,
+            AppContext::new(config_clone, trusted_state)?,
             tx_block,
             storage.clone(),
             queue_capacity,
@@ -65,16 +72,12 @@ pub async fn start_server(config: Config) -> Result<()> {
         }
     });
 
-    let client_config = ClientConfig::from_env()?;
-    let client = CelestiaIsmClient::new(client_config).await?;
-
-    tokio::spawn({
-        let prover = Arc::new(BlockRangeExecProver::new()?);
-        let service = BlockRangeExecService::new(client, prover, storage.clone(), rx_block, tx_range, batch_size, 16);
-        async move {
-            if let Err(e) = service.run().await {
-                error!("Block prover task failed: {e:?}");
-            }
+    let prover = Arc::new(BlockRangeExecProver::new()?);
+    let service =
+        BlockRangeExecService::new(client, prover, storage.clone(), rx_block, tx_range, batch_size, 16).await?;
+    tokio::spawn(async move {
+        if let Err(e) = service.run().await {
+            error!("Block prover task failed: {e:?}");
         }
     });
 
@@ -82,6 +85,9 @@ pub async fn start_server(config: Config) -> Result<()> {
     // First generate the block proof, then generate the message proof inside a joined service.
     // We have a service implementation for each prover that can run in isolation, but for our ZK ISM
     // we will want to send both proofs together in a single request.
+    while let Some(event) = rx_range.recv().await {
+        info!(?event, "TODO: RangeProofCommitted... consume me!");
+    }
 
     let prover_service = ProverService::new(storage)?;
 
@@ -105,4 +111,16 @@ pub async fn public_key() -> Result<String> {
     let resp = sequencer_client.get_block(block_req).await?;
     let pub_key = resp.into_inner().block.unwrap().header.unwrap().signer.unwrap().pub_key;
     Ok(hex::encode(&pub_key[4..]))
+}
+
+pub async fn get_trusted_state(client: &CelestiaIsmClient) -> Result<TrustedState> {
+    let resp = client
+        .ism(QueryIsmRequest {
+            id: client.ism_id().to_string(),
+        })
+        .await?;
+
+    let ism = resp.ism.unwrap();
+
+    Ok(TrustedState::new(ism.height, FixedBytes::from_slice(&ism.state_root)))
 }

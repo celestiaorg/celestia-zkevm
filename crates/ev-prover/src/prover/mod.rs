@@ -14,7 +14,7 @@ pub mod service;
 
 pub use config::{BaseProverConfig, ProgramId, ProgramVerifyingKey, ProverConfig, ProverMode, RecursiveProverConfig};
 
-pub type SP1Prover = dyn Prover<CpuProverComponents> + Send + Sync;
+pub type SP1Prover = dyn Prover<CpuProverComponents>;
 
 /// ProgramProver is a trait implemented per SP1 program*.
 ///

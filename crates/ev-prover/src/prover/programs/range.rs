@@ -151,7 +151,7 @@ pub struct BlockRangeExecService {
 }
 
 impl BlockRangeExecService {
-    pub fn new(
+    pub async fn new(
         client: CelestiaIsmClient,
         prover: Arc<BlockRangeExecProver>,
         storage: Arc<dyn ProofStorage>,
@@ -159,8 +159,11 @@ impl BlockRangeExecService {
         tx_range: Sender<RangeProofCommitted>,
         batch_size: usize,
         concurrency: usize,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        let next_expected = storage.get_range_cursor().await?;
+        debug!(?next_expected, "loaded next expected range cursor from storage");
+
+        Ok(Self {
             client,
             prover,
             storage,
@@ -169,17 +172,22 @@ impl BlockRangeExecService {
             batch_size,
             concurrency: Arc::new(Semaphore::new(concurrency)),
             pending: BTreeSet::new(),
-            next_expected: None,
-        }
+            next_expected,
+        })
     }
 
     pub async fn run(mut self) -> Result<()> {
         while let Some(ev) = self.rx_block.recv().await {
-            info!("ProofCommitted for height: {}", ev);
             self.pending.insert(ev);
             debug!("Block execution proofs pending: {}", self.pending.len());
 
             while let Some((start, end)) = self.next_provable_range()? {
+                if let Some(cursor) = self.next_expected {
+                    let storage = self.storage.clone();
+                    storage.set_range_cursor(cursor).await?;
+                    debug!(next_expected = cursor, "persisted next expected range cursor");
+                }
+
                 let permit = self.concurrency.clone().acquire_owned().await?;
 
                 let client = self.client.clone();
@@ -187,6 +195,7 @@ impl BlockRangeExecService {
                 let storage = self.storage.clone();
                 let tx = self.tx_range.clone();
 
+                info!(?start, ?end, "spawning new task for aggregate range");
                 tokio::spawn(async move {
                     let _permit = permit;
 
@@ -215,16 +224,12 @@ impl BlockRangeExecService {
     /// If a complete batch exists then remove those entries from `pending`, advance the cursor, and return the range.
     /// Note: the start and end range indices are inclusive.
     fn next_provable_range(&mut self) -> Result<Option<(u64, u64)>> {
-        debug!("trying to accumulate next provable range");
         if self.batch_size == 0 {
             return Ok(None);
         }
 
-        // TODO: this initialisation code using the Option<u64> is just for testing.
-        // ideally we can persist this somewhere (db), this just allows me to test locally quickly
-        // If we don't have a cursor yet, initialize it from the smallest pending height.
+        // If we still don't have a cursor (e.g. nothing persisted yet), initialize it from the smallest pending height.
         if self.next_expected.is_none() {
-            debug!("next expected is not set, trying to set...");
             match self.pending.first() {
                 Some(h) => self.next_expected = Some(h.height()),
                 None => return Ok(None), // nothing pending yet
@@ -284,13 +289,6 @@ impl BlockRangeExecService {
 
         info!("Successfull created and stored proof for range {start}-{end}. Outputs: {output}");
 
-        // NOTE: temporarily to allow local testing in mock mode
-        // let prover = ProverClient::builder().mock().build();
-        // let res = prover
-        //     .prove(&self.cfg().pk(), &self.build_stdin(input)?)
-        //     .deferred_proof_verification(false)
-        //     .run()?;
-        // let output = self.post_process(res)?;
         Ok((res, output))
     }
 
@@ -298,7 +296,7 @@ impl BlockRangeExecService {
         let public_values = proof.public_values.to_vec();
         let signer_address = client.signer_address().to_string();
 
-        let ism_id = "todo: or add a configurable to client".to_string();
+        let ism_id = client.ism_id().to_string();
         let proof_msg = StateTransitionProofMsg::new(ism_id, proof.bytes(), public_values, signer_address);
 
         let res = client.send_tx(proof_msg).await?;
