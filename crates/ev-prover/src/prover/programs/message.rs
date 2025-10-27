@@ -197,12 +197,11 @@ impl HyperlaneMessageProver {
         // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
         // then save new snapshot
         let mut snapshot = self.snapshot_store.get_snapshot(self.snapshot_store.current_index()?)?;
-
-        let start_height = snapshot.height + 1;
         if snapshot.height == height {
             debug!("No new ev blocks so no new messages to prove");
             return Ok(());
         }
+        let start_height = snapshot.height + 1;
 
         indexer.filter = Filter::new()
             .address(indexer.contract_address)
@@ -255,8 +254,10 @@ impl HyperlaneMessageProver {
             message_proof.0.public_values.as_slice().to_vec(),
             ism_client.signer_address().to_string(),
         );
+
         info!("Submitting Hyperlane tree proof to ZKISM...");
         let response = ism_client.send_tx(message_proof_msg).await?;
+
         assert!(response.success);
         info!("[Done] ZKISM was updated successfully");
 

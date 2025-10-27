@@ -34,6 +34,7 @@ use crate::prover::{config::CombinedProverConfig, prover_from_env, SP1Prover};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_COMBINED_ELF: &[u8] = include_elf!("ev-combined-program");
+// hardcoded batch size for now
 pub const BATCH_SIZE: u64 = 50;
 pub const WARN_DISTANCE: u64 = 60;
 pub const ERR_DISTANCE: u64 = 120;
