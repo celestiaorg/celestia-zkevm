@@ -138,7 +138,7 @@ pub async fn parallel_prover(
             .ok_or_else(|| anyhow::anyhow!("Block {} not found", last_height))?;
 
         trusted_heights.push(last_height);
-        trusted_roots.push(block.header.state_root.into());
+        trusted_roots.push(block.header.state_root);
     }
 
     // now we can generate proofs in parallel

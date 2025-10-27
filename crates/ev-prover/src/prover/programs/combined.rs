@@ -4,7 +4,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{generate_client_executor_input, get_sequencer_pubkey, load_chain_spec_from_genesis, ISM_ID};
+use crate::{
+    generate_client_executor_input, get_sequencer_pubkey, load_chain_spec_from_genesis, prover::RangeProofCommitted,
+    ISM_ID,
+};
 use alloy::hex::FromHex;
 use alloy_primitives::FixedBytes;
 use alloy_provider::{Provider, ProviderBuilder};
@@ -46,7 +49,9 @@ impl AppContext {
     pub fn new(evm_rpc: String, celestia_rpc: String) -> Self {
         Self { evm_rpc, celestia_rpc }
     }
-    pub fn default() -> Self {
+}
+impl Default for AppContext {
+    fn default() -> Self {
         Self::new(
             "http://127.0.0.1:8545".to_string(),
             "http://127.0.0.1:26657".to_string(),
@@ -56,6 +61,7 @@ impl AppContext {
 
 pub struct EvCombinedProver {
     app: AppContext,
+    range_tx: tokio::sync::mpsc::Sender<RangeProofCommitted>,
     config: CombinedProverConfig,
     prover: Arc<SP1Prover>,
 }
@@ -87,10 +93,16 @@ impl ProgramProver for EvCombinedProver {
 }
 
 impl EvCombinedProver {
-    pub fn new(app: AppContext) -> Result<Self> {
+    pub fn new(app: AppContext, range_tx: tokio::sync::mpsc::Sender<RangeProofCommitted>) -> Result<Self> {
         let prover = prover_from_env();
         let config = EvCombinedProver::default_config(prover.as_ref());
-        Ok(Self { app, config, prover })
+
+        Ok(Self {
+            app,
+            config,
+            prover,
+            range_tx,
+        })
     }
 
     pub fn default_config(prover: &SP1Prover) -> CombinedProverConfig {
@@ -166,7 +178,13 @@ impl EvCombinedProver {
             info!("[Done] ZKISM was updated successfully");
             let public_values: BlockRangeExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
             known_celestia_height = public_values.celestia_height;
-            // use shared channel to request message proof for new height
+            // use shared channel to request message proof for new height and root
+            self.range_tx
+                .send(RangeProofCommitted {
+                    trusted_height: public_values.new_height,
+                    trusted_root: public_values.new_state_root,
+                })
+                .await?;
         }
     }
 }

@@ -21,6 +21,7 @@ use std::{env, str::FromStr, sync::Arc};
 use storage::hyperlane::StoredHyperlaneMessage;
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use storage::proofs::ProofStorage;
+use tokio::sync::mpsc::Receiver;
 use tracing::{error, info};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
@@ -120,7 +121,7 @@ impl HyperlaneMessageProver {
     }
 
     /// Run the message prover with indexer
-    pub async fn run(self: Arc<Self>, mut range_rx: tokio::sync::mpsc::Receiver<RangeProofCommitted>) -> Result<()> {
+    pub async fn run(self: Arc<Self>, mut range_rx: Receiver<RangeProofCommitted>) -> Result<()> {
         let evm_provider: DefaultProvider =
             ProviderBuilder::new().connect_http(Url::from_str(&self.ctx.evm_rpc).unwrap());
         let socket = WsConnect::new(&self.ctx.evm_ws);
