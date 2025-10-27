@@ -26,7 +26,7 @@ use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnap
 use storage::proofs::ProofStorage;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::Mutex;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
@@ -199,6 +199,10 @@ impl HyperlaneMessageProver {
         let mut snapshot = self.snapshot_store.get_snapshot(self.snapshot_store.current_index()?)?;
 
         let start_height = snapshot.height + 1;
+        if snapshot.height == height {
+            debug!("No new ev blocks so no new messages to prove");
+            return Ok(());
+        }
 
         indexer.filter = Filter::new()
             .address(indexer.contract_address)
