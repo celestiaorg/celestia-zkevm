@@ -72,30 +72,22 @@ pub fn version() {
 pub async fn query(query_cmd: QueryCommands) -> Result<()> {
     match query_cmd {
         QueryCommands::LatestBlock { server } => {
-            println!("Connecting to gRPC server at {}...", server);
             let mut client = ProverClient::connect(server).await?;
-            println!("✓ Connected\n");
-
-            println!("Querying latest block proof...");
             let response = client.get_latest_block_proof(GetLatestBlockProofRequest {}).await?;
             let inner = response.into_inner();
 
             if let Some(proof) = inner.proof {
-                println!("✓ Found latest block proof:");
+                println!("Latest block proof:");
                 println!("  Height: {}", proof.celestia_height);
                 println!("  Proof size: {} bytes", proof.proof_data.len());
                 println!("  Public values size: {} bytes", proof.public_values.len());
                 println!("  Created at (Unix): {}", proof.created_at);
             } else {
-                println!("✗ No proof data returned");
+                println!("No proof data returned");
             }
         }
         QueryCommands::Block { height, server } => {
-            println!("Connecting to gRPC server at {}...", server);
             let mut client = ProverClient::connect(server).await?;
-            println!("✓ Connected\n");
-
-            println!("Querying block proof for height {}...", height);
             let response = client
                 .get_block_proof(GetBlockProofRequest {
                     celestia_height: height,
@@ -103,13 +95,13 @@ pub async fn query(query_cmd: QueryCommands) -> Result<()> {
                 .await?;
 
             if let Some(proof) = response.into_inner().proof {
-                println!("✓ Found block proof:");
+                println!("Block proof for height {height}:");
                 println!("  Height: {}", proof.celestia_height);
                 println!("  Proof size: {} bytes", proof.proof_data.len());
                 println!("  Public values size: {} bytes", proof.public_values.len());
                 println!("  Created at (Unix): {}", proof.created_at);
             } else {
-                println!("✗ No proof data returned");
+                println!("No proof data returned");
             }
         }
         QueryCommands::BlockRange {
@@ -117,11 +109,7 @@ pub async fn query(query_cmd: QueryCommands) -> Result<()> {
             end_height,
             server,
         } => {
-            println!("Connecting to gRPC server at {}...", server);
             let mut client = ProverClient::connect(server).await?;
-            println!("✓ Connected\n");
-
-            println!("Querying block proofs in range [{}, {}]...", start_height, end_height);
             let response = client
                 .get_block_proofs_in_range(GetBlockProofsInRangeRequest {
                     start_height,
@@ -130,10 +118,10 @@ pub async fn query(query_cmd: QueryCommands) -> Result<()> {
                 .await?;
 
             let proofs = response.into_inner().proofs;
-            println!("✓ Found {} block proof(s):\n", proofs.len());
+            println!("Found {} block proof(s):\n", proofs.len());
 
             for (i, proof) in proofs.iter().enumerate() {
-                println!("--- Proof {} ---", i + 1);
+                println!("Proof {} of {}:", i + 1, proofs.len());
                 println!("  Height: {}", proof.celestia_height);
                 println!("  Proof size: {} bytes", proof.proof_data.len());
                 println!("  Public values size: {} bytes", proof.public_values.len());
@@ -142,41 +130,33 @@ pub async fn query(query_cmd: QueryCommands) -> Result<()> {
             }
         }
         QueryCommands::LatestMembership { server } => {
-            println!("Connecting to gRPC server at {}...", server);
             let mut client = ProverClient::connect(server).await?;
-            println!("✓ Connected\n");
-
-            println!("Querying latest membership proof...");
             let response = client
                 .get_latest_membership_proof(GetLatestMembershipProofRequest {})
                 .await?;
 
             if let Some(proof) = response.into_inner().proof {
-                println!("✓ Found latest membership proof:");
+                println!("Latest membership proof:");
                 println!("  Proof size: {} bytes", proof.proof_data.len());
                 println!("  Public values size: {} bytes", proof.public_values.len());
                 println!("  Created at (Unix): {}", proof.created_at);
             } else {
-                println!("✗ No proof data returned");
+                println!("No proof data returned");
             }
         }
         QueryCommands::Membership { height, server } => {
-            println!("Connecting to gRPC server at {}...", server);
             let mut client = ProverClient::connect(server).await?;
-            println!("✓ Connected\n");
-
-            println!("Querying membership proof for height {}...", height);
             let response = client
                 .get_membership_proof(GetMembershipProofRequest { height })
                 .await?;
 
             if let Some(proof) = response.into_inner().proof {
-                println!("✓ Found membership proof:");
+                println!("Membership proof for height {height}:");
                 println!("  Proof size: {} bytes", proof.proof_data.len());
                 println!("  Public values size: {} bytes", proof.public_values.len());
                 println!("  Created at (Unix): {}", proof.created_at);
             } else {
-                println!("✗ No proof data returned");
+                println!("No proof data returned");
             }
         }
         QueryCommands::RangeProofs {
@@ -184,11 +164,7 @@ pub async fn query(query_cmd: QueryCommands) -> Result<()> {
             end_height,
             server,
         } => {
-            println!("Connecting to gRPC server at {}...", server);
             let mut client = ProverClient::connect(server).await?;
-            println!("✓ Connected\n");
-
-            println!("Querying range proofs for range [{}, {}]...", start_height, end_height);
             let response = client
                 .get_range_proofs(GetRangeProofsRequest {
                     start_height,
@@ -197,10 +173,10 @@ pub async fn query(query_cmd: QueryCommands) -> Result<()> {
                 .await?;
 
             let proofs = response.into_inner().proofs;
-            println!("✓ Found {} range proof(s):\n", proofs.len());
+            println!("Found {} range proof(s):\n", proofs.len());
 
             for (i, proof) in proofs.iter().enumerate() {
-                println!("--- Range Proof {} ---", i + 1);
+                println!("Range Proof {} of {}:", i + 1, proofs.len());
                 println!("  Range: {} - {}", proof.start_height, proof.end_height);
                 println!("  Proof size: {} bytes", proof.proof_data.len());
                 println!("  Public values size: {} bytes", proof.public_values.len());
