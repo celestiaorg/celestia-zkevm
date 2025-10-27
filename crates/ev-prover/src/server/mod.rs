@@ -2,11 +2,9 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use celestia_grpc_client::{types::ClientConfig, CelestiaIsmClient};
 use ev_types::v1::get_block_request::Identifier;
 use ev_types::v1::store_service_client::StoreServiceClient;
 use ev_types::v1::GetBlockRequest;
-use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use storage::proofs::RocksDbProofStorage;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
@@ -19,15 +17,19 @@ use crate::config::config::{Config, APP_HOME};
 use crate::proto::celestia::prover::v1::prover_server::ProverServer;
 use crate::prover::service::ProverService;
 
-#[cfg(feature = "combined")]
-use crate::prover::programs::{
-    combined::{AppContext as CombinedAppContext, EvCombinedProver},
-    message::AppContext as MessageAppContext,
-};
 #[cfg(not(feature = "combined"))]
 use {
     crate::prover::programs::block::{AppContext, BlockExecProver},
     crate::prover::programs::range::BlockRangeExecProver,
+};
+#[cfg(feature = "combined")]
+use {
+    crate::prover::programs::{
+        combined::{AppContext as CombinedAppContext, EvCombinedProver},
+        message::AppContext as MessageAppContext,
+    },
+    celestia_grpc_client::{types::ClientConfig, CelestiaIsmClient},
+    storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore},
 };
 
 pub async fn start_server(config: Config) -> Result<()> {
