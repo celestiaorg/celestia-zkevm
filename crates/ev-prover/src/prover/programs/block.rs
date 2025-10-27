@@ -36,7 +36,7 @@ use tracing::{debug, error, info};
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
 use crate::prover::prover_from_env;
 use crate::prover::SP1Prover;
-use crate::prover::{ProverConfig, BlockProofCommitted, ProgramProver};
+use crate::prover::{BlockProofCommitted, ProgramProver, ProverConfig};
 use storage::proofs::ProofStorage;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
