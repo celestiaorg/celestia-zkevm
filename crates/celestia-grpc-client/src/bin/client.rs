@@ -27,9 +27,6 @@ enum Commands {
         /// Public values file path (hex encoded)
         #[arg(long)]
         public_values_file: String,
-        /// Block height for state transition
-        #[arg(long)]
-        height: u64,
     },
     /// Submit a state inclusion proof (MsgSubmitMessages)
     StateInclusion {
@@ -91,7 +88,6 @@ async fn main() -> Result<()> {
             id,
             proof_file,
             public_values_file,
-            height,
         } => {
             info!("Submitting state transition proof (MsgUpdateZKExecutionISM)...");
 
