@@ -34,10 +34,10 @@ use crate::prover::{config::CombinedProverConfig, prover_from_env, SP1Prover};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_COMBINED_ELF: &[u8] = include_elf!("ev-combined-program");
-pub const BATCH_SIZE: u64 = 120;
+pub const BATCH_SIZE: u64 = 20;
 //pub const PARALLELISM: u64 = 1;
-pub const WARN_DISTANCE: u64 = 240;
-pub const ERR_DISTANCE: u64 = 480;
+pub const WARN_DISTANCE: u64 = 60;
+pub const ERR_DISTANCE: u64 = 120;
 
 pub struct AppContext {
     // reth http, for example http://127.0.0.1:8545
@@ -140,6 +140,7 @@ impl EvCombinedProver {
             }
 
             let distance = latest_celestia_height.saturating_sub(trusted_celestia_height);
+
             if distance >= ERR_DISTANCE {
                 error!("Prover is {distance} blocks behind Celestia head");
             } else if distance >= WARN_DISTANCE {

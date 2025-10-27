@@ -5,8 +5,10 @@ use anyhow::Result;
 use ev_types::v1::get_block_request::Identifier;
 use ev_types::v1::store_service_client::StoreServiceClient;
 use ev_types::v1::GetBlockRequest;
+use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use storage::proofs::RocksDbProofStorage;
 use tokio::net::TcpListener;
+use tokio::sync::mpsc;
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server;
 use tonic_reflection::server::Builder as ReflectionBuilder;
@@ -25,7 +27,6 @@ use crate::prover::programs::{
 use {
     crate::prover::programs::block::{AppContext, BlockExecProver},
     crate::prover::programs::range::BlockRangeExecProver,
-    tokio::sync::mpsc,
 };
 
 pub async fn start_server(config: Config) -> Result<()> {
@@ -96,8 +97,6 @@ pub async fn start_server(config: Config) -> Result<()> {
     #[cfg(feature = "combined")]
     {
         let (range_tx, range_rx) = mpsc::channel(256);
-        use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
-        use tokio::sync::mpsc;
         let message_storage_path = dirs::home_dir()
             .expect("cannot find home directory")
             .join(APP_HOME)
@@ -119,12 +118,11 @@ pub async fn start_server(config: Config) -> Result<()> {
             }
         });
         tokio::spawn({
-            use std::str::FromStr;
-
             use alloy_primitives::Address;
             use alloy_provider::ProviderBuilder;
             use ev_state_queries::{DefaultProvider, MockStateQueryProvider};
             use reqwest::Url;
+            use std::str::FromStr;
 
             use crate::prover::programs::message::HyperlaneMessageProver;
 
@@ -146,6 +144,7 @@ pub async fn start_server(config: Config) -> Result<()> {
                 Arc::new(MockStateQueryProvider::new(evm_provider)),
             )
             .unwrap();
+
             async move {
                 if let Err(e) = message_prover.run(range_rx).await {
                     error!("Message prover task failed: {e:?}");
