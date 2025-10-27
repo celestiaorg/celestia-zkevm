@@ -28,6 +28,8 @@ pub struct ClientConfig {
     pub signer_address: String,
     /// Chain ID for the Celestia network
     pub chain_id: String,
+    /// Default ISM ID
+    pub ism_id: String,
     /// Gas price for transactions
     pub gas_price: u64,
     /// Maximum gas limit per transaction
@@ -70,6 +72,7 @@ impl ClientConfig {
             private_key_hex,
             signer_address,
             chain_id: env::var("CELESTIA_CHAIN_ID").unwrap_or_else(|_| "celestia-zkevm-testnet".to_string()),
+            ism_id: env::var("CELESTIA_ISM_ID").unwrap_or_default(),
             gas_price: env::var("CELESTIA_GAS_PRICE")
                 .unwrap_or_else(|_| "1000".to_string())
                 .parse()
@@ -95,6 +98,7 @@ impl Default for ClientConfig {
             private_key_hex: String::new(),
             signer_address: String::new(),
             chain_id: "celestia-zkevm-testnet".to_string(),
+            ism_id: String::new(),
             gas_price: 1000,
             max_gas: 200_000,
             confirmation_timeout: 60,

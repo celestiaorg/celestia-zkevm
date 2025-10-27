@@ -63,6 +63,11 @@ impl CelestiaIsmClient {
         &self.config.chain_id
     }
 
+    /// Get the configured ism ID
+    pub fn ism_id(&self) -> &str {
+        &self.config.ism_id
+    }
+
     /// Get the configured gRPC endpoint
     pub fn grpc_endpoint(&self) -> &str {
         &self.config.grpc_endpoint
@@ -143,6 +148,7 @@ mod tests {
             private_key_hex: "0123456789abcdef".repeat(8), // 64 hex chars
             signer_address: String::new(),                 // Will be derived
             chain_id: "test-chain".to_string(),
+            ism_id: String::new(),
             gas_price: 1000,
             max_gas: 200_000,
             confirmation_timeout: 30,
