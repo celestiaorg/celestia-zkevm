@@ -1,23 +1,21 @@
 #![allow(dead_code)]
-use std::{
-    collections::{BTreeSet, HashMap},
-    env,
-    sync::Arc,
-};
+use std::{collections::BTreeSet, env, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use celestia_grpc_client::{CelestiaIsmClient, StateTransitionProofMsg};
 use ev_zkevm_types::programs::block::{BlockRangeExecInput, BlockRangeExecOutput};
-use sp1_sdk::{include_elf, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey};
+use sp1_sdk::{
+    include_elf, HashableKey, SP1Proof, SP1ProofMode, SP1ProofWithPublicValues, SP1ProvingKey, SP1Stdin,
+    SP1VerifyingKey,
+};
 use storage::proofs::ProofStorage;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::Semaphore;
 use tracing::{debug, error, info};
 
 use crate::prover::{
-    programs::block::EV_EXEC_ELF, BlockProofCommitted, ProgramProver, ProgramVerifyingKey, RangeProofCommitted,
-    RecursiveProverConfig,
+    programs::block::EV_EXEC_ELF, BlockProofCommitted, ProgramProver, ProverConfig, RangeProofCommitted,
 };
 use crate::prover::{prover_from_env, SP1Prover};
 
@@ -36,9 +34,55 @@ impl ProofInput {
     }
 }
 
+#[derive(Clone)]
+pub struct BlockRangeExecConfig {
+    pub pk: Arc<SP1ProvingKey>,
+    pub vk: Arc<SP1VerifyingKey>,
+    pub proof_mode: SP1ProofMode,
+    pub block_exec: ProgramVerifyingKey,
+}
+
+impl BlockRangeExecConfig {
+    pub fn new(pk: SP1ProvingKey, vk: SP1VerifyingKey, mode: SP1ProofMode, block_exec: ProgramVerifyingKey) -> Self {
+        BlockRangeExecConfig {
+            pk: Arc::new(pk),
+            vk: Arc::new(vk),
+            proof_mode: mode,
+            block_exec,
+        }
+    }
+}
+
+impl ProverConfig for BlockRangeExecConfig {
+    fn pk(&self) -> Arc<SP1ProvingKey> {
+        Arc::clone(&self.pk)
+    }
+
+    fn vk(&self) -> Arc<SP1VerifyingKey> {
+        Arc::clone(&self.vk)
+    }
+
+    fn proof_mode(&self) -> SP1ProofMode {
+        self.proof_mode
+    }
+}
+
+#[derive(Clone)]
+pub struct ProgramVerifyingKey {
+    pub vk: Arc<SP1VerifyingKey>,
+    pub digest: [u32; 8],
+}
+
+impl ProgramVerifyingKey {
+    pub fn new(vk: Arc<SP1VerifyingKey>) -> Self {
+        let digest = vk.vk.hash_u32();
+        Self { vk, digest }
+    }
+}
+
 #[async_trait]
 impl ProgramProver for BlockRangeExecProver {
-    type Config = RecursiveProverConfig;
+    type Config = BlockRangeExecConfig;
     type Input = (BlockRangeExecInput, Vec<ProofInput>);
     type Output = BlockRangeExecOutput;
 
@@ -110,7 +154,7 @@ impl ProgramProver for BlockRangeExecProver {
 /// - All SP1 proofs must be in compressed format (`SP1Proof::Compressed`).
 /// - The number of `vkeys` must exactly match the number of `proofs`.
 pub struct BlockRangeExecProver {
-    config: RecursiveProverConfig,
+    config: BlockRangeExecConfig,
     prover: Arc<SP1Prover>,
 }
 
@@ -123,15 +167,15 @@ impl BlockRangeExecProver {
     }
 
     /// Returns the default prover configuration for the block execution program.
-    pub fn default_config(prover: &SP1Prover) -> RecursiveProverConfig {
+    pub fn default_config(prover: &SP1Prover) -> BlockRangeExecConfig {
         let (pk, vk) = prover.setup(EV_RANGE_EXEC_ELF);
         let (_, inner_vk) = prover.setup(EV_EXEC_ELF);
 
-        RecursiveProverConfig::new(
+        BlockRangeExecConfig::new(
             pk,
             vk,
             SP1ProofMode::Groth16,
-            HashMap::from([("block-exec", ProgramVerifyingKey::new(Arc::new(inner_vk)))]),
+            ProgramVerifyingKey::new(Arc::new(inner_vk)),
         )
     }
 }
@@ -271,7 +315,7 @@ impl BlockRangeExecService {
         storage: Arc<dyn ProofStorage>,
     ) -> Result<(SP1ProofWithPublicValues, BlockRangeExecOutput)> {
         let block_proofs = storage.get_block_proofs_in_range(start, end).await?;
-        let inner = prover.cfg().inner.get("block-exec").unwrap();
+        let inner = &prover.cfg().block_exec;
         let vkeys = vec![inner.digest; block_proofs.len()];
 
         let mut public_values = Vec::with_capacity(block_proofs.len());

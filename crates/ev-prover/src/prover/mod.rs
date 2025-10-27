@@ -12,7 +12,7 @@ pub mod config;
 pub mod programs;
 pub mod service;
 
-pub use config::{BaseProverConfig, ProgramId, ProgramVerifyingKey, ProverConfig, ProverMode, RecursiveProverConfig};
+pub use config::{ProverConfig, ProverMode};
 
 pub type SP1Prover = dyn Prover<CpuProverComponents>;
 
@@ -22,7 +22,7 @@ pub type SP1Prover = dyn Prover<CpuProverComponents>;
 #[async_trait]
 pub trait ProgramProver {
     /// Config implements the the BaseProverConfig trait while allowing per implementation extensions.
-    type Config: BaseProverConfig + Send + Sync + 'static;
+    type Config: ProverConfig + Send + Sync + 'static;
     /// Context needed to build the stdin for this program.
     type Input: Send + 'static;
     /// Output data to return alongside the proof.
