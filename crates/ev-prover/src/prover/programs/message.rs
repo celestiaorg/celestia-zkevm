@@ -4,13 +4,17 @@
 #![allow(dead_code)]
 use crate::prover::{prover_from_env, RangeProofCommitted, SP1Prover};
 use crate::prover::{ProgramProver, ProverConfig};
+use crate::ISM_ID;
 use alloy::hex::FromHex;
 use alloy_primitives::{Address, FixedBytes};
 use alloy_provider::{Provider, ProviderBuilder, WsConnect};
 use alloy_rpc_types::{EIP1186AccountProofResponse, Filter};
 use anyhow::{Context as AnyhowContext, Result};
+use celestia_grpc_client::types::ClientConfig;
+use celestia_grpc_client::{CelestiaIsmClient, MsgProcessMessage, MsgSubmitMessages};
 use ev_state_queries::{hyperlane::indexer::HyperlaneIndexer, DefaultProvider, StateQueryProvider};
 use ev_zkevm_types::events::Dispatch;
+use ev_zkevm_types::hyperlane::encode_hyperlane_message;
 use ev_zkevm_types::programs::hyperlane::types::{
     HyperlaneBranchProof, HyperlaneBranchProofInputs, HyperlaneMessageInputs, HyperlaneMessageOutputs,
     HYPERLANE_MERKLE_TREE_KEYS,
@@ -122,6 +126,8 @@ impl HyperlaneMessageProver {
 
     /// Run the message prover with indexer
     pub async fn run(self: Arc<Self>, mut range_rx: Receiver<RangeProofCommitted>) -> Result<()> {
+        let config = ClientConfig::from_env().expect("failed to create celestia client config");
+        let ism_client = CelestiaIsmClient::new(config).await.unwrap();
         let evm_provider: DefaultProvider =
             ProviderBuilder::new().connect_http(Url::from_str(&self.ctx.evm_rpc).unwrap());
         let socket = WsConnect::new(&self.ctx.evm_ws);
@@ -156,6 +162,7 @@ impl HyperlaneMessageProver {
                     committed_height,
                     merkle_proof.clone(),
                     FixedBytes::from_slice(&committed_state_root),
+                    &ism_client,
                 )
                 .await
             {
@@ -175,6 +182,7 @@ impl HyperlaneMessageProver {
         height: u64,
         proof: EIP1186AccountProofResponse,
         state_root: FixedBytes<32>,
+        ism_client: &CelestiaIsmClient,
     ) -> Result<()> {
         // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
         // then save new snapshot
@@ -230,17 +238,42 @@ impl HyperlaneMessageProver {
         );
 
         // Prove messages against trusted root
-        let proof = self.prove(input).await.expect("Failed to prove");
+        let message_proof = self.prove(input).await.expect("Failed to prove");
+        info!("Message proof generated successfully");
+
+        let message_proof_msg = MsgSubmitMessages::new(
+            ISM_ID.to_string(),
+            height,
+            message_proof.0.bytes(),
+            message_proof.0.public_values.as_slice().to_vec(),
+            ism_client.signer_address().to_string(),
+        );
+        info!("Submitting Hyperlane tree proof to ZKISM...");
+        let response = ism_client.send_tx(message_proof_msg).await.unwrap();
+        assert!(response.success);
+        info!("[Done] ZKISM was updated successfully");
+
+        info!("Relaying verified Hyperlane messages to Celestia...");
+        // submit all now verified messages to hyperlane
+        for message in messages.clone() {
+            let message_hex = alloy::hex::encode(encode_hyperlane_message(&message.message).unwrap());
+            let msg = MsgProcessMessage::new(
+                // Celestia mailbox id, todo: add to config
+                "0x68797065726c616e650000000000000000000000000000000000000000000000".to_string(),
+                ism_client.signer_address().to_string(),
+                alloy::hex::encode(vec![]), // empty metadata; messages are pre-authorized before submission
+                message_hex,
+            );
+            let response = ism_client.send_tx(msg).await.unwrap();
+            assert!(response.success);
+        }
+        info!("[Done] Tia was bridged back to Celestia");
         self.proof_store
-            .store_membership_proof(height, &proof.0, &proof.1)
+            .store_membership_proof(height, &message_proof.0, &message_proof.1)
             .await
             .expect("Failed to store proof");
 
-        info!("Membership proof generated successfully");
-
         snapshot.height = height;
-
-        // store mutated snapshot at next index
         self.snapshot_store
             .insert_snapshot(self.snapshot_store.current_index()? + 1, snapshot)
             .expect("Failed to insert snapshot into snapshot store");
