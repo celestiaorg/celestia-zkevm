@@ -93,7 +93,6 @@ pub async fn start_server(config: Config) -> Result<()> {
         });
     }
 
-    // combined
     #[cfg(feature = "combined")]
     {
         let (range_tx, range_rx) = mpsc::channel(256);
