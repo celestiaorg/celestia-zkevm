@@ -112,19 +112,14 @@ impl ProgramProver for BlockRangeExecProver {
 pub struct BlockRangeExecProver {
     config: RecursiveProverConfig,
     prover: Arc<SP1Prover>,
-    storage: Arc<dyn ProofStorage>,
 }
 
 impl BlockRangeExecProver {
-    pub fn new(storage: Arc<dyn ProofStorage>) -> Result<Self> {
+    pub fn new() -> Result<Self> {
         let prover = prover_from_env();
         let config = BlockRangeExecProver::default_config(prover.as_ref());
 
-        Ok(Self {
-            config,
-            prover,
-            storage,
-        })
+        Ok(Self { config, prover })
     }
 
     /// Returns the default prover configuration for the block execution program.
@@ -144,6 +139,7 @@ impl BlockRangeExecProver {
 pub struct BlockRangeExecService {
     client: CelestiaIsmClient,
     prover: Arc<BlockRangeExecProver>,
+    storage: Arc<dyn ProofStorage>,
     rx_block: Receiver<BlockProofCommitted>,
     tx_range: Sender<RangeProofCommitted>,
 
@@ -158,6 +154,7 @@ impl BlockRangeExecService {
     pub fn new(
         client: CelestiaIsmClient,
         prover: Arc<BlockRangeExecProver>,
+        storage: Arc<dyn ProofStorage>,
         rx_block: Receiver<BlockProofCommitted>,
         tx_range: Sender<RangeProofCommitted>,
         batch_size: usize,
@@ -166,6 +163,7 @@ impl BlockRangeExecService {
         Self {
             client,
             prover,
+            storage,
             rx_block,
             tx_range,
             batch_size,
@@ -186,12 +184,13 @@ impl BlockRangeExecService {
 
                 let client = self.client.clone();
                 let prover = self.prover.clone();
+                let storage = self.storage.clone();
                 let tx = self.tx_range.clone();
 
                 tokio::spawn(async move {
                     let _permit = permit;
 
-                    match Self::aggregate_range(start, end, prover).await {
+                    match Self::aggregate_range(start, end, prover, storage).await {
                         Ok((proof, output)) => {
                             if let Err(e) = Self::submit_range_proof(&client, &proof).await {
                                 error!(?e, "failed to submit tx to ism");
@@ -264,8 +263,9 @@ impl BlockRangeExecService {
         start: u64,
         end: u64,
         prover: Arc<BlockRangeExecProver>,
+        storage: Arc<dyn ProofStorage>,
     ) -> Result<(SP1ProofWithPublicValues, BlockRangeExecOutput)> {
-        let block_proofs = prover.storage.get_block_proofs_in_range(start, end).await?;
+        let block_proofs = storage.get_block_proofs_in_range(start, end).await?;
         let inner = prover.cfg().inner.get("block-exec").unwrap();
         let vkeys = vec![inner.digest; block_proofs.len()];
 
@@ -280,7 +280,7 @@ impl BlockRangeExecService {
 
         let input = (BlockRangeExecInput { vkeys, public_values }, proofs);
         let (res, output) = prover.prove(input).await?;
-        prover.storage.store_range_proof(start, end, &res, &output).await?;
+        storage.store_range_proof(start, end, &res, &output).await?;
 
         info!("Successfull created and stored proof for range {start}-{end}. Outputs: {output}");
 

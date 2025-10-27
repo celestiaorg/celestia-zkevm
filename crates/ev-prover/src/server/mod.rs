@@ -43,8 +43,8 @@ pub async fn start_server(config: Config) -> Result<()> {
         .join("proofs.db");
 
     let storage = Arc::new(RocksDbProofStorage::new(storage_path)?);
-    let (block_tx, block_rx) = mpsc::channel(256);
-    let (range_tx, _range_rx) = mpsc::channel(256);
+    let (tx_block, rx_block) = mpsc::channel(256);
+    let (tx_range, _rx_range) = mpsc::channel(256);
 
     let batch_size = config_clone.batch_size;
     let concurrency = config_clone.concurrency;
@@ -53,7 +53,7 @@ pub async fn start_server(config: Config) -> Result<()> {
     tokio::spawn({
         let block_prover = BlockExecProver::new(
             AppContext::from_config(config_clone)?,
-            block_tx,
+            tx_block,
             storage.clone(),
             queue_capacity,
             concurrency,
@@ -69,10 +69,10 @@ pub async fn start_server(config: Config) -> Result<()> {
     let client = CelestiaIsmClient::new(client_config).await?;
 
     tokio::spawn({
-        let prover = Arc::new(BlockRangeExecProver::new(storage.clone())?);
-        let svc = BlockRangeExecService::new(client, prover, block_rx, range_tx, batch_size, 16);
+        let prover = Arc::new(BlockRangeExecProver::new()?);
+        let service = BlockRangeExecService::new(client, prover, storage.clone(), rx_block, tx_range, batch_size, 16);
         async move {
-            if let Err(e) = svc.run().await {
+            if let Err(e) = service.run().await {
                 error!("Block prover task failed: {e:?}");
             }
         }
