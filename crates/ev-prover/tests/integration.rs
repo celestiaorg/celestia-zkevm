@@ -1,11 +1,8 @@
-use std::{
-    str::FromStr,
-    sync::{Arc, RwLock},
-};
+use std::{str::FromStr, sync::Arc};
 
 use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
-use ev_prover::prover::programs::message::{AppContext, HyperlaneMessageProver, MerkleTreeState};
+use ev_prover::prover::programs::message::{AppContext, HyperlaneMessageProver};
 use ev_state_queries::{DefaultProvider, MockStateQueryProvider};
 use reqwest::Url;
 use storage::{
@@ -39,7 +36,7 @@ async fn test_run_message_prover() {
         .join("data")
         .join("proofs.db");
     let hyperlane_message_store = Arc::new(HyperlaneMessageStore::new(message_storage_path).unwrap());
-    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
+    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path, None).unwrap());
     let proof_store = Arc::new(RocksDbProofStorage::new(proof_storage_path).unwrap());
 
     hyperlane_message_store.reset_db().unwrap();
@@ -50,7 +47,6 @@ async fn test_run_message_prover() {
         evm_ws: "ws://127.0.0.1:8546".to_string(),
         mailbox_address: Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap(),
         merkle_tree_address: Address::from_str("0xfcb1d485ef46344029d9e8a7925925e146b3430e").unwrap(),
-        merkle_tree_state: RwLock::new(MerkleTreeState::new(0, 0)),
     };
 
     let evm_provider: DefaultProvider =
@@ -59,12 +55,11 @@ async fn test_run_message_prover() {
     let (_tx, rx) = mpsc::channel(256);
     let prover = HyperlaneMessageProver::new(
         app,
-        rx,
         hyperlane_message_store,
         hyperlane_snapshot_store,
         proof_store,
         Arc::new(MockStateQueryProvider::new(evm_provider)),
     )
     .unwrap();
-    prover.run().await.unwrap();
+    prover.run(rx).await.unwrap();
 }

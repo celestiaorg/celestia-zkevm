@@ -17,7 +17,8 @@ use crate::proto::celestia::prover::v1::prover_server::ProverServer;
 use crate::prover::service::ProverService;
 
 #[cfg(feature = "combined")]
-use crate::prover::programs::combined::EvCombinedProver;
+use crate::prover::programs::combined::{AppContext as CombinedAppContext, EvCombinedProver};
+use crate::prover::programs::message::AppContext as MessageAppContext;
 #[cfg(not(feature = "combined"))]
 use {
     crate::prover::programs::block::{AppContext, BlockExecProver},
@@ -92,8 +93,21 @@ pub async fn start_server(config: Config) -> Result<()> {
     // combined
     #[cfg(feature = "combined")]
     {
+        use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
+        let message_storage_path = dirs::home_dir()
+            .expect("cannot find home directory")
+            .join(APP_HOME)
+            .join("data")
+            .join("messages.db");
+        let snapshot_storage_path = dirs::home_dir()
+            .expect("cannot find home directory")
+            .join(APP_HOME)
+            .join("data")
+            .join("snapshots.db");
+        let hyperlane_message_store = Arc::new(HyperlaneMessageStore::new(message_storage_path).unwrap());
+        let snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path, None).unwrap());
         tokio::spawn({
-            let combined_prover = EvCombinedProver::new().unwrap();
+            let combined_prover = EvCombinedProver::new(CombinedAppContext::default()).unwrap();
             async move {
                 if let Err(e) = combined_prover.run().await {
                     error!("Combined prover task failed: {e:?}");

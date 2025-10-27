@@ -35,7 +35,27 @@ pub const BATCH_SIZE: u64 = 120;
 //pub const PARALLELISM: u64 = 1;
 pub const WARN_DISTANCE: u64 = 240;
 pub const ERR_DISTANCE: u64 = 480;
+
+pub struct AppContext {
+    // reth http, for example http://127.0.0.1:8545
+    pub evm_rpc: String,
+    // celestia rpc, for example http://127.0.0.1:26657
+    pub celestia_rpc: String,
+}
+impl AppContext {
+    pub fn new(evm_rpc: String, celestia_rpc: String) -> Self {
+        Self { evm_rpc, celestia_rpc }
+    }
+    pub fn default() -> Self {
+        Self::new(
+            "http://127.0.0.1:8545".to_string(),
+            "http://127.0.0.1:26657".to_string(),
+        )
+    }
+}
+
 pub struct EvCombinedProver {
+    app: AppContext,
     config: CombinedProverConfig,
     prover: Arc<SP1Prover>,
 }
@@ -67,10 +87,10 @@ impl ProgramProver for EvCombinedProver {
 }
 
 impl EvCombinedProver {
-    pub fn new() -> Result<Self> {
+    pub fn new(app: AppContext) -> Result<Self> {
         let prover = prover_from_env();
         let config = EvCombinedProver::default_config(prover.as_ref());
-        Ok(Self { config, prover })
+        Ok(Self { app, config, prover })
     }
 
     pub fn default_config(prover: &SP1Prover) -> CombinedProverConfig {
@@ -81,7 +101,7 @@ impl EvCombinedProver {
     pub async fn run(self) -> Result<()> {
         let config = ClientConfig::from_env()?;
         let ism_client = CelestiaIsmClient::new(config).await?;
-        let client = Client::new(crate::rpc_config::CELESTIA_RPC_URL, None).await?;
+        let client = Client::new(&self.app.celestia_rpc, None).await?;
 
         let mut known_celestia_height: u64 = 0;
 
@@ -119,6 +139,7 @@ impl EvCombinedProver {
             let celestia_start_height = ism.celestia_height + 1;
             let stdin = prepare_combined_inputs(
                 &client,
+                &self.app.evm_rpc,
                 celestia_start_height,
                 &mut trusted_height,
                 BATCH_SIZE,
@@ -143,15 +164,16 @@ impl EvCombinedProver {
             let response = ism_client.send_tx(block_proof_msg).await?;
             assert!(response.success);
             info!("[Done] ZKISM was updated successfully");
-            // todo: trigger message prover here
             let public_values: BlockRangeExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
             known_celestia_height = public_values.celestia_height;
+            // use shared channel to request message proof for new height
         }
     }
 }
 
 async fn prepare_combined_inputs(
     celestia_client: &Client,
+    evm_rpc: &str,
     start_height: u64,
     trusted_height: &mut u64,
     num_blocks: u64,
@@ -169,12 +191,13 @@ async fn prepare_combined_inputs(
     )?;
     let namespace_hex = env::var("CELESTIA_NAMESPACE")?;
     let namespace = Namespace::new_v0(&hex::decode(namespace_hex)?)?;
-    let pub_key = get_sequencer_pubkey(crate::rpc_config::SEQUENCER_URL.to_string()).await?;
+    let pub_key = get_sequencer_pubkey("http://localhost:7331".to_string()).await?;
     let mut block_inputs: Vec<BlockExecInput> = Vec::new();
     for block_number in start_height..=(start_height + num_blocks) {
         block_inputs.push(
             get_block_inputs(
                 celestia_client,
+                evm_rpc,
                 block_number,
                 namespace,
                 trusted_height,
@@ -197,6 +220,7 @@ async fn prepare_combined_inputs(
 #[allow(clippy::too_many_arguments)]
 pub async fn get_block_inputs(
     celestia_client: &Client,
+    evm_rpc: &str,
     block_number: u64,
     namespace: Namespace,
     trusted_height: &mut u64,
@@ -254,13 +278,8 @@ pub async fn get_block_inputs(
         last_height = height;
         debug!("Got SignedData for EVM block {height}");
 
-        let client_executor_input = generate_client_executor_input(
-            crate::rpc_config::EVM_RPC_URL,
-            height,
-            chain_spec.clone(),
-            genesis.clone(),
-        )
-        .await?;
+        let client_executor_input =
+            generate_client_executor_input(evm_rpc, height, chain_spec.clone(), genesis.clone()).await?;
         executor_inputs.push(client_executor_input);
     }
 
@@ -276,7 +295,7 @@ pub async fn get_block_inputs(
         trusted_root: *trusted_root,
     };
 
-    let provider = ProviderBuilder::new().connect_http(crate::rpc_config::EVM_RPC_URL.parse()?);
+    let provider = ProviderBuilder::new().connect_http(evm_rpc.parse()?);
     let block = provider
         .get_block_by_number(last_height.into())
         .await?

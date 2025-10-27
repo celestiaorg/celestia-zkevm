@@ -5,23 +5,41 @@
 use anyhow::{Context, Result};
 use ev_zkevm_types::programs::hyperlane::tree::{MerkleTree, ZERO_BYTES};
 use rocksdb::{ColumnFamilyDescriptor, DB, IteratorMode, Options};
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
-pub type HyperlaneSnapshot = MerkleTree;
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct HyperlaneSnapshot {
+    pub height: u64,
+    pub tree: MerkleTree,
+}
+impl HyperlaneSnapshot {
+    pub fn new(height: u64, tree: MerkleTree) -> HyperlaneSnapshot {
+        HyperlaneSnapshot { height, tree }
+    }
+}
 
 pub struct HyperlaneSnapshotStore {
     pub db: Arc<RwLock<DB>>,
 }
 
 impl HyperlaneSnapshotStore {
-    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn new<P: AsRef<Path>>(path: P, trusted_snapshot: Option<MerkleTree>) -> Result<Self> {
         let opts = Self::get_opts()?;
         let cfs = Self::get_cfs()?;
         let db = DB::open_cf_descriptors(&opts, path, cfs)?;
-        Ok(Self {
+        let snapshot_store = Self {
             db: Arc::new(RwLock::new(db)),
-        })
+        };
+        if let Some(trusted_snapshot) = trusted_snapshot {
+            snapshot_store
+                .insert_snapshot(0, HyperlaneSnapshot::new(0, trusted_snapshot))
+                .context("Failed to insert trusted snapshot")?;
+        } else {
+            snapshot_store.insert_snapshot(0, HyperlaneSnapshot::new(0, MerkleTree::default()))?;
+        }
+        Ok(snapshot_store)
     }
 
     pub fn get_opts() -> Result<Options> {
@@ -53,18 +71,15 @@ impl HyperlaneSnapshotStore {
     }
 
     pub fn get_snapshot(&self, index: u64) -> Result<HyperlaneSnapshot> {
-        if index == 0 {
-            return Ok(MerkleTree::default());
-        }
         let read_lock = self.db.read().map_err(|e| anyhow::anyhow!("lock error: {e}"))?;
         let cf = read_lock.cf_handle("snapshots").context("Missing CF")?;
         let snapshot_bytes = read_lock
             .get_cf(cf, index.to_be_bytes())?
             .context("Failed to get snapshot")?;
-        let mut snapshot: MerkleTree = bincode::deserialize(&snapshot_bytes)?;
+        let mut snapshot: HyperlaneSnapshot = bincode::deserialize(&snapshot_bytes)?;
 
         // normalize: replace "" with ZERO_BYTES
-        for h in snapshot.branch.iter_mut() {
+        for h in snapshot.tree.branch.iter_mut() {
             if h.is_empty() {
                 *h = ZERO_BYTES.to_string();
             }
@@ -82,8 +97,8 @@ impl HyperlaneSnapshotStore {
         let mut iter = read_lock.iterator_cf(cf, IteratorMode::End);
         if let Some(Ok((k, _))) = iter.next() {
             let mut buf = [0u8; 8];
-            buf.copy_from_slice(&k); // safe since key is always 4 bytes
-            Ok(u64::from_be_bytes(buf) + 1)
+            buf.copy_from_slice(&k);
+            Ok(u64::from_be_bytes(buf))
         } else {
             Ok(0)
         }

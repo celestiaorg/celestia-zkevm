@@ -8,7 +8,6 @@ use celestia_rpc::{BlobClient, Client, HeaderClient, ShareClient};
 use celestia_types::Blob;
 use celestia_types::nmt::{Namespace, NamespaceProof};
 use ev_prover::prover::programs::combined::get_block_inputs;
-use ev_prover::rpc_config;
 use ev_prover::{generate_client_executor_input, get_sequencer_pubkey, load_chain_spec_from_genesis};
 use ev_types::v1::SignedData;
 use ev_zkevm_types::programs::block::{BlockExecOutput, BlockRangeExecInput, BlockRangeExecOutput};
@@ -23,6 +22,8 @@ use std::sync::Arc;
 use storage::proofs::{ProofStorage, RocksDbProofStorage};
 use tokio::task::JoinHandle;
 use tracing::debug;
+
+use crate::utils::rpc_config;
 
 pub async fn prove_blocks(
     start_height: u64,
@@ -162,6 +163,7 @@ pub async fn parallel_prover(
                 let mut stdin = SP1Stdin::new();
                 let inputs = get_block_inputs(
                     &celestia_client,
+                    rpc_config::EVM_RPC_URL,
                     block_number,
                     namespace,
                     &mut trusted_heights[(block_number - start_height) as usize],
@@ -289,6 +291,7 @@ pub async fn synchronous_prover(
         let mut stdin = SP1Stdin::new();
         let inputs = get_block_inputs(
             &celestia_client,
+            rpc_config::EVM_RPC_URL,
             block_number,
             namespace,
             &mut *trusted_height,

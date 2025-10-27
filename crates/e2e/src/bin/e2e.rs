@@ -110,7 +110,7 @@ async fn main() {
         .join(".ev-prover")
         .join("data")
         .join("snapshots.db");
-    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
+    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path, None).unwrap());
     hyperlane_snapshot_store.reset_db().unwrap();
 
     let message_proof = prove_messages(

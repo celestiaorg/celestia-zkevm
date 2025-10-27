@@ -22,12 +22,6 @@ use tracing::debug;
 
 pub const ISM_ID: &str = "0x726f757465725f69736d000000000000000000000000002a0000000000000001";
 
-pub mod rpc_config {
-    pub const CELESTIA_RPC_URL: &str = "http://localhost:26658";
-    pub const EVM_RPC_URL: &str = "http://localhost:8545";
-    pub const SEQUENCER_URL: &str = "http://localhost:7331";
-}
-
 /// Generates the client executor input (STF) for an EVM block.
 pub async fn generate_client_executor_input(
     rpc_url: &str,
@@ -84,7 +78,7 @@ pub async fn get_sequencer_pubkey(sequencer_url: String) -> Result<Vec<u8>> {
 
 // Get the Celestia inclusion height for a given Evolve block number
 pub async fn inclusion_height(block_number: u64) -> anyhow::Result<u64> {
-    let mut client = StoreServiceClient::connect(rpc_config::SEQUENCER_URL).await?;
+    let mut client = StoreServiceClient::connect("http://localhost:7331").await?;
     let req = GetMetadataRequest {
         key: format!("rhb/{block_number}/d"),
     };

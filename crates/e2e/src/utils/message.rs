@@ -97,7 +97,7 @@ pub async fn prove_messages(
         .join(&tmp)
         .join("data")
         .join("snapshots.db");
-    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
+    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path, None).unwrap());
     hyperlane_snapshot_store.reset_db().unwrap();
     let snapshot = hyperlane_snapshot_store.get_snapshot(0).unwrap();
 
@@ -107,7 +107,7 @@ pub async fn prove_messages(
         MERKLE_TREE_ADDRESS.to_string(),
         messages.clone().into_iter().map(|m| m.message).collect(),
         HyperlaneBranchProofInputs::from(branch_proof),
-        snapshot.clone(),
+        snapshot.tree.clone(),
     );
 
     // generate and return the Groth16 proof

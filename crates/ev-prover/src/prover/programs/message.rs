@@ -4,31 +4,25 @@
 #![allow(dead_code)]
 use crate::prover::{prover_from_env, RangeProofCommitted, SP1Prover};
 use crate::prover::{ProgramProver, ProverConfig};
-use alloy_primitives::{hex::FromHex, Address, FixedBytes};
+use alloy::hex::FromHex;
+use alloy_primitives::{Address, FixedBytes};
 use alloy_provider::{Provider, ProviderBuilder, WsConnect};
 use alloy_rpc_types::{EIP1186AccountProofResponse, Filter};
-use anyhow::{Context, Result};
+use anyhow::{Context as AnyhowContext, Result};
 use ev_state_queries::{hyperlane::indexer::HyperlaneIndexer, DefaultProvider, StateQueryProvider};
+use ev_zkevm_types::events::Dispatch;
 use ev_zkevm_types::programs::hyperlane::types::{
     HyperlaneBranchProof, HyperlaneBranchProofInputs, HyperlaneMessageInputs, HyperlaneMessageOutputs,
+    HYPERLANE_MERKLE_TREE_KEYS,
 };
-use ev_zkevm_types::{events::Dispatch, programs::hyperlane::types::HYPERLANE_MERKLE_TREE_KEYS};
 use reqwest::Url;
 use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
-use std::{
-    env,
-    str::FromStr,
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::{env, str::FromStr, sync::Arc};
+use storage::hyperlane::StoredHyperlaneMessage;
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use storage::proofs::ProofStorage;
-use tokio::sync::mpsc::Receiver;
-use tokio::time::sleep;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
-const TIMEOUT: u64 = 6; // in seconds
-const DISTANCE_TO_HEAD: u64 = 32; // in blocks
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
 
@@ -44,7 +38,6 @@ pub struct AppContext {
     pub evm_ws: String,
     pub mailbox_address: Address,
     pub merkle_tree_address: Address,
-    pub merkle_tree_state: RwLock<MerkleTreeState>,
 }
 
 /// MerkleTreeState encapsulates the height of the merkle tree in terms of snapshots and blocks
@@ -63,10 +56,9 @@ impl MerkleTreeState {
 
 /// HyperlaneMessageProver is a prover for generating SP1 proofs for Hyperlane message inclusion in EVM blocks.
 pub struct HyperlaneMessageProver {
-    pub app: AppContext,
+    pub ctx: AppContext,
     pub config: ProverConfig,
     pub prover: Arc<SP1Prover>,
-    pub range_rx: Receiver<RangeProofCommitted>,
     pub message_store: Arc<HyperlaneMessageStore>,
     pub snapshot_store: Arc<HyperlaneSnapshotStore>,
     pub proof_store: Arc<dyn ProofStorage>,
@@ -101,8 +93,7 @@ impl ProgramProver for HyperlaneMessageProver {
 
 impl HyperlaneMessageProver {
     pub fn new(
-        app: AppContext,
-        range_rx: Receiver<RangeProofCommitted>,
+        ctx: AppContext,
         message_store: Arc<HyperlaneMessageStore>,
         snapshot_store: Arc<HyperlaneSnapshotStore>,
         proof_store: Arc<dyn ProofStorage>,
@@ -112,10 +103,9 @@ impl HyperlaneMessageProver {
         let config = HyperlaneMessageProver::default_config(prover.as_ref());
 
         Ok(Arc::new(Self {
-            app,
+            ctx,
             config,
             prover,
-            range_rx,
             message_store,
             snapshot_store,
             proof_store,
@@ -130,63 +120,42 @@ impl HyperlaneMessageProver {
     }
 
     /// Run the message prover with indexer
-    pub async fn run(self: Arc<Self>) -> Result<()> {
+    pub async fn run(self: Arc<Self>, mut range_rx: tokio::sync::mpsc::Receiver<RangeProofCommitted>) -> Result<()> {
         let evm_provider: DefaultProvider =
-            ProviderBuilder::new().connect_http(Url::from_str(&self.app.evm_rpc).unwrap());
-        let socket = WsConnect::new(&self.app.evm_ws);
-        let contract_address = self.app.mailbox_address;
+            ProviderBuilder::new().connect_http(Url::from_str(&self.ctx.evm_rpc).unwrap());
+        let socket = WsConnect::new(&self.ctx.evm_ws);
+        let contract_address = self.ctx.mailbox_address;
         let filter = Filter::new().address(contract_address).event(&Dispatch::id());
         let mut indexer = HyperlaneIndexer::new(socket, contract_address, filter.clone());
-
         loop {
-            // get the trusted height and state root from the state query provider
-            let height = self.state_query_provider.get_height().await;
-            let state_root = self
-                .state_query_provider
-                .get_state_root(height)
-                .await
-                .expect("Failed to get state root");
+            // Wait for the next range proof to be committed
+            let commit_message: RangeProofCommitted =
+                range_rx.recv().await.context("Failed to receive commit message")?;
+
+            info!("Received commit message: {:?}", commit_message);
+
+            let committed_height = commit_message.trusted_height;
+            let committed_state_root = commit_message.trusted_root;
 
             let merkle_proof = evm_provider
                 .get_proof(
-                    self.app.merkle_tree_address,
+                    self.ctx.merkle_tree_address,
                     HYPERLANE_MERKLE_TREE_KEYS
                         .iter()
                         .map(|k| FixedBytes::from_hex(k).unwrap())
                         .collect(),
                 )
-                .block_id(height.into())
+                .block_id(committed_height.into())
                 .await?;
-            info!(
-                "state_root: {state_root}, height: {height}, trusted height: {}",
-                self.app.merkle_tree_state.read().unwrap().height + 1
-            );
-
-            if self.app.merkle_tree_state.read().unwrap().height >= height {
-                info!(
-                    "Waiting for more blocks to occur {}/{}...",
-                    height,
-                    self.app.merkle_tree_state.read().unwrap().height + DISTANCE_TO_HEAD
-                );
-                sleep(Duration::from_secs(TIMEOUT)).await;
-                continue;
-            }
-
-            // Check if the root has changed for our height, if so panic
-            let block = evm_provider
-                .get_block(height.into())
-                .await?
-                .context("Failed to get block")?;
-            // This is an optional check to ensure the state root is always finalized
-            let new_root = alloy::hex::encode(block.header.state_root);
-            if new_root != hex::encode(state_root) {
-                panic!(
-                    "The state root has changed at depth HEAD-{DISTANCE_TO_HEAD}, this should not happen! Expected: {state_root}, Got: {new_root}",
-                );
-            }
 
             if let Err(e) = self
-                .run_inner(&evm_provider, &mut indexer, height, merkle_proof.clone(), state_root)
+                .run_inner(
+                    &evm_provider,
+                    &mut indexer,
+                    committed_height,
+                    merkle_proof.clone(),
+                    FixedBytes::from_slice(&committed_state_root),
+                )
                 .await
             {
                 error!(
@@ -206,17 +175,19 @@ impl HyperlaneMessageProver {
         proof: EIP1186AccountProofResponse,
         state_root: FixedBytes<32>,
     ) -> Result<()> {
+        // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
+        // then save new snapshot
+        let mut snapshot = self
+            .snapshot_store
+            .get_snapshot(self.snapshot_store.current_index()?)
+            .expect("Failed to get snapshot");
+
+        let start_height = snapshot.height + 1;
+
         indexer.filter = Filter::new()
             .address(indexer.contract_address)
             .event(&Dispatch::id())
-            .from_block(
-                self.app
-                    .merkle_tree_state
-                    .read()
-                    .expect("Failed to read trusted state")
-                    .height
-                    + 1,
-            )
+            .from_block(start_height)
             .to_block(height);
 
         // run the indexer to get all messages that occurred since the last trusted height
@@ -224,88 +195,54 @@ impl HyperlaneMessageProver {
             .index(self.message_store.clone(), Arc::new(evm_provider.clone()))
             .await
             .expect("Failed to index messages");
-        debug!(
-            "Indexed messages, new height {}",
-            self.message_store.current_index().expect("Failed to get current index")
-        );
 
-        // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
-        // then save new snapshot
-        let mut snapshot = self
-            .snapshot_store
-            .get_snapshot(
-                self.app
-                    .merkle_tree_state
-                    .read()
-                    .expect("Failed to read trusted state")
-                    .snapshot_index,
-            )
-            .expect("Failed to get snapshot");
-        let messages = self
-            .message_store
-            .get_by_block(
-                self.app
-                    .merkle_tree_state
-                    .read()
-                    .expect("Failed to read trusted state")
-                    .height
-                    + 1,
-            )
-            .expect("Failed to get messages");
+        let mut messages: Vec<StoredHyperlaneMessage> = Vec::new();
+        for block in start_height..=height {
+            messages.extend(self.message_store.get_by_block(block).expect("Failed to get messages"));
+        }
+
+        if messages.is_empty() {
+            return Ok(());
+        }
+
         let branch_proof = HyperlaneBranchProof::new(proof);
 
         // Construct program inputs from values
         let input = HyperlaneMessageInputs::new(
             state_root.to_string(),
-            self.app.merkle_tree_address.to_string(),
+            self.ctx.merkle_tree_address.to_string(),
             messages.clone().into_iter().map(|m| m.message).collect(),
             HyperlaneBranchProofInputs::from(branch_proof),
-            snapshot.clone(),
+            snapshot.tree.clone(),
         );
+
+        for message in messages.clone() {
+            snapshot
+                .tree
+                .insert(message.message.id())
+                .expect("Failed to insert message into snapshot");
+        }
+
         info!(
             "Proving messages with ids: {:?}",
             messages.iter().map(|m| m.message.id()).collect::<Vec<String>>()
         );
 
-        // Generate a proof
+        // Prove messages against trusted root
         let proof = self.prove(input).await.expect("Failed to prove");
         self.proof_store
             .store_membership_proof(height, &proof.0, &proof.1)
             .await
             .expect("Failed to store proof");
 
-        // insert messages into snapshot to get new snapshot for next proof
-        for message in messages {
-            snapshot
-                .insert(message.message.id())
-                .expect("Failed to insert messages into snapshot");
-        }
+        info!("Membership proof generated successfully");
 
-        // store snapshot
+        snapshot.height = height;
+
+        // store mutated snapshot at next index
         self.snapshot_store
-            .insert_snapshot(
-                self.app
-                    .merkle_tree_state
-                    .read()
-                    .expect("Failed to read trusted state")
-                    .snapshot_index
-                    + 1,
-                snapshot,
-            )
+            .insert_snapshot(self.snapshot_store.current_index()? + 1, snapshot)
             .expect("Failed to insert snapshot into snapshot store");
-
-        // update trusted state
-        self.app
-            .merkle_tree_state
-            .write()
-            .expect("Failed to write trusted state")
-            .height = height;
-
-        self.app
-            .merkle_tree_state
-            .write()
-            .expect("Failed to write trusted state")
-            .snapshot_index += 1;
 
         Ok(())
     }
