@@ -10,7 +10,6 @@ use alloy_primitives::{Address, FixedBytes};
 use alloy_provider::{Provider, ProviderBuilder, WsConnect};
 use alloy_rpc_types::{EIP1186AccountProofResponse, Filter};
 use anyhow::{Context as AnyhowContext, Result};
-use celestia_grpc_client::types::ClientConfig;
 use celestia_grpc_client::{CelestiaIsmClient, MsgProcessMessage, MsgSubmitMessages};
 use ev_state_queries::{hyperlane::indexer::HyperlaneIndexer, DefaultProvider, StateQueryProvider};
 use ev_zkevm_types::events::Dispatch;
@@ -125,9 +124,11 @@ impl HyperlaneMessageProver {
     }
 
     /// Run the message prover with indexer
-    pub async fn run(self: Arc<Self>, mut range_rx: Receiver<RangeProofCommitted>) -> Result<()> {
-        let config = ClientConfig::from_env()?;
-        let ism_client = CelestiaIsmClient::new(config).await?;
+    pub async fn run(
+        self: Arc<Self>,
+        mut range_rx: Receiver<RangeProofCommitted>,
+        ism_client: Arc<CelestiaIsmClient>,
+    ) -> Result<()> {
         let evm_provider: DefaultProvider = ProviderBuilder::new().connect_http(Url::from_str(&self.ctx.evm_rpc)?);
         let socket = WsConnect::new(&self.ctx.evm_ws);
         let contract_address = self.ctx.mailbox_address;

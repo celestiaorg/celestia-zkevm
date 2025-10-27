@@ -2,6 +2,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use celestia_grpc_client::{types::ClientConfig, CelestiaIsmClient};
 use ev_types::v1::get_block_request::Identifier;
 use ev_types::v1::store_service_client::StoreServiceClient;
 use ev_types::v1::GetBlockRequest;
@@ -95,6 +96,8 @@ pub async fn start_server(config: Config) -> Result<()> {
 
     #[cfg(feature = "combined")]
     {
+        let config = ClientConfig::from_env()?;
+        let ism_client = Arc::new(CelestiaIsmClient::new(config).await?);
         let (range_tx, range_rx) = mpsc::channel(256);
         let message_storage_path = dirs::home_dir()
             .expect("cannot find home directory")
@@ -109,9 +112,10 @@ pub async fn start_server(config: Config) -> Result<()> {
         let hyperlane_message_store = Arc::new(HyperlaneMessageStore::new(message_storage_path).unwrap());
         let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path, None).unwrap());
         tokio::spawn({
+            let ism_client = ism_client.clone();
             let combined_prover = EvCombinedProver::new(CombinedAppContext::default(), range_tx).unwrap();
             async move {
-                if let Err(e) = combined_prover.run().await {
+                if let Err(e) = combined_prover.run(ism_client).await {
                     error!("Combined prover task failed: {e:?}");
                 }
             }
@@ -145,7 +149,8 @@ pub async fn start_server(config: Config) -> Result<()> {
             .unwrap();
 
             async move {
-                if let Err(e) = message_prover.run(range_rx).await {
+                let ism_client = ism_client.clone();
+                if let Err(e) = message_prover.run(range_rx, ism_client).await {
                     error!("Message prover task failed: {e:?}");
                 }
             }

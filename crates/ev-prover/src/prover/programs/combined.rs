@@ -13,7 +13,7 @@ use alloy_primitives::FixedBytes;
 use alloy_provider::{Provider, ProviderBuilder};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use celestia_grpc_client::{types::ClientConfig, CelestiaIsmClient, MsgUpdateZkExecutionIsm, QueryIsmRequest};
+use celestia_grpc_client::{CelestiaIsmClient, MsgUpdateZkExecutionIsm, QueryIsmRequest};
 use celestia_rpc::{BlobClient, Client, HeaderClient, ShareClient};
 use celestia_types::{
     nmt::{Namespace, NamespaceProof},
@@ -109,9 +109,7 @@ impl EvCombinedProver {
         CombinedProverConfig::new(pk, vk, SP1ProofMode::Groth16)
     }
 
-    pub async fn run(self) -> Result<()> {
-        let config = ClientConfig::from_env()?;
-        let ism_client = CelestiaIsmClient::new(config).await?;
+    pub async fn run(self, ism_client: Arc<CelestiaIsmClient>) -> Result<()> {
         let client = Client::new(&self.app.celestia_rpc, None).await?;
 
         let mut known_celestia_height: u64 = 0;

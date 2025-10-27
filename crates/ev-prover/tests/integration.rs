@@ -2,6 +2,7 @@ use std::{str::FromStr, sync::Arc};
 
 use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
+use celestia_grpc_client::{types::ClientConfig, CelestiaIsmClient};
 use ev_prover::prover::programs::message::{AppContext, HyperlaneMessageProver};
 use ev_state_queries::{DefaultProvider, MockStateQueryProvider};
 use reqwest::Url;
@@ -16,6 +17,8 @@ use tracing_subscriber::EnvFilter;
 #[tokio::test]
 async fn test_run_message_prover() {
     dotenvy::dotenv().ok();
+    let config = ClientConfig::from_env().unwrap();
+    let ism_client = Arc::new(CelestiaIsmClient::new(config).await.unwrap());
     // Configure logging for ev-prover
     let filter = EnvFilter::new("ev-prover=debug,sp1_core=warn,sp1_runtime=warn,sp1_sdk=warn,sp1_vm=warn");
     tracing_subscriber::fmt().with_env_filter(filter).init();
@@ -61,5 +64,5 @@ async fn test_run_message_prover() {
         Arc::new(MockStateQueryProvider::new(evm_provider)),
     )
     .unwrap();
-    prover.run(rx).await.unwrap();
+    prover.run(rx, ism_client).await.unwrap();
 }
