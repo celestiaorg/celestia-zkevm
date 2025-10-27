@@ -25,6 +25,7 @@ use storage::hyperlane::StoredHyperlaneMessage;
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use storage::proofs::ProofStorage;
 use tokio::sync::mpsc::Receiver;
+use tokio::sync::Mutex;
 use tracing::{error, info};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
@@ -128,6 +129,7 @@ impl HyperlaneMessageProver {
         self: Arc<Self>,
         mut range_rx: Receiver<RangeProofCommitted>,
         ism_client: Arc<CelestiaIsmClient>,
+        is_proving_messages: Arc<Mutex<bool>>,
     ) -> Result<()> {
         let evm_provider: DefaultProvider = ProviderBuilder::new().connect_http(Url::from_str(&self.ctx.evm_rpc)?);
         let socket = WsConnect::new(&self.ctx.evm_ws);
@@ -140,6 +142,7 @@ impl HyperlaneMessageProver {
                 range_rx.recv().await.context("Failed to receive commit message")?;
 
             info!("Received commit message: {:?}", commit_message);
+            *is_proving_messages.lock().await = true;
 
             let committed_height = commit_message.trusted_height;
             let committed_state_root = commit_message.trusted_root;
@@ -167,7 +170,7 @@ impl HyperlaneMessageProver {
                 .await
             {
                 error!(
-                    "Failed to generate proof, Stored Value: {}",
+                    "Failed to generate proof, Stored Value: {}, error: {e:?}",
                     hex::encode(
                         merkle_proof
                             .storage_proof
@@ -177,8 +180,8 @@ impl HyperlaneMessageProver {
                             .to_be_bytes::<32>()
                     )
                 );
-                panic!("Failed to generate proof: {e:?}");
             }
+            *is_proving_messages.lock().await = false;
         }
     }
 
@@ -268,6 +271,7 @@ impl HyperlaneMessageProver {
             assert!(response.success);
         }
         info!("[Done] Tia was bridged back to Celestia");
+
         self.proof_store
             .store_membership_proof(height, &message_proof.0, &message_proof.1)
             .await?;

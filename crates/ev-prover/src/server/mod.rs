@@ -98,6 +98,8 @@ pub async fn start_server(config: Config) -> Result<()> {
 
     #[cfg(feature = "combined")]
     {
+        use tokio::sync::Mutex;
+
         let config = ClientConfig::from_env()?;
         let ism_client = Arc::new(CelestiaIsmClient::new(config).await?);
         let (range_tx, range_rx) = mpsc::channel(256);
@@ -113,11 +115,14 @@ pub async fn start_server(config: Config) -> Result<()> {
             .join("snapshots.db");
         let hyperlane_message_store = Arc::new(HyperlaneMessageStore::new(message_storage_path).unwrap());
         let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path, None).unwrap());
+
+        let is_proving_messages: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
         tokio::spawn({
             let ism_client = ism_client.clone();
             let combined_prover = EvCombinedProver::new(CombinedAppContext::default(), range_tx).unwrap();
+            let is_proving_messages = is_proving_messages.clone();
             async move {
-                if let Err(e) = combined_prover.run(ism_client).await {
+                if let Err(e) = combined_prover.run(ism_client, is_proving_messages).await {
                     error!("Combined prover task failed: {e:?}");
                 }
             }
@@ -150,9 +155,11 @@ pub async fn start_server(config: Config) -> Result<()> {
             )
             .unwrap();
 
+            let is_proving_messages = is_proving_messages.clone();
+
             async move {
                 let ism_client = ism_client.clone();
-                if let Err(e) = message_prover.run(range_rx, ism_client).await {
+                if let Err(e) = message_prover.run(range_rx, ism_client, is_proving_messages).await {
                     error!("Message prover task failed: {e:?}");
                 }
             }

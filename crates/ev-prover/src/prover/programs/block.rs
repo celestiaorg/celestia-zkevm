@@ -1,11 +1,4 @@
 #![allow(dead_code)]
-use celestia_types::ExtendedHeader;
-use std::collections::BTreeMap;
-use std::env;
-use std::fs;
-use std::result::Result::{Err, Ok};
-use std::sync::Arc;
-
 use alloy_genesis::Genesis as AlloyGenesis;
 use alloy_primitives::FixedBytes;
 use alloy_provider::ProviderBuilder;
@@ -16,6 +9,7 @@ use celestia_rpc::blob::BlobsAtHeight;
 use celestia_rpc::{client::Client, BlobClient, HeaderClient, ShareClient};
 use celestia_types::nmt::{Namespace, NamespaceProof};
 use celestia_types::Blob;
+use celestia_types::ExtendedHeader;
 use ev_types::v1::SignedData;
 use ev_zkevm_types::programs::block::{BlockExecInput, BlockExecOutput};
 use jsonrpsee_core::client::Subscription;
@@ -26,6 +20,11 @@ use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
 use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
+use std::collections::BTreeMap;
+use std::env;
+use std::fs;
+use std::result::Result::{Err, Ok};
+use std::sync::Arc;
 use tokio::{
     sync::{mpsc, mpsc::Sender, RwLock, Semaphore},
     task::JoinSet,

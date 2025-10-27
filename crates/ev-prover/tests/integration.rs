@@ -11,7 +11,7 @@ use storage::{
     proofs::RocksDbProofStorage,
 };
 use tempfile::TempDir;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::test]
@@ -64,5 +64,5 @@ async fn test_run_message_prover() {
         Arc::new(MockStateQueryProvider::new(evm_provider)),
     )
     .unwrap();
-    prover.run(rx, ism_client).await.unwrap();
+    prover.run(rx, ism_client, Arc::new(Mutex::new(false))).await.unwrap();
 }

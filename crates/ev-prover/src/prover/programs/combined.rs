@@ -26,7 +26,7 @@ use reth_chainspec::ChainSpec;
 use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_primitives::genesis::Genesis;
 use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
-use tokio::time::sleep;
+use tokio::{sync::Mutex, time::sleep};
 use tracing::{debug, error, info, warn};
 
 use crate::prover::ProgramProver;
@@ -109,12 +109,17 @@ impl EvCombinedProver {
         CombinedProverConfig::new(pk, vk, SP1ProofMode::Groth16)
     }
 
-    pub async fn run(self, ism_client: Arc<CelestiaIsmClient>) -> Result<()> {
+    pub async fn run(self, ism_client: Arc<CelestiaIsmClient>, is_proving_messages: Arc<Mutex<bool>>) -> Result<()> {
         let client = Client::new(&self.app.celestia_rpc, None).await?;
 
         let mut known_celestia_height: u64 = 0;
 
         loop {
+            if *is_proving_messages.lock().await {
+                info!("Waiting for message proof to be completed");
+                sleep(Duration::from_secs(10)).await;
+                continue;
+            }
             let resp = ism_client.ism(QueryIsmRequest { id: ISM_ID.to_string() }).await?;
             let ism = resp.ism.ok_or_else(|| anyhow::anyhow!("ZKISM not found"))?;
             let trusted_root_hex = alloy::hex::encode(ism.state_root);
