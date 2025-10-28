@@ -17,9 +17,14 @@ pub enum Commands {
     /// Start the gRPC server
     Start {},
 
-    /// Reset all database state in the local data directory
-    UnsafeResetDb {},
+    /// Create ZKISM
+    Create {},
+
+    /// Update
+    Update { ism_id: String, token_id: String },
 
     /// Show the service version
     Version {},
+    /// Reset all database state in the local data directory
+    UnsafeResetDb {},
 }

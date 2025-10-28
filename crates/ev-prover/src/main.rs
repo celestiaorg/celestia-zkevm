@@ -5,11 +5,6 @@ use ev_prover::command::{init, start, unsafe_reset_db, version, Cli, Commands};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Initialize rustls crypto provider
-    rustls::crypto::aws_lc_rs::default_provider()
-        .install_default()
-        .map_err(|_| anyhow::anyhow!("Failed to install default crypto provider"))?;
-
     // Filter out sp1 logs by default, show debug level for ev-prover
     // This can be changed to info for operational logging.
     let mut filter = EnvFilter::new("sp1_core=warn,sp1_runtime=warn,sp1_sdk=warn,sp1_vm=warn");
@@ -23,11 +18,18 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     dotenvy::dotenv().ok();
 
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("Failed to set default crypto provider");
+    dotenvy::dotenv().ok();
+
     match cli.command {
-        Commands::Init {} => init()?,
-        Commands::Start {} => start().await?,
+        Commands::Init {} => commands::command::init()?,
+        Commands::Start {} => commands::command::start().await?,
+        Commands::Create {} => commands::command::create_zkism().await?,
+        Commands::Update { ism_id, token_id } => commands::command::update_ism(ism_id, token_id).await?,
+        Commands::Version {} => commands::command::version(),
         Commands::UnsafeResetDb {} => unsafe_reset_db()?,
-        Commands::Version {} => version(),
     }
 
     Ok(())
