@@ -108,7 +108,7 @@ pub async fn create_zkism() -> Result<()> {
     let pub_key = get_sequencer_pubkey(sequencer_rpc_url).await?;
 
     let ev_hyperlane_vkey = fs::read("testdata/vkeys/ev-hyperlane-vkey-hash")?;
-    let ev_combined_vkey = fs::read("testdata/vkeys/ev-combined-vkey-hash")?;
+    let ev_combined_vkey = fs::read("testdata/vkeys/ev-range-exec-vkey-hash")?;
     let groth16_vkey = fs::read("testdata/vkeys/groth16_vk.bin")?;
 
     let create_message = MsgCreateZkExecutionIsm {
