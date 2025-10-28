@@ -22,6 +22,8 @@ pub struct Config {
     pub queue_capacity: usize,
     #[serde(default = "default_concurrency")]
     pub concurrency: usize,
+    #[serde(default = "default_batch_size")]
+    pub batch_size: usize,
 }
 
 fn default_queue_capacity() -> usize {
@@ -30,6 +32,10 @@ fn default_queue_capacity() -> usize {
 
 fn default_concurrency() -> usize {
     16
+}
+
+fn default_batch_size() -> usize {
+    10
 }
 
 impl Default for Config {
@@ -42,6 +48,7 @@ impl Default for Config {
             pub_key: DEFAULT_PUB_KEY_HEX.to_string(),
             queue_capacity: default_queue_capacity(),
             concurrency: default_concurrency(),
+            batch_size: default_batch_size(),
         }
     }
 }

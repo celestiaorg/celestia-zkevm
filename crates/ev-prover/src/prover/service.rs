@@ -4,7 +4,6 @@ use std::sync::Arc;
 use storage::proofs::ProofStorage;
 use tonic::{Request, Response, Status};
 
-use crate::config::config::Config;
 use crate::proto::celestia::prover::v1::prover_server::Prover;
 use crate::proto::celestia::prover::v1::{
     BlockProof, GetBlockProofRequest, GetBlockProofResponse, GetBlockProofsInRangeRequest,
@@ -18,9 +17,7 @@ pub struct ProverService {
 }
 
 impl ProverService {
-    /// Creates a new ProverService with an externally provided proof storage instance.
-    /// This is useful for sharing the same storage between multiple components.
-    pub fn with_storage(_config: Config, proof_storage: Arc<dyn ProofStorage>) -> Result<Self> {
+    pub fn new(proof_storage: Arc<dyn ProofStorage>) -> Result<Self> {
         Ok(ProverService { proof_storage })
     }
 }
