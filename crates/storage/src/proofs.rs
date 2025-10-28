@@ -101,9 +101,6 @@ pub trait ProofStorage: Send + Sync {
     async fn get_latest_membership_proof(&self) -> Result<Option<StoredMembershipProof>, ProofStorageError>;
 
     #[allow(dead_code)]
-    fn unsafe_reset(&self) -> Result<(), ProofStorageError>;
-
-    #[allow(dead_code)]
     async fn set_range_cursor(&self, cursor: u64) -> Result<(), ProofStorageError>;
 
     #[allow(dead_code)]
@@ -111,6 +108,9 @@ pub trait ProofStorage: Send + Sync {
 
     #[allow(dead_code)]
     async fn get_latest_block_proof(&self) -> Result<Option<StoredBlockProof>, ProofStorageError>;
+
+    #[allow(dead_code)]
+    fn unsafe_reset(&mut self) -> Result<(), ProofStorageError>;
 }
 
 pub struct RocksDbProofStorage {
@@ -363,15 +363,8 @@ impl ProofStorage for RocksDbProofStorage {
         Ok(None)
     }
 
-    fn unsafe_reset(&self) -> Result<(), ProofStorageError> {
-        if Arc::strong_count(&self.db) != 1 {
-            return Err(ProofStorageError::General(anyhow!(
-                "cannot reset RocksDB state while storage is shared"
-            )));
-        }
-
-        // Safe because we just asserted exclusive ownership of the Arc.
-        let db: &mut DB = unsafe { &mut *(Arc::as_ptr(&self.db) as *mut DB) };
+    fn unsafe_reset(&mut self) -> Result<(), ProofStorageError> {
+        let db = Arc::get_mut(&mut self.db).ok_or_else(|| ProofStorageError::General(anyhow!("storage is shared")))?;
 
         let mut opts = Options::default();
         opts.create_if_missing(true);
@@ -575,7 +568,7 @@ pub mod testing {
             }
         }
 
-        fn unsafe_reset(&self) -> Result<(), ProofStorageError> {
+        fn unsafe_reset(&mut self) -> Result<(), ProofStorageError> {
             self.block_proofs.lock().unwrap().clear();
             self.membership_proofs.lock().unwrap().clear();
             self.range_proofs.lock().unwrap().clear();

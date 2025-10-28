@@ -70,7 +70,7 @@ pub fn unsafe_reset_db() -> Result<()> {
 
     info!("resetting db state at {}", storage_path.display());
 
-    let storage = RocksDbProofStorage::new(storage_path)?;
+    let mut storage = RocksDbProofStorage::new(storage_path)?;
     storage.unsafe_reset()?;
 
     Ok(())
