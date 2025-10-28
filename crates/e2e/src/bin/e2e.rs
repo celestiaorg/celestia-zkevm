@@ -28,8 +28,6 @@ const RETRY_DELAY: u64 = 2;
 #[tokio::main]
 #[allow(clippy::field_reassign_with_default)]
 async fn main() {
-    let reth_rpc_url = env::var("RETH_RPC_URL").unwrap();
-    let sequencer_rpc_url = env::var("SEQUENCER_RPC_URL").unwrap();
     rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
         .expect("Failed to set default crypto provider");
@@ -41,6 +39,9 @@ async fn main() {
         }
     }
     tracing_subscriber::fmt().with_env_filter(filter).init();
+
+    let reth_rpc_url = env::var("RETH_RPC_URL").unwrap();
+    let sequencer_rpc_url = env::var("SEQUENCER_RPC_URL").unwrap();
 
     // instantiate ISM client for submitting payloads and querying state
     let config = ClientConfig::from_env().expect("failed to create celestia client config");
