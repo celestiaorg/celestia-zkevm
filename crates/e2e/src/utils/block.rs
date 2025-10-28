@@ -135,7 +135,7 @@ pub async fn parallel_prover(
         let block: alloy_rpc_types::Block = provider
             .get_block_by_number(last_height.into())
             .await?
-            .ok_or_else(|| anyhow::anyhow!("Block {} not found", last_height))?;
+            .ok_or_else(|| anyhow::anyhow!("Block {last_height} not found"))?;
 
         trusted_heights.push(last_height);
         trusted_roots.push(block.header.state_root);
