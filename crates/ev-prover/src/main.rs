@@ -1,10 +1,7 @@
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
-use ev_prover::commands::{
-    self,
-    cli::{Cli, Commands},
-};
+use ev_prover::command::{init, start, unsafe_reset_db, version, Cli, Commands};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -27,9 +24,10 @@ async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
 
     match cli.command {
-        Commands::Init {} => commands::command::init()?,
-        Commands::Start {} => commands::command::start().await?,
-        Commands::Version {} => commands::command::version(),
+        Commands::Init {} => init()?,
+        Commands::Start {} => start().await?,
+        Commands::UnsafeResetDb {} => unsafe_reset_db()?,
+        Commands::Version {} => version(),
     }
 
     Ok(())

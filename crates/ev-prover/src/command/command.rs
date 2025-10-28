@@ -3,9 +3,10 @@ use std::fs;
 use anyhow::{bail, Result};
 use tracing::info;
 
-use crate::commands::cli::VERSION;
+use crate::command::cli::VERSION;
 use crate::config::config::{Config, APP_HOME, CONFIG_DIR, CONFIG_FILE, DEFAULT_GENESIS_JSON, GENESIS_FILE};
 use crate::server::start_server;
+use storage::proofs::{ProofStorage, RocksDbProofStorage};
 
 pub fn init() -> Result<()> {
     let home_dir = dirs::home_dir().expect("cannot find home directory").join(APP_HOME);
@@ -60,6 +61,21 @@ pub async fn start() -> Result<()> {
     Ok(())
 }
 
+pub fn unsafe_reset_db() -> Result<()> {
+    let storage_path = dirs::home_dir()
+        .expect("cannot find home directory")
+        .join(APP_HOME)
+        .join("data")
+        .join("proofs.db");
+
+    info!("resetting db state at {}", storage_path.display());
+
+    let storage = RocksDbProofStorage::new(storage_path)?;
+    storage.unsafe_reset()?;
+
+    Ok(())
+}
+
 pub fn version() {
-    println!("version: {VERSION}");
+    info!("version: {VERSION}");
 }

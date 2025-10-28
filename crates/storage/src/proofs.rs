@@ -101,6 +101,9 @@ pub trait ProofStorage: Send + Sync {
     async fn get_latest_membership_proof(&self) -> Result<Option<StoredMembershipProof>, ProofStorageError>;
 
     #[allow(dead_code)]
+    fn unsafe_reset(&self) -> Result<(), ProofStorageError>;
+
+    #[allow(dead_code)]
     async fn set_range_cursor(&self, cursor: u64) -> Result<(), ProofStorageError>;
 
     #[allow(dead_code)]
@@ -359,6 +362,35 @@ impl ProofStorage for RocksDbProofStorage {
         }
         Ok(None)
     }
+
+    fn unsafe_reset(&self) -> Result<(), ProofStorageError> {
+        if Arc::strong_count(&self.db) != 1 {
+            return Err(ProofStorageError::General(anyhow!(
+                "cannot reset RocksDB state while storage is shared"
+            )));
+        }
+
+        // Safe because we just asserted exclusive ownership of the Arc.
+        let db: &mut DB = unsafe { &mut *(Arc::as_ptr(&self.db) as *mut DB) };
+
+        let mut opts = Options::default();
+        opts.create_if_missing(true);
+        opts.create_missing_column_families(true);
+
+        let cfs = vec![
+            ColumnFamilyDescriptor::new(CF_BLOCK_PROOFS, Options::default()),
+            ColumnFamilyDescriptor::new(CF_RANGE_PROOFS, Options::default()),
+            ColumnFamilyDescriptor::new(CF_MEMBERSHIP_PROOFS, Options::default()),
+            ColumnFamilyDescriptor::new(CF_METADATA, Options::default()),
+        ];
+
+        for cf in cfs {
+            db.drop_cf(cf.name()).ok();
+            db.create_cf(cf.name(), &opts).ok();
+        }
+
+        Ok(())
+    }
 }
 
 /// Testing utilities for ProofStorage implementations.
@@ -415,6 +447,14 @@ pub mod testing {
 
     #[async_trait]
     impl ProofStorage for MockProofStorage {
+        fn unsafe_reset(&self) -> Result<(), ProofStorageError> {
+            self.block_proofs.lock().unwrap().clear();
+            self.membership_proofs.lock().unwrap().clear();
+            self.range_proofs.lock().unwrap().clear();
+            *self.range_cursor.lock().unwrap() = None;
+            Ok(())
+        }
+
         async fn store_block_proof(
             &self,
             celestia_height: u64,

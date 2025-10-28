@@ -17,6 +17,9 @@ pub enum Commands {
     /// Start the gRPC server
     Start {},
 
+    /// Reset all database state in the local data directory
+    UnsafeResetDb {},
+
     /// Show the service version
     Version {},
 }

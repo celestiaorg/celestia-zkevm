@@ -1,4 +1,4 @@
-pub mod commands;
+pub mod command;
 pub mod config;
 pub mod proto;
 pub mod prover;
