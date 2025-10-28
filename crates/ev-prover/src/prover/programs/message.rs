@@ -142,7 +142,6 @@ impl HyperlaneMessageProver {
             ctx,
             config,
             prover,
-            range_rx,
             message_store,
             snapshot_store,
             proof_store,

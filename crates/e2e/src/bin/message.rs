@@ -1,5 +1,5 @@
 use alloy_provider::ProviderBuilder;
-use e2e::{config::debug::TARGET_HEIGHT, prover::message::prove_messages};
+use e2e::{config::debug::TARGET_HEIGHT, utils::message::prove_messages};
 use ev_state_queries::MockStateQueryProvider;
 use sp1_sdk::{EnvProver, ProverClient};
 use std::{env, str::FromStr, sync::Arc};
