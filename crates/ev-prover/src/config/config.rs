@@ -11,6 +11,8 @@ pub const DEFAULT_GENESIS_JSON: &str = include_str!("../../resources/genesis.jso
 pub const DEFAULT_NAMESPACE: &str = "a8045f161bf468bf4d44";
 pub const DEFAULT_PUB_KEY_HEX: &str = "3964a68700cf76e215626e076e76d23bd1f4c3b31184b5822fd7b4df15d5ce9a";
 
+pub const GROTH16_VK: &[u8] = include_bytes!("../../resources/groth16_vk.bin");
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     pub grpc_address: String,

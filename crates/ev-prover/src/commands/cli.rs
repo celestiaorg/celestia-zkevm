@@ -19,4 +19,7 @@ pub enum Commands {
 
     /// Show the service version
     Version {},
+
+    /// Instantiate a new zk ism on the remote server
+    CreateIsm {},
 }

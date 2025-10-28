@@ -1,10 +1,46 @@
-use crate::{MsgProcessMessage, MsgRemoteTransfer, MsgSubmitMessages, MsgUpdateZkExecutionIsm};
+use crate::{
+    MsgCreateZkExecutionIsm, MsgProcessMessage, MsgRemoteTransfer, MsgSubmitMessages, MsgUpdateZkExecutionIsm,
+};
 use prost::Name;
 
 // Legacy aliases for backward compatibility
 pub type StateTransitionProofMsg = MsgUpdateZkExecutionIsm;
 pub type StateInclusionProofMsg = MsgSubmitMessages;
 pub type HyperlaneMessage = MsgProcessMessage;
+
+impl MsgCreateZkExecutionIsm {
+    /// Create a new ZK execution ISM update message
+    pub fn new(
+        creator: String,
+        state_root: Vec<u8>,
+        height: u64,
+        celestia_header_hash: Vec<u8>,
+        celestia_height: u64,
+        namespace: Vec<u8>,
+        sequencer_public_key: Vec<u8>,
+        groth16_vkey: Vec<u8>,
+        state_transition_vkey: Vec<u8>,
+        state_membership_vkey: Vec<u8>,
+    ) -> Self {
+        Self {
+            creator,
+            state_root,
+            height,
+            celestia_header_hash,
+            celestia_height,
+            namespace,
+            sequencer_public_key,
+            groth16_vkey,
+            state_transition_vkey,
+            state_membership_vkey,
+        }
+    }
+}
+
+impl Name for MsgCreateZkExecutionIsm {
+    const NAME: &'static str = "MsgCreateZKExecutionISM";
+    const PACKAGE: &'static str = "celestia.zkism.v1";
+}
 
 impl MsgUpdateZkExecutionIsm {
     /// Create a new ZK execution ISM update message
