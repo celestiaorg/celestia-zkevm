@@ -21,6 +21,9 @@ use crate::prover::programs::block::{AppContext, BlockExecProver, TrustedState};
 use crate::prover::programs::range::{BlockRangeExecProver, BlockRangeExecService};
 use crate::prover::service::ProverService;
 
+use crate::prover::programs::combined::AppContext as CombinedAppContext;
+use crate::prover::programs::message::AppContext as MessageAppContext;
+
 pub async fn start_server(config: Config) -> Result<()> {
     let listener = TcpListener::bind(config.grpc_address.clone()).await?;
 
@@ -75,11 +78,86 @@ pub async fn start_server(config: Config) -> Result<()> {
     let prover = Arc::new(BlockRangeExecProver::new()?);
     let service =
         BlockRangeExecService::new(client, prover, storage.clone(), rx_block, tx_range, batch_size, 16).await?;
+
+    #[cfg(not(feature = "combined"))]
     tokio::spawn(async move {
         if let Err(e) = service.run().await {
             error!("Block prover task failed: {e:?}");
         }
     });
+
+    #[cfg(feature = "combined")]
+    {
+        use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
+        use tokio::sync::Mutex;
+
+        let config = ClientConfig::from_env()?;
+        let ism_client = Arc::new(CelestiaIsmClient::new(config).await?);
+        let (range_tx, range_rx) = mpsc::channel(256);
+        let message_storage_path = dirs::home_dir()
+            .expect("cannot find home directory")
+            .join(APP_HOME)
+            .join("data")
+            .join("messages.db");
+        let snapshot_storage_path = dirs::home_dir()
+            .expect("cannot find home directory")
+            .join(APP_HOME)
+            .join("data")
+            .join("snapshots.db");
+        let hyperlane_message_store = Arc::new(HyperlaneMessageStore::new(message_storage_path).unwrap());
+        let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path, None).unwrap());
+
+        let is_proving_messages: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+        tokio::spawn({
+            use crate::prover::programs::combined::EvCombinedProver;
+
+            let ism_client = ism_client.clone();
+            let combined_prover = EvCombinedProver::new(CombinedAppContext::default(), range_tx).unwrap();
+            let is_proving_messages = is_proving_messages.clone();
+            async move {
+                if let Err(e) = combined_prover.run(ism_client, is_proving_messages).await {
+                    error!("Combined prover task failed: {e:?}");
+                }
+            }
+        });
+        tokio::spawn({
+            use alloy_primitives::Address;
+            use alloy_provider::ProviderBuilder;
+            use ev_state_queries::{DefaultProvider, MockStateQueryProvider};
+            use reqwest::Url;
+            use std::str::FromStr;
+
+            use crate::prover::programs::message::HyperlaneMessageProver;
+
+            let ctx = MessageAppContext {
+                evm_rpc: "http://127.0.0.1:8545".to_string(),
+                evm_ws: "ws://127.0.0.1:8546".to_string(),
+                mailbox_address: Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap(),
+                merkle_tree_address: Address::from_str("0xfcb1d485ef46344029d9e8a7925925e146b3430e").unwrap(),
+            };
+
+            let evm_provider: DefaultProvider =
+                ProviderBuilder::new().connect_http(Url::from_str("http://127.0.0.1:8545").unwrap());
+
+            let message_prover = HyperlaneMessageProver::new(
+                ctx,
+                hyperlane_message_store,
+                hyperlane_snapshot_store,
+                storage.clone(),
+                Arc::new(MockStateQueryProvider::new(evm_provider)),
+            )
+            .unwrap();
+
+            let is_proving_messages = is_proving_messages.clone();
+
+            async move {
+                let ism_client = ism_client.clone();
+                if let Err(e) = message_prover.run(range_rx, ism_client, is_proving_messages).await {
+                    error!("Message prover task failed: {e:?}");
+                }
+            }
+        });
+    }
 
     // Todo: Integrate message prover and supply trusted_root, trusted_height from block prover
     // First generate the block proof, then generate the message proof inside a joined service.
