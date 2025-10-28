@@ -42,6 +42,8 @@ use crate::prover::programs::message::AppContext as MessageAppContext;
 
 pub async fn start_server(config: Config) -> Result<()> {
     let listener = TcpListener::bind(config.grpc_address.clone()).await?;
+    let sequencer_rpc_url = std::env::var("SEQUENCER_RPC_URL").expect("SEQUENCER_RPC_URL must be set");
+    let reth_rpc_url = std::env::var("RETH_RPC_URL").expect("RETH_RPC_URL must be set");
 
     let descriptor_bytes = include_bytes!("../../src/proto/descriptor.bin");
     let reflection_service = ReflectionBuilder::configure()
@@ -52,7 +54,7 @@ pub async fn start_server(config: Config) -> Result<()> {
     // TODO: Remove this config cloning when we can rely on the public key from config
     // https://github.com/evstack/ev-node/issues/2603
     let mut config_clone = config.clone();
-    config_clone.pub_key = public_key().await?;
+    config_clone.pub_key = public_key(sequencer_rpc_url).await?;
     debug!("Successfully got pubkey from evnode: {}", config_clone.pub_key);
 
     let client_config = ClientConfig::from_env()?;
@@ -140,14 +142,13 @@ pub async fn start_server(config: Config) -> Result<()> {
         let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path, None).unwrap());
 
         let ctx = MessageAppContext {
-            evm_rpc: "http://127.0.0.1:8545".to_string(),
+            evm_rpc: reth_rpc_url.clone(),
             evm_ws: "ws://127.0.0.1:8546".to_string(),
             mailbox_address: Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap(),
             merkle_tree_address: Address::from_str("0xfcb1d485ef46344029d9e8a7925925e146b3430e").unwrap(),
         };
 
-        let evm_provider: DefaultProvider =
-            ProviderBuilder::new().connect_http(Url::from_str("http://127.0.0.1:8545").unwrap());
+        let evm_provider: DefaultProvider = ProviderBuilder::new().connect_http(Url::from_str(&reth_rpc_url).unwrap());
 
         let message_prover = HyperlaneMessageProver::new(
             ctx,
@@ -182,8 +183,8 @@ pub async fn start_server(config: Config) -> Result<()> {
 // TODO: Use from config file when we can have a reproducible key in docker-compose.
 // For now query the pubkey on startup from evnode.
 // https://github.com/evstack/ev-node/issues/2603
-pub async fn public_key() -> Result<String> {
-    let mut sequencer_client = StoreServiceClient::connect("http://127.0.0.1:7331").await?;
+pub async fn public_key(sequencer_rpc_url: String) -> Result<String> {
+    let mut sequencer_client = StoreServiceClient::connect(sequencer_rpc_url).await?;
     let block_req = GetBlockRequest {
         identifier: Some(Identifier::Height(1)),
     };
