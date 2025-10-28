@@ -36,12 +36,6 @@ use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
 
-mod config {
-    pub const CELESTIA_RPC_URL: &str = "http://localhost:26658";
-    pub const EVM_RPC_URL: &str = "http://localhost:8545";
-    pub const SEQUENCER_URL: &str = "http://localhost:7331";
-}
-
 /// The arguments for the command.
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -85,7 +79,8 @@ async fn generate_client_executor_input(
 }
 
 async fn get_sequencer_pubkey() -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut sequencer_client = StoreServiceClient::connect(config::SEQUENCER_URL).await?;
+    let sequencer_rpc_url = env::var("SEQUENCER_RPC_URL")?;
+    let mut sequencer_client = StoreServiceClient::connect(sequencer_rpc_url).await?;
     let block_req = GetBlockRequest {
         identifier: Some(Identifier::Height(1)),
     };
@@ -101,6 +96,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     let num_blocks = args.blocks;
     let start_height = args.start;
+    let celestia_rpc_url = env::var("CELESTIA_RPC_URL")?;
+    let reth_rpc_url = env::var("RETH_RPC_URL")?;
 
     let genesis_path = env::var("GENESIS_PATH").expect("GENESIS_PATH must be set");
     let (genesis, chain_spec) = load_chain_spec_from_genesis(&genesis_path)?;
@@ -108,7 +105,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let namespace_hex = env::var("CELESTIA_NAMESPACE").expect("CELESTIA_NAMESPACE must be set");
     let namespace = Namespace::new_v0(&hex::decode(namespace_hex)?)?;
 
-    let celestia_client = Client::new(config::CELESTIA_RPC_URL, None)
+    let celestia_client = Client::new(&celestia_rpc_url, None)
         .await
         .context("Failed creating Celestia RPC client")?;
 
@@ -143,8 +140,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             println!("Got SignedData for EVM block {height}");
 
             let client_executor_input =
-                generate_client_executor_input(config::EVM_RPC_URL, height, chain_spec.clone(), genesis.clone())
-                    .await?;
+                generate_client_executor_input(&reth_rpc_url, height, chain_spec.clone(), genesis.clone()).await?;
 
             executor_inputs.push(client_executor_input);
         }

@@ -1,10 +1,23 @@
-use crate::{MsgProcessMessage, MsgRemoteTransfer, MsgSubmitMessages, MsgUpdateZkExecutionIsm};
+use crate::{
+    proto::{celestia::zkism::v1::MsgCreateZkExecutionIsm, hyperlane::warp::v1::MsgSetToken},
+    MsgProcessMessage, MsgRemoteTransfer, MsgSubmitMessages, MsgUpdateZkExecutionIsm,
+};
 use prost::Name;
 
 // Legacy aliases for backward compatibility
 pub type StateTransitionProofMsg = MsgUpdateZkExecutionIsm;
 pub type StateInclusionProofMsg = MsgSubmitMessages;
 pub type HyperlaneMessage = MsgProcessMessage;
+
+impl Name for MsgSetToken {
+    const NAME: &'static str = "MsgSetToken";
+    const PACKAGE: &'static str = "hyperlane.warp.v1";
+}
+
+impl Name for MsgCreateZkExecutionIsm {
+    const NAME: &'static str = "MsgCreateZKExecutionISM";
+    const PACKAGE: &'static str = "celestia.zkism.v1";
+}
 
 impl MsgUpdateZkExecutionIsm {
     /// Create a new ZK execution ISM update message
