@@ -1,7 +1,7 @@
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
-use ev_prover::command::{init, start, unsafe_reset_db, version, Cli, Commands};
+use ev_prover::command::{create_zkism, init, start, unsafe_reset_db, update_ism, version, Cli, Commands};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -24,11 +24,11 @@ async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
 
     match cli.command {
-        Commands::Init {} => commands::command::init()?,
-        Commands::Start {} => commands::command::start().await?,
-        Commands::Create {} => commands::command::create_zkism().await?,
-        Commands::Update { ism_id, token_id } => commands::command::update_ism(ism_id, token_id).await?,
-        Commands::Version {} => commands::command::version(),
+        Commands::Init {} => init()?,
+        Commands::Start {} => start().await?,
+        Commands::Create {} => create_zkism().await?,
+        Commands::Update { ism_id, token_id } => update_ism(ism_id, token_id).await?,
+        Commands::Version {} => version(),
         Commands::UnsafeResetDb {} => unsafe_reset_db()?,
     }
 
