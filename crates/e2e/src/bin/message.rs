@@ -1,18 +1,16 @@
 use alloy_provider::ProviderBuilder;
-use e2e::{
-    config::debug::{EV_RPC, TARGET_HEIGHT},
-    utils::message::prove_messages,
-};
+use e2e::{config::debug::TARGET_HEIGHT, prover::message::prove_messages};
 use ev_state_queries::MockStateQueryProvider;
 use sp1_sdk::{EnvProver, ProverClient};
-use std::{str::FromStr, sync::Arc};
+use std::{env, str::FromStr, sync::Arc};
 use url::Url;
 
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
+    let reth_rpc_url = env::var("RETH_RPC_URL").unwrap();
     let client: Arc<EnvProver> = Arc::new(ProverClient::from_env());
-    let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
+    let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(&reth_rpc_url).unwrap());
     let _proof = prove_messages(
         TARGET_HEIGHT,
         &evm_provider.clone(),

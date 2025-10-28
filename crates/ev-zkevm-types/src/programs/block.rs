@@ -67,6 +67,7 @@ impl Display for BlockExecOutput {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         writeln!(f, "BlockExecOutput {{")?;
         writeln!(f, "  celestia_header_hash: {}", encode(self.celestia_header_hash))?;
+        writeln!(f, "  prev_celestia_height: {}", self.prev_celestia_height)?;
         writeln!(
             f,
             "  prev_celestia_header_hash: {}",
@@ -123,7 +124,14 @@ pub struct BlockRangeExecOutput {
 impl Display for BlockRangeExecOutput {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         writeln!(f, "BlockRangeExecOutput {{")?;
+        writeln!(
+            f,
+            "  prev_celestia_header_hash: {}",
+            encode(self.prev_celestia_header_hash)
+        )?;
+        writeln!(f, "  prev_celestia_height: {}", self.prev_celestia_height)?;
         writeln!(f, "  celestia_header_hash: {}", encode(self.celestia_header_hash))?;
+        writeln!(f, "  celestia_height: {}", self.celestia_height)?;
         writeln!(f, "  trusted_height: {}", self.trusted_height)?;
         writeln!(f, "  trusted_state_root: {}", encode(self.trusted_state_root))?;
         writeln!(f, "  new_height: {}", self.new_height)?;

@@ -58,6 +58,7 @@ async fn test_run_message_prover() {
     let (_tx, rx) = mpsc::channel(256);
     let prover = HyperlaneMessageProver::new(
         app,
+        rx,
         hyperlane_message_store,
         hyperlane_snapshot_store,
         proof_store,

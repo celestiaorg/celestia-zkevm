@@ -17,6 +17,12 @@ pub enum Commands {
     /// Start the gRPC server
     Start {},
 
+    /// Create ZKISM
+    Create {},
+
+    /// Update
+    Update { ism_id: String, token_id: String },
+
     /// Show the service version
     Version {},
 }

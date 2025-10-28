@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{env, sync::Arc};
 
 use alloy_primitives::{FixedBytes, hex::FromHex};
 use e2e::{
@@ -10,9 +10,13 @@ use sp1_sdk::ProverClient;
 
 #[tokio::main]
 async fn main() {
+    let sequencer_rpc_url = env::var("SEQUENCER_RPC_URL").unwrap();
     dotenvy::dotenv().ok();
-    let trusted_inclusion_height = inclusion_height(TRUSTED_HEIGHT).await.unwrap() + 1;
-    let target_inclusion_height = inclusion_height(TARGET_HEIGHT).await.unwrap();
+    let trusted_inclusion_height = inclusion_height(TRUSTED_HEIGHT, sequencer_rpc_url.clone())
+        .await
+        .unwrap()
+        + 1;
+    let target_inclusion_height = inclusion_height(TARGET_HEIGHT, sequencer_rpc_url).await.unwrap();
     let num_blocks = target_inclusion_height - trusted_inclusion_height + 1;
     let client = Arc::new(ProverClient::from_env());
     prove_blocks(

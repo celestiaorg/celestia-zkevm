@@ -77,8 +77,8 @@ pub async fn get_sequencer_pubkey(sequencer_url: String) -> Result<Vec<u8>> {
 }
 
 // Get the Celestia inclusion height for a given Evolve block number
-pub async fn inclusion_height(block_number: u64) -> anyhow::Result<u64> {
-    let mut client = StoreServiceClient::connect("http://localhost:7331").await?;
+pub async fn inclusion_height(block_number: u64, sequencer_rpc_url: String) -> anyhow::Result<u64> {
+    let mut client = StoreServiceClient::connect(sequencer_rpc_url).await?;
     let req = GetMetadataRequest {
         key: format!("rhb/{block_number}/d"),
     };
