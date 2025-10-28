@@ -447,14 +447,6 @@ pub mod testing {
 
     #[async_trait]
     impl ProofStorage for MockProofStorage {
-        fn unsafe_reset(&self) -> Result<(), ProofStorageError> {
-            self.block_proofs.lock().unwrap().clear();
-            self.membership_proofs.lock().unwrap().clear();
-            self.range_proofs.lock().unwrap().clear();
-            *self.range_cursor.lock().unwrap() = None;
-            Ok(())
-        }
-
         async fn store_block_proof(
             &self,
             celestia_height: u64,
@@ -581,6 +573,14 @@ pub mod testing {
                 Some(height) => Ok(Some(self.block_proofs.lock().unwrap()[&height].clone())),
                 None => Ok(None),
             }
+        }
+
+        fn unsafe_reset(&self) -> Result<(), ProofStorageError> {
+            self.block_proofs.lock().unwrap().clear();
+            self.membership_proofs.lock().unwrap().clear();
+            self.range_proofs.lock().unwrap().clear();
+            *self.range_cursor.lock().unwrap() = None;
+            Ok(())
         }
     }
 }
