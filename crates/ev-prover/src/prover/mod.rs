@@ -12,9 +12,9 @@ pub mod config;
 pub mod programs;
 pub mod service;
 
-pub use config::{BaseProverConfig, ProgramId, ProgramVerifyingKey, ProverConfig, ProverMode, RecursiveProverConfig};
+pub use config::{ProverConfig, ProverMode};
 
-pub type SP1Prover = dyn Prover<CpuProverComponents> + Send + Sync;
+pub type SP1Prover = dyn Prover<CpuProverComponents>;
 
 /// ProgramProver is a trait implemented per SP1 program*.
 ///
@@ -22,7 +22,7 @@ pub type SP1Prover = dyn Prover<CpuProverComponents> + Send + Sync;
 #[async_trait]
 pub trait ProgramProver {
     /// Config implements the the BaseProverConfig trait while allowing per implementation extensions.
-    type Config: BaseProverConfig + Send + Sync + 'static;
+    type Config: ProverConfig + Send + Sync + 'static;
     /// Context needed to build the stdin for this program.
     type Input: Send + 'static;
     /// Output data to return alongside the proof.
@@ -106,6 +106,13 @@ pub struct RangeProofCommitted {
 }
 
 impl RangeProofCommitted {
+    pub fn new(trusted_height: u64, trusted_root: [u8; 32]) -> Self {
+        Self {
+            trusted_height,
+            trusted_root,
+        }
+    }
+
     pub fn trusted_height(&self) -> u64 {
         self.trusted_height
     }

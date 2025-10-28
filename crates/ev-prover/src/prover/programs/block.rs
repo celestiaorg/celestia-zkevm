@@ -1,4 +1,12 @@
 #![allow(dead_code)]
+use celestia_types::ExtendedHeader;
+use std::collections::BTreeMap;
+use std::env;
+use std::fmt::Display;
+use std::fs;
+use std::result::Result::{Err, Ok};
+use std::sync::Arc;
+
 use alloy_genesis::Genesis as AlloyGenesis;
 use alloy_primitives::FixedBytes;
 use alloy_provider::ProviderBuilder;
@@ -9,7 +17,6 @@ use celestia_rpc::blob::BlobsAtHeight;
 use celestia_rpc::{client::Client, BlobClient, HeaderClient, ShareClient};
 use celestia_types::nmt::{Namespace, NamespaceProof};
 use celestia_types::Blob;
-use celestia_types::ExtendedHeader;
 use ev_types::v1::SignedData;
 use ev_zkevm_types::programs::block::{BlockExecInput, BlockExecOutput};
 use jsonrpsee_core::client::Subscription;
@@ -19,12 +26,7 @@ use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_host_executor::EthHostExecutor;
 use rsp_primitives::genesis::Genesis;
 use rsp_rpc_db::RpcDb;
-use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
-use std::collections::BTreeMap;
-use std::env;
-use std::fs;
-use std::result::Result::{Err, Ok};
-use std::sync::Arc;
+use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1ProvingKey, SP1Stdin, SP1VerifyingKey};
 use tokio::{
     sync::{mpsc, mpsc::Sender, RwLock, Semaphore},
     task::JoinSet,
@@ -39,6 +41,37 @@ use storage::proofs::ProofStorage;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_EXEC_ELF: &[u8] = include_elf!("ev-exec-program");
+
+#[derive(Clone)]
+pub struct BlockExecConfig {
+    pub pk: Arc<SP1ProvingKey>,
+    pub vk: Arc<SP1VerifyingKey>,
+    pub proof_mode: SP1ProofMode,
+}
+
+impl BlockExecConfig {
+    pub fn new(pk: SP1ProvingKey, vk: SP1VerifyingKey, mode: SP1ProofMode) -> Self {
+        BlockExecConfig {
+            pk: Arc::new(pk),
+            vk: Arc::new(vk),
+            proof_mode: mode,
+        }
+    }
+}
+
+impl ProverConfig for BlockExecConfig {
+    fn pk(&self) -> Arc<SP1ProvingKey> {
+        Arc::clone(&self.pk)
+    }
+
+    fn vk(&self) -> Arc<SP1VerifyingKey> {
+        Arc::clone(&self.vk)
+    }
+
+    fn proof_mode(&self) -> SP1ProofMode {
+        self.proof_mode
+    }
+}
 
 /// AppContext encapsulates the full set of RPC endpoints and configuration
 /// needed to fetch input data for execution and data availability proofs.
@@ -69,8 +102,14 @@ impl TrustedState {
     }
 }
 
+impl Display for TrustedState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "height={}, root={}", self.height, self.root)
+    }
+}
+
 impl AppContext {
-    pub fn from_config(config: Config) -> Result<Self> {
+    pub fn new(config: Config, trusted_state: TrustedState) -> Result<Self> {
         let genesis = AppContext::load_genesis().context("Error loading app genesis")?;
         let chain_spec: Arc<ChainSpec> = Arc::new(
             (&genesis)
@@ -81,7 +120,7 @@ impl AppContext {
         let raw_ns = hex::decode(config.namespace_hex)?;
         let namespace = Namespace::new_v0(raw_ns.as_ref()).context("Failed to construct Namespace")?;
         let pub_key = hex::decode(config.pub_key)?;
-        let trusted_state = RwLock::new(TrustedState::new(0, chain_spec.genesis_header().state_root));
+        let trusted_state = RwLock::new(trusted_state);
 
         Ok(AppContext {
             chain_spec,
@@ -116,7 +155,7 @@ impl AppContext {
 /// EVM state transition function.
 pub struct BlockExecProver {
     pub app: AppContext,
-    pub config: ProverConfig,
+    pub config: BlockExecConfig,
     pub prover: Arc<SP1Prover>,
     pub tx: Sender<BlockProofCommitted>,
     pub storage: Arc<dyn ProofStorage>,
@@ -126,7 +165,7 @@ pub struct BlockExecProver {
 
 #[async_trait]
 impl ProgramProver for BlockExecProver {
-    type Config = ProverConfig;
+    type Config = BlockExecConfig;
     type Input = BlockExecInput;
     type Output = BlockExecOutput;
 
@@ -213,9 +252,9 @@ impl BlockExecProver {
     }
 
     /// Returns the default prover configuration for the block execution program.
-    pub fn default_config(prover: &SP1Prover) -> ProverConfig {
+    pub fn default_config(prover: &SP1Prover) -> BlockExecConfig {
         let (pk, vk) = prover.setup(EV_EXEC_ELF);
-        ProverConfig::new(pk, vk, SP1ProofMode::Compressed)
+        BlockExecConfig::new(pk, vk, SP1ProofMode::Compressed)
     }
 
     async fn connect_and_subscribe(&self) -> Result<(Arc<Client>, Subscription<BlobsAtHeight>)> {

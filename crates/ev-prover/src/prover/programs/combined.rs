@@ -5,7 +5,8 @@ use std::{
 };
 
 use crate::{
-    generate_client_executor_input, get_sequencer_pubkey, load_chain_spec_from_genesis, prover::RangeProofCommitted,
+    generate_client_executor_input, get_sequencer_pubkey, load_chain_spec_from_genesis,
+    prover::{ProverConfig, RangeProofCommitted},
     ISM_ID,
 };
 use alloy::hex::FromHex;
@@ -25,12 +26,12 @@ use prost::Message;
 use reth_chainspec::ChainSpec;
 use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_primitives::genesis::Genesis;
-use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
+use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1ProvingKey, SP1Stdin, SP1VerifyingKey};
 use tokio::{sync::Mutex, time::sleep};
 use tracing::{debug, error, info, warn};
 
 use crate::prover::ProgramProver;
-use crate::prover::{config::CombinedProverConfig, prover_from_env, SP1Prover};
+use crate::prover::{prover_from_env, SP1Prover};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_COMBINED_ELF: &[u8] = include_elf!("ev-combined-program");
@@ -56,6 +57,37 @@ impl Default for AppContext {
             "http://127.0.0.1:8545".to_string(),
             "http://127.0.0.1:26658".to_string(),
         )
+    }
+}
+
+#[derive(Clone)]
+pub struct CombinedProverConfig {
+    pub pk: Arc<SP1ProvingKey>,
+    pub vk: Arc<SP1VerifyingKey>,
+    pub proof_mode: SP1ProofMode,
+}
+
+impl CombinedProverConfig {
+    pub fn new(pk: SP1ProvingKey, vk: SP1VerifyingKey, mode: SP1ProofMode) -> Self {
+        CombinedProverConfig {
+            pk: Arc::new(pk),
+            vk: Arc::new(vk),
+            proof_mode: mode,
+        }
+    }
+}
+
+impl ProverConfig for CombinedProverConfig {
+    fn pk(&self) -> Arc<SP1ProvingKey> {
+        Arc::clone(&self.pk)
+    }
+
+    fn vk(&self) -> Arc<SP1VerifyingKey> {
+        Arc::clone(&self.vk)
+    }
+
+    fn proof_mode(&self) -> SP1ProofMode {
+        self.proof_mode
     }
 }
 

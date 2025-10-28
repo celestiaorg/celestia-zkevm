@@ -19,7 +19,7 @@ use ev_zkevm_types::programs::hyperlane::types::{
     HYPERLANE_MERKLE_TREE_KEYS,
 };
 use reqwest::Url;
-use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
+use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1ProvingKey, SP1Stdin, SP1VerifyingKey};
 use std::{env, str::FromStr, sync::Arc};
 use storage::hyperlane::StoredHyperlaneMessage;
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
@@ -45,6 +45,37 @@ pub struct AppContext {
     pub merkle_tree_address: Address,
 }
 
+#[derive(Clone)]
+pub struct MessageProverConfig {
+    pub pk: Arc<SP1ProvingKey>,
+    pub vk: Arc<SP1VerifyingKey>,
+    pub proof_mode: SP1ProofMode,
+}
+
+impl MessageProverConfig {
+    pub fn new(pk: SP1ProvingKey, vk: SP1VerifyingKey, mode: SP1ProofMode) -> Self {
+        MessageProverConfig {
+            pk: Arc::new(pk),
+            vk: Arc::new(vk),
+            proof_mode: mode,
+        }
+    }
+}
+
+impl ProverConfig for MessageProverConfig {
+    fn pk(&self) -> Arc<SP1ProvingKey> {
+        Arc::clone(&self.pk)
+    }
+
+    fn vk(&self) -> Arc<SP1VerifyingKey> {
+        Arc::clone(&self.vk)
+    }
+
+    fn proof_mode(&self) -> SP1ProofMode {
+        self.proof_mode
+    }
+}
+
 /// MerkleTreeState encapsulates the height of the merkle tree in terms of snapshots and blocks
 pub struct MerkleTreeState {
     // the index of the snapshot that we will load from the db, initially 0 (empty by default)
@@ -62,7 +93,7 @@ impl MerkleTreeState {
 /// HyperlaneMessageProver is a prover for generating SP1 proofs for Hyperlane message inclusion in EVM blocks.
 pub struct HyperlaneMessageProver {
     pub ctx: AppContext,
-    pub config: ProverConfig,
+    pub config: MessageProverConfig,
     pub prover: Arc<SP1Prover>,
     pub message_store: Arc<HyperlaneMessageStore>,
     pub snapshot_store: Arc<HyperlaneSnapshotStore>,
@@ -71,7 +102,7 @@ pub struct HyperlaneMessageProver {
 }
 
 impl ProgramProver for HyperlaneMessageProver {
-    type Config = ProverConfig;
+    type Config = MessageProverConfig;
     type Input = HyperlaneMessageInputs;
     type Output = HyperlaneMessageOutputs;
 
@@ -119,9 +150,9 @@ impl HyperlaneMessageProver {
     }
 
     /// Returns the default prover configuration for the block execution program.
-    pub fn default_config(prover: &SP1Prover) -> ProverConfig {
+    pub fn default_config(prover: &SP1Prover) -> MessageProverConfig {
         let (pk, vk) = prover.setup(EV_HYPERLANE_ELF);
-        ProverConfig::new(pk, vk, SP1ProofMode::Groth16)
+        MessageProverConfig::new(pk, vk, SP1ProofMode::Groth16)
     }
 
     /// Run the message prover with indexer
