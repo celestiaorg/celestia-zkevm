@@ -220,6 +220,7 @@ impl EvCombinedProver {
             info!("[Done] ZKISM was updated successfully");
             let public_values: BlockRangeExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
             known_celestia_height = public_values.celestia_height;
+            *is_proving_messages.lock().await = true;
             // use shared channel to request message proof for new height and root
             self.range_tx
                 .send(RangeProofCommitted {
