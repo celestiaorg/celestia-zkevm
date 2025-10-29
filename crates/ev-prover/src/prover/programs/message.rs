@@ -19,7 +19,11 @@ use ev_zkevm_types::programs::hyperlane::types::{
     HYPERLANE_MERKLE_TREE_KEYS,
 };
 use reqwest::Url;
-use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1ProvingKey, SP1Stdin, SP1VerifyingKey};
+use sp1_sdk::{
+    include_elf, EnvProver, SP1ProofMode, SP1ProofWithPublicValues, SP1ProvingKey, SP1Stdin, SP1VerifyingKey,
+};
+use std::fs;
+use std::time::Instant;
 use std::{env, str::FromStr, sync::Arc};
 use storage::hyperlane::StoredHyperlaneMessage;
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
@@ -161,6 +165,7 @@ impl HyperlaneMessageProver {
         mut range_rx: Receiver<RangeProofCommitted>,
         ism_client: Arc<CelestiaIsmClient>,
         is_proving_messages: Arc<Mutex<bool>>,
+        prover_client: Arc<EnvProver>,
     ) -> Result<()> {
         let evm_provider: DefaultProvider = ProviderBuilder::new().connect_http(Url::from_str(&self.ctx.evm_rpc)?);
         let socket = WsConnect::new(&self.ctx.evm_ws);
@@ -197,6 +202,7 @@ impl HyperlaneMessageProver {
                     merkle_proof.clone(),
                     FixedBytes::from_slice(&committed_state_root),
                     &ism_client,
+                    prover_client.clone(),
                 )
                 .await
             {
@@ -224,6 +230,7 @@ impl HyperlaneMessageProver {
         proof: EIP1186AccountProofResponse,
         state_root: FixedBytes<32>,
         ism_client: &CelestiaIsmClient,
+        prover_client: Arc<EnvProver>,
     ) -> Result<()> {
         // generate a new proof for all messages that occurred since the last trusted height, inserting into the last snapshot
         // then save new snapshot
@@ -274,15 +281,22 @@ impl HyperlaneMessageProver {
             messages.iter().map(|m| m.message.id()).collect::<Vec<String>>()
         );
 
-        // Prove messages against trusted root
-        let message_proof = self.prove(input).await?;
-        info!("Message proof generated successfully");
+        let start_time = Instant::now();
+        let mut stdin = SP1Stdin::new();
+        stdin.write(&input);
+        let hyperlane_elf = fs::read("elfs/ev-hyperlane-elf").expect("Failed to read ELF");
+        let (pk, _vk) = prover_client.setup(&hyperlane_elf);
+        let message_proof = prover_client.prove(&pk, &stdin).groth16().run()?;
+        info!("Message Proof generation time: {}", start_time.elapsed().as_millis());
+
+        let hyperlane_message_outputs =
+            bincode::deserialize::<HyperlaneMessageOutputs>(message_proof.public_values.as_slice())?;
 
         let message_proof_msg = MsgSubmitMessages::new(
             ISM_ID.to_string(),
             height,
-            message_proof.0.bytes(),
-            message_proof.0.public_values.as_slice().to_vec(),
+            message_proof.bytes(),
+            message_proof.public_values.as_slice().to_vec(),
             ism_client.signer_address().to_string(),
         );
 
@@ -309,7 +323,7 @@ impl HyperlaneMessageProver {
         info!("[Done] Tia was bridged back to Celestia");
 
         self.proof_store
-            .store_membership_proof(height, &message_proof.0, &message_proof.1)
+            .store_membership_proof(height, &message_proof, &hyperlane_message_outputs)
             .await?;
 
         snapshot.height = height;

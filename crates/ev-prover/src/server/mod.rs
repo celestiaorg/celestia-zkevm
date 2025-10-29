@@ -11,6 +11,8 @@ use ev_types::v1::get_block_request::Identifier;
 use ev_types::v1::store_service_client::StoreServiceClient;
 use ev_types::v1::GetBlockRequest;
 use reqwest::Url;
+use sp1_sdk::EnvProver;
+use sp1_sdk::ProverClient;
 use std::str::FromStr;
 use storage::hyperlane::message::HyperlaneMessageStore;
 use storage::hyperlane::snapshot::HyperlaneSnapshotStore;
@@ -80,6 +82,7 @@ pub async fn start_server(config: Config) -> Result<()> {
 
     #[cfg(not(feature = "combined"))]
     {
+        panic!("CUDA MODE ONLY SUPPORTED WITH COMBINED FEATURE ENABLED");
         let batch_size = config_clone.batch_size;
         let concurrency = config_clone.concurrency;
         let queue_capacity = config_clone.queue_capacity;
@@ -110,6 +113,7 @@ pub async fn start_server(config: Config) -> Result<()> {
         });
     }
 
+    let prover_client: Arc<EnvProver> = Arc::new(ProverClient::from_env());
     #[cfg(feature = "combined")]
     {
         tokio::spawn({
@@ -118,8 +122,12 @@ pub async fn start_server(config: Config) -> Result<()> {
             let ism_client = ism_client.clone();
             let combined_prover = EvCombinedProver::new(CombinedAppContext::default(), tx_range).unwrap();
             let is_proving_messages = is_proving_messages.clone();
+            let prover_client = prover_client.clone();
             async move {
-                if let Err(e) = combined_prover.run(ism_client, is_proving_messages).await {
+                if let Err(e) = combined_prover
+                    .run(ism_client, is_proving_messages, prover_client)
+                    .await
+                {
                     error!("Combined prover task failed: {e:?}");
                 }
             }
@@ -160,10 +168,14 @@ pub async fn start_server(config: Config) -> Result<()> {
         .unwrap();
 
         let is_proving_messages = is_proving_messages.clone();
+        let prover_client = prover_client.clone();
 
         async move {
             let ism_client = ism_client.clone();
-            if let Err(e) = message_prover.run(rx_range, ism_client, is_proving_messages).await {
+            if let Err(e) = message_prover
+                .run(rx_range, ism_client, is_proving_messages, prover_client)
+                .await
+            {
                 error!("Message prover task failed: {e:?}");
             }
         }

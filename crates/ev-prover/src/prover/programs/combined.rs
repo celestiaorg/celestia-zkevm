@@ -1,5 +1,5 @@
 use std::{
-    env,
+    env, fs,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -12,7 +12,7 @@ use crate::{
 use alloy::hex::FromHex;
 use alloy_primitives::FixedBytes;
 use alloy_provider::{Provider, ProviderBuilder};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use celestia_grpc_client::{CelestiaIsmClient, MsgUpdateZkExecutionIsm, QueryIsmRequest};
 use celestia_rpc::{BlobClient, Client, HeaderClient, ShareClient};
@@ -26,7 +26,9 @@ use prost::Message;
 use reth_chainspec::ChainSpec;
 use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_primitives::genesis::Genesis;
-use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1ProvingKey, SP1Stdin, SP1VerifyingKey};
+use sp1_sdk::{
+    include_elf, EnvProver, SP1ProofMode, SP1ProofWithPublicValues, SP1ProvingKey, SP1Stdin, SP1VerifyingKey,
+};
 use tokio::{sync::Mutex, time::sleep};
 use tracing::{debug, error, info, warn};
 
@@ -142,7 +144,12 @@ impl EvCombinedProver {
         CombinedProverConfig::new(pk, vk, SP1ProofMode::Groth16)
     }
 
-    pub async fn run(self, ism_client: Arc<CelestiaIsmClient>, is_proving_messages: Arc<Mutex<bool>>) -> Result<()> {
+    pub async fn run(
+        self,
+        ism_client: Arc<CelestiaIsmClient>,
+        is_proving_messages: Arc<Mutex<bool>>,
+        prover_client: Arc<EnvProver>,
+    ) -> Result<()> {
         let client = Client::new(&self.app.celestia_rpc, None).await?;
 
         let mut known_celestia_height: u64 = 0;
@@ -196,12 +203,10 @@ impl EvCombinedProver {
             .await?;
 
             let start_time = Instant::now();
-            let proof = self
-                .prover
-                .prove(&self.config.pk, &stdin, SP1ProofMode::Groth16)
-                .context("Failed to prove")?;
-            info!("Proof generation time: {}", start_time.elapsed().as_millis());
-
+            let combined_elf = fs::read("elfs/ev-combined-elf").expect("Failed to read ELF");
+            let (pk, _vk) = prover_client.setup(&combined_elf);
+            let proof = prover_client.prove(&pk, &stdin).groth16().run()?;
+            info!("Combined Proof generation time: {}", start_time.elapsed().as_millis());
             let block_proof_msg = MsgUpdateZkExecutionIsm::new(
                 ISM_ID.to_string(),
                 proof.bytes(),

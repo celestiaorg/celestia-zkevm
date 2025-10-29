@@ -6,6 +6,7 @@ use celestia_grpc_client::{types::ClientConfig, CelestiaIsmClient};
 use ev_prover::prover::programs::message::{AppContext, HyperlaneMessageProver};
 use ev_state_queries::{DefaultProvider, MockStateQueryProvider};
 use reqwest::Url;
+use sp1_sdk::ProverClient;
 use storage::{
     hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore},
     proofs::RocksDbProofStorage,
@@ -64,5 +65,9 @@ async fn test_run_message_prover() {
         Arc::new(MockStateQueryProvider::new(evm_provider)),
     )
     .unwrap();
-    prover.run(rx, ism_client, Arc::new(Mutex::new(false))).await.unwrap();
+    let prover_client = Arc::new(ProverClient::from_env());
+    prover
+        .run(rx, ism_client, Arc::new(Mutex::new(false)), prover_client)
+        .await
+        .unwrap();
 }
