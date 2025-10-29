@@ -56,8 +56,7 @@ impl ClientConfig {
         let sha = Sha256::digest(pk_compressed.as_bytes());
         let ripemd = Ripemd160::digest(sha);
         let hrp = Hrp::parse("celestia")?;
-        #[allow(deprecated)]
-        let addr = bech32::encode::<Bech32>(hrp, ripemd.as_slice()).context("Failed to encode bech32 address")?;
+        let addr = bech32::encode::<Bech32>(hrp, ripemd.as_ref()).context("Failed to encode bech32 address")?;
 
         Ok(addr)
     }
