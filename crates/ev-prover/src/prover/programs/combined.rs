@@ -50,6 +50,11 @@ impl AppContext {
     pub fn new(evm_rpc: String, celestia_rpc: String) -> Self {
         Self { evm_rpc, celestia_rpc }
     }
+    pub fn from_env() -> Result<Self> {
+        let evm_rpc = std::env::var("RETH_RPC_URL").expect("RETH_RPC_URL must be set");
+        let celestia_rpc = std::env::var("CELESTIA_RPC_URL").expect("CELESTIA_RPC_URL must be set");
+        Ok(Self::new(evm_rpc, celestia_rpc))
+    }
 }
 impl Default for AppContext {
     fn default() -> Self {

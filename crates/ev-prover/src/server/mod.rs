@@ -44,6 +44,7 @@ pub async fn start_server(config: Config) -> Result<()> {
     let listener = TcpListener::bind(config.grpc_address.clone()).await?;
     let sequencer_rpc_url = std::env::var("SEQUENCER_RPC_URL").expect("SEQUENCER_RPC_URL must be set");
     let reth_rpc_url = std::env::var("RETH_RPC_URL").expect("RETH_RPC_URL must be set");
+    let reth_ws_url = std::env::var("RETH_WS_URL").expect("RETH_WS_URL must be set");
 
     let descriptor_bytes = include_bytes!("../../src/proto/descriptor.bin");
     let reflection_service = ReflectionBuilder::configure()
@@ -116,7 +117,7 @@ pub async fn start_server(config: Config) -> Result<()> {
             use crate::prover::programs::combined::EvCombinedProver;
 
             let ism_client = ism_client.clone();
-            let combined_prover = EvCombinedProver::new(CombinedAppContext::default(), tx_range).unwrap();
+            let combined_prover = EvCombinedProver::new(CombinedAppContext::from_env()?, tx_range).unwrap();
             let is_proving_messages = is_proving_messages.clone();
             async move {
                 if let Err(e) = combined_prover.run(ism_client, is_proving_messages).await {
@@ -143,7 +144,7 @@ pub async fn start_server(config: Config) -> Result<()> {
 
         let ctx = MessageAppContext {
             evm_rpc: reth_rpc_url.clone(),
-            evm_ws: "ws://127.0.0.1:8546".to_string(),
+            evm_ws: reth_ws_url,
             mailbox_address: Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap(),
             merkle_tree_address: Address::from_str("0xfcb1d485ef46344029d9e8a7925925e146b3430e").unwrap(),
         };
