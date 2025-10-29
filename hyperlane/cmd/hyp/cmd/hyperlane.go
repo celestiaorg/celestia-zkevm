@@ -197,7 +197,7 @@ func readGroth16Vkey() []byte {
 }
 
 func readStateTransitionVkey() []byte {
-	data, err := os.ReadFile("testdata/vkeys/ev-range-exec-vkey-hash")
+	data, err := os.ReadFile("testdata/vkeys/ev-combined-vkey-hash")
 	if err != nil {
 		log.Fatal(err)
 	}

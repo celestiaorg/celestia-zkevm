@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+alloy-consensus = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-rlp = { workspace = true }
 alloy-rpc-types = { workspace = true }
@@ -11,8 +12,16 @@ alloy-sol-types = { workspace = true }
 alloy-trie = { workspace = true }
 anyhow = { workspace = true }
 bincode = { workspace = true }
+bytes = { workspace = true }
 celestia-types = { workspace = true }
+ed25519-dalek = { workspace = true }
+ev-types = { workspace = true }
 hex = { workspace = true }
+nmt-rs = { workspace = true }
+prost = { workspace = true }
+reth-primitives = { workspace = true }
 rsp-client-executor = { workspace = true }
 serde = { workspace = true }
+serde_cbor = { workspace = true }
 sha3 = { workspace = true }
+tendermint = { workspace = true }

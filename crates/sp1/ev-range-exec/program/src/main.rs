@@ -21,11 +21,6 @@ use ev_zkevm_types::programs::block::{BlockExecOutput, BlockRangeExecInput, Bloc
 use sha2::{Digest, Sha256};
 
 pub fn main() {
-    // ------------------------------
-    // 1. Deserialize inputs
-    // ------------------------------
-    println!("cycle-tracker-report-start: deserialize inputs");
-
     let inputs: BlockRangeExecInput = sp1_zkvm::io::read::<BlockRangeExecInput>();
 
     assert_eq!(
@@ -36,24 +31,10 @@ pub fn main() {
 
     let proof_count = inputs.vkeys.len();
 
-    println!("cycle-tracker-report-end: deserialize inputs");
-
-    // ------------------------------
-    // 2. Verify proofs
-    // ------------------------------
-    println!("cycle-tracker-report-start: verify sp1 proofs");
-
     for i in 0..proof_count {
         let digest = Sha256::digest(&inputs.public_values[i]);
         sp1_zkvm::lib::verify::verify_sp1_proof(&inputs.vkeys[i], &digest.into());
     }
-
-    println!("cycle-tracker-report-end: verify sp1 proofs");
-
-    // ------------------------------
-    // 3. Parse public values into outputs
-    // ------------------------------
-    println!("cycle-tracker-report-start: decode public values from proofs");
 
     let outputs: Vec<BlockExecOutput> = inputs
         .public_values
@@ -63,13 +44,6 @@ pub fn main() {
             buffer.read::<BlockExecOutput>()
         })
         .collect();
-
-    println!("cycle-tracker-report-end: decode public values from proofs");
-
-    // ------------------------------
-    // 4. Verify sequential headers (EVM and Celestia)
-    // ------------------------------
-    println!("cycle-tracker-report-start: verify sequential headers");
 
     for window in outputs.windows(2).enumerate() {
         let (i, pair) = window;
@@ -114,13 +88,6 @@ pub fn main() {
         );
     }
 
-    println!("cycle-tracker-report-end: verify sequential headers");
-
-    // ------------------------------
-    // 5. Build and commit outputs
-    // ------------------------------
-    println!("cycle-tracker-report-start: build and commit outputs");
-
     let first = outputs.first().expect("No outputs provided");
     let last = outputs.last().expect("No outputs provided");
 
@@ -140,8 +107,6 @@ pub fn main() {
             .expect("namespace must be 29 bytes"),
         public_key: last.public_key,
     };
-
-    println!("cycle-tracker-report-end: build and commit outputs");
 
     sp1_zkvm::io::commit(&output);
 }

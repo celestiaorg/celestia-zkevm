@@ -6,9 +6,9 @@ use celestia_grpc_client::{
     MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm, QueryIsmRequest, client::CelestiaIsmClient,
 };
 use e2e::config::e2e::{CELESTIA_MAILBOX_ID, CELESTIA_TOKEN_ID, EV_RECIPIENT_ADDRESS, ISM_ID};
-use e2e::prover::block::prove_blocks;
-use e2e::prover::helpers::transfer_back;
-use e2e::prover::message::prove_messages;
+use e2e::utils::block::prove_blocks;
+use e2e::utils::helpers::transfer_back;
+use e2e::utils::message::prove_messages;
 use ev_prover::inclusion_height;
 use ev_state_queries::MockStateQueryProvider;
 use ev_zkevm_types::hyperlane::encode_hyperlane_message;
@@ -33,10 +33,10 @@ async fn main() {
         .expect("Failed to set default crypto provider");
     dotenvy::dotenv().ok();
     let mut filter = EnvFilter::new("sp1_core=warn,sp1_runtime=warn,sp1_sdk=warn,sp1_vm=warn");
-    if let Ok(env_filter) = std::env::var("RUST_LOG") {
-        if let Ok(parsed) = env_filter.parse() {
-            filter = filter.add_directive(parsed);
-        }
+    if let Ok(env_filter) = std::env::var("RUST_LOG")
+        && let Ok(parsed) = env_filter.parse()
+    {
+        filter = filter.add_directive(parsed);
     }
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
@@ -117,7 +117,7 @@ async fn main() {
         .join(".ev-prover")
         .join("data")
         .join("snapshots.db");
-    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap());
+    let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path, None).unwrap());
     hyperlane_snapshot_store.reset_db().unwrap();
 
     let message_proof = prove_messages(

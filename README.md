@@ -24,7 +24,7 @@ NETWORK_PRIVATE_KEY="PRIVATE_KEY" to the SP1 prover network private key from Cel
 3. Install [Rust](https://rustup.rs/)
 4. Install [SP1](https://docs.succinct.xyz/docs/sp1/getting-started/install)
 
-### Steps
+### Running a local network with Docker
 
 1. Clone this repository.
 
@@ -113,14 +113,23 @@ NETWORK_PRIVATE_KEY="PRIVATE_KEY" to the SP1 prover network private key from Cel
     ev-prover init
     ```
 
-6. Start the docker compose services.
-
+6. Initialize the Docker network
+    Start all services (ev-reth, ev sequencer, celestia)
     ```shell
     # Run `make start` or `docker compose up` from the root of the repository
     make start 
     ```
-
     Wait for all containers to finish their initialization sequence.
+
+    Next, deploy and update the ZKISM:
+
+    ```shell
+    make deploy-ism
+    ```
+
+    ```shell
+    make update-ism
+    ```
 
 7. Run the e2e
     ```shell
@@ -129,6 +138,9 @@ NETWORK_PRIVATE_KEY="PRIVATE_KEY" to the SP1 prover network private key from Cel
 
     Note that depending on your hardware it can take a while for the e2e to run,
     as it will prove a series of EVM blocks leading up to a target height, as well as state inclusion of a Hyperlane deposit message at the target height.
+
+### Start the Prover Service 
+You will find detailed documentation on how to run the joint hyperlane message and block prover service `ev-prover` [here](crates/ev-prover/README.md).
 
 ## Architecture
 
