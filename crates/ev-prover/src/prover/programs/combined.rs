@@ -5,6 +5,7 @@ use std::{
 };
 
 use crate::{
+    config::config::APP_HOME,
     generate_client_executor_input, get_sequencer_pubkey, load_chain_spec_from_genesis,
     prover::{ProverConfig, RangeProofCommitted},
     ISM_ID,
@@ -54,6 +55,19 @@ impl AppContext {
         let evm_rpc = std::env::var("RETH_RPC_URL").expect("RETH_RPC_URL must be set");
         let celestia_rpc = std::env::var("CELESTIA_RPC_URL").expect("CELESTIA_RPC_URL must be set");
         Ok(Self::new(evm_rpc, celestia_rpc))
+    }
+    pub fn load_genesis_and_chainspec() -> Result<(Genesis, Arc<ChainSpec>)> {
+        let genesis_path = dirs::home_dir()
+            .ok_or_else(|| anyhow::anyhow!("cannot find home directory"))?
+            .join(APP_HOME)
+            .join("config")
+            .join("genesis.json");
+        let (genesis, chain_spec) = load_chain_spec_from_genesis(
+            genesis_path
+                .to_str()
+                .ok_or_else(|| anyhow::anyhow!("Invalid genesis path"))?,
+        )?;
+        Ok((genesis, chain_spec))
     }
 }
 impl Default for AppContext {
@@ -151,6 +165,7 @@ impl EvCombinedProver {
         let client = Client::new(&self.app.celestia_rpc, None).await?;
         let sequencer_rpc_url = std::env::var("SEQUENCER_RPC_URL").expect("SEQUENCER_RPC_URL must be set");
         let mut known_celestia_height: u64 = 0;
+        let (genesis, chain_spec) = AppContext::load_genesis_and_chainspec()?;
 
         loop {
             if *is_proving_messages.lock().await {
@@ -198,6 +213,8 @@ impl EvCombinedProver {
                 BATCH_SIZE,
                 &mut trusted_root,
                 &sequencer_rpc_url,
+                genesis.clone(),
+                chain_spec.clone(),
             )
             .await?;
 
@@ -240,17 +257,9 @@ async fn prepare_combined_inputs(
     num_blocks: u64,
     trusted_root: &mut FixedBytes<32>,
     sequencer_rpc_url: &str,
+    genesis: Genesis,
+    chain_spec: Arc<ChainSpec>,
 ) -> Result<SP1Stdin> {
-    let genesis_path = dirs::home_dir()
-        .ok_or_else(|| anyhow::anyhow!("cannot find home directory"))?
-        .join(".ev-prover")
-        .join("config")
-        .join("genesis.json");
-    let (genesis, chain_spec) = load_chain_spec_from_genesis(
-        genesis_path
-            .to_str()
-            .ok_or_else(|| anyhow::anyhow!("Invalid genesis path"))?,
-    )?;
     let namespace_hex = env::var("CELESTIA_NAMESPACE")?;
     let namespace = Namespace::new_v0(&hex::decode(namespace_hex)?)?;
     let pub_key = get_sequencer_pubkey(sequencer_rpc_url.to_string()).await?;
