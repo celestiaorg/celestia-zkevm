@@ -65,8 +65,17 @@ hyperlane warp deploy --config ./configs/warp-config.yaml --registry ./registry 
 ```
 go install ./cmd/hyp
 
-hyp deploy 127.0.0.1:9090
+# Deploy with NoopISM (for testing)
+hyp deploy-noopism 127.0.0.1:9090 69420
+
+# Deploy with ZK Execution ISM
+hyp deploy-zkism 127.0.0.1:9090 [evm-rpc] [ev-node-rpc] 69420
+
+# Deploy with Multisig ISM
+hyp deploy-multisigism 127.0.0.1:9090 [validators-comma-separated] [threshold] 69420
 ```
+
+The local-domain parameter (e.g., `69420`) specifies the domain ID for the Celestia chain.
 
 Below is a list of the manual steps which are performed by the Go program used above.
 Skip to the next section to configure the remote routers for both the EVM and cosmosnative deployments.
