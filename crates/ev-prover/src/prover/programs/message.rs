@@ -178,7 +178,6 @@ impl HyperlaneMessageProver {
                 range_rx.recv().await.context("Failed to receive commit message")?;
 
             info!("Received commit message: {:?}", commit_message);
-            *is_proving_messages.lock().await = true;
 
             let committed_height = commit_message.trusted_height;
             let committed_state_root = commit_message.trusted_root;
