@@ -89,10 +89,12 @@ message MsgUpdateZKExecutionISM {
 message MsgUpdateZKExecutionISMResponse {
   // state commitment root of the remote chain
   string state_root = 1;
+  // latest tracked height of the remote chain
+  uint64 height = 2;
   // trusted celestia header hash
-  string celestia_header_hash = 2;
+  string celestia_header_hash = 3;
   // trusted celestia height
-  uint64 celestia_height = 3;
+  uint64 celestia_height = 4;
 }
 
 // MsgSubmitMessages is the request type for SubmitMessages.
