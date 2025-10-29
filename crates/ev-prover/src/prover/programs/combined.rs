@@ -144,7 +144,7 @@ impl EvCombinedProver {
 
     pub async fn run(self, ism_client: Arc<CelestiaIsmClient>, is_proving_messages: Arc<Mutex<bool>>) -> Result<()> {
         let client = Client::new(&self.app.celestia_rpc, None).await?;
-
+        let sequencer_rpc_url = std::env::var("SEQUENCER_RPC_URL").expect("SEQUENCER_RPC_URL must be set");
         let mut known_celestia_height: u64 = 0;
 
         loop {
@@ -192,6 +192,7 @@ impl EvCombinedProver {
                 &mut trusted_height,
                 BATCH_SIZE,
                 &mut trusted_root,
+                &sequencer_rpc_url,
             )
             .await?;
 
@@ -232,6 +233,7 @@ async fn prepare_combined_inputs(
     trusted_height: &mut u64,
     num_blocks: u64,
     trusted_root: &mut FixedBytes<32>,
+    sequencer_rpc_url: &str,
 ) -> Result<SP1Stdin> {
     let genesis_path = dirs::home_dir()
         .ok_or_else(|| anyhow::anyhow!("cannot find home directory"))?
@@ -245,7 +247,7 @@ async fn prepare_combined_inputs(
     )?;
     let namespace_hex = env::var("CELESTIA_NAMESPACE")?;
     let namespace = Namespace::new_v0(&hex::decode(namespace_hex)?)?;
-    let pub_key = get_sequencer_pubkey("http://localhost:7331".to_string()).await?;
+    let pub_key = get_sequencer_pubkey(sequencer_rpc_url.to_string()).await?;
     let mut block_inputs: Vec<BlockExecInput> = Vec::new();
     for block_number in start_height..=(start_height + num_blocks) {
         block_inputs.push(
