@@ -16,7 +16,6 @@ anyhow = "1.0"
 async-trait = "0.1.88"
 bincode = { workspace = true }
 bytes = { workspace = true }
-celestia-client = "0.2.0"
 celestia-grpc-client = { path = "../celestia-grpc-client" }
 celestia-rpc = { workspace = true }
 celestia-types = { workspace = true }
