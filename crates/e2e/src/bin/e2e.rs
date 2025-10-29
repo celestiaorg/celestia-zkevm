@@ -5,15 +5,15 @@ use celestia_grpc_client::types::ClientConfig;
 use celestia_grpc_client::{
     MsgProcessMessage, MsgSubmitMessages, MsgUpdateZkExecutionIsm, QueryIsmRequest, client::CelestiaIsmClient,
 };
-use e2e::config::debug::EV_RPC;
 use e2e::config::e2e::{CELESTIA_MAILBOX_ID, CELESTIA_TOKEN_ID, EV_RECIPIENT_ADDRESS, ISM_ID};
 use e2e::prover::block::prove_blocks;
 use e2e::prover::helpers::transfer_back;
 use e2e::prover::message::prove_messages;
+use ev_prover::inclusion_height;
 use ev_state_queries::MockStateQueryProvider;
-use ev_types::v1::{GetMetadataRequest, store_service_client::StoreServiceClient};
 use ev_zkevm_types::hyperlane::encode_hyperlane_message;
 use sp1_sdk::{EnvProver, ProverClient};
+use std::env;
 use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
 use storage::hyperlane::snapshot::HyperlaneSnapshotStore;
@@ -39,6 +39,9 @@ async fn main() {
         }
     }
     tracing_subscriber::fmt().with_env_filter(filter).init();
+
+    let reth_rpc_url = env::var("RETH_RPC_URL").unwrap();
+    let sequencer_rpc_url = env::var("SEQUENCER_RPC_URL").unwrap();
 
     // instantiate ISM client for submitting payloads and querying state
     let config = ClientConfig::from_env().expect("failed to create celestia client config");
@@ -75,7 +78,11 @@ async fn main() {
     let target_height = retry_async(transfer_back, "transfer_back").await;
     info!("Target height: {}", target_height);
     let client: Arc<EnvProver> = Arc::new(ProverClient::from_env());
-    let target_inclusion_height = retry_async(|| inclusion_height(target_height), "inclusion_height").await;
+    let target_inclusion_height = retry_async(
+        || inclusion_height(target_height, sequencer_rpc_url.clone()),
+        "inclusion_height",
+    )
+    .await;
     let num_blocks = target_inclusion_height - celestia_start_height;
 
     info!("Proving Evolve blocks...");
@@ -92,7 +99,6 @@ async fn main() {
 
     let block_proof_msg = MsgUpdateZkExecutionIsm::new(
         ISM_ID.to_string(),
-        target_inclusion_height,
         block_proof.bytes(),
         block_proof.public_values.as_slice().to_vec(),
         ism_client.signer_address().to_string(),
@@ -103,7 +109,7 @@ async fn main() {
     assert!(response.success);
     info!("[Done] ZKISM was updated successfully");
 
-    let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(EV_RPC).unwrap());
+    let evm_provider = ProviderBuilder::new().connect_http(Url::from_str(&reth_rpc_url).unwrap());
     info!("Proving Evolve Hyperlane deposit events...");
 
     let snapshot_storage_path = dirs::home_dir()
@@ -151,18 +157,6 @@ async fn main() {
         assert!(response.success);
     }
     info!("[Done] Tia was bridged back to Celestia");
-}
-
-// todo: find a place for this function and remove it from the binaries
-async fn inclusion_height(block_number: u64) -> anyhow::Result<u64> {
-    let mut client = StoreServiceClient::connect(e2e::config::e2e::SEQUENCER_URL).await?;
-    let req = GetMetadataRequest {
-        key: format!("rhb/{block_number}/d"),
-    };
-
-    let resp = client.get_metadata(req).await?;
-    let height = u64::from_le_bytes(resp.into_inner().value[..8].try_into()?);
-    Ok(height)
 }
 
 async fn retry_async<F, Fut, T, E>(mut f: F, label: &str) -> T

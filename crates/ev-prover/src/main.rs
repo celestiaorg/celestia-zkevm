@@ -21,9 +21,16 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     dotenvy::dotenv().ok();
 
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("Failed to set default crypto provider");
+    dotenvy::dotenv().ok();
+
     match cli.command {
         Commands::Init {} => commands::command::init()?,
         Commands::Start {} => commands::command::start().await?,
+        Commands::Create {} => commands::command::create_zkism().await?,
+        Commands::Update { ism_id, token_id } => commands::command::update_ism(ism_id, token_id).await?,
         Commands::Version {} => commands::command::version(),
         Commands::Query(query_cmd) => commands::command::query(query_cmd).await?,
     }

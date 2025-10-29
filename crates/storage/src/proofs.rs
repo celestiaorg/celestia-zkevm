@@ -7,6 +7,7 @@ use ev_zkevm_types::programs::{
 use rocksdb::{ColumnFamily, ColumnFamilyDescriptor, DB, Options};
 use serde::{Deserialize, Serialize};
 use sp1_sdk::SP1ProofWithPublicValues;
+use std::convert::TryInto;
 use std::path::Path;
 use std::sync::Arc;
 use thiserror::Error;
@@ -100,6 +101,12 @@ pub trait ProofStorage: Send + Sync {
     async fn get_latest_membership_proof(&self) -> Result<Option<StoredMembershipProof>, ProofStorageError>;
 
     #[allow(dead_code)]
+    async fn set_range_cursor(&self, cursor: u64) -> Result<(), ProofStorageError>;
+
+    #[allow(dead_code)]
+    async fn get_range_cursor(&self) -> Result<Option<u64>, ProofStorageError>;
+
+    #[allow(dead_code)]
     async fn get_latest_block_proof(&self) -> Result<Option<StoredBlockProof>, ProofStorageError>;
 }
 
@@ -111,6 +118,7 @@ const CF_BLOCK_PROOFS: &str = "block_proofs";
 const CF_RANGE_PROOFS: &str = "range_proofs";
 const CF_MEMBERSHIP_PROOFS: &str = "membership_proofs";
 const CF_METADATA: &str = "metadata";
+const KEY_RANGE_CURSOR: &[u8] = b"range_cursor";
 
 impl RocksDbProofStorage {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, ProofStorageError> {
@@ -207,6 +215,26 @@ impl ProofStorage for RocksDbProofStorage {
 
         self.db.put_cf(cf, key, value)?;
         Ok(())
+    }
+
+    async fn set_range_cursor(&self, cursor: u64) -> Result<(), ProofStorageError> {
+        let cf = self.get_cf(CF_METADATA)?;
+        self.db.put_cf(cf, KEY_RANGE_CURSOR, cursor.to_be_bytes())?;
+        Ok(())
+    }
+
+    async fn get_range_cursor(&self) -> Result<Option<u64>, ProofStorageError> {
+        let cf = self.get_cf(CF_METADATA)?;
+        match self.db.get_cf(cf, KEY_RANGE_CURSOR)? {
+            Some(bytes) => {
+                let arr: [u8; 8] = bytes
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| ProofStorageError::General(anyhow!("invalid range cursor metadata length")))?;
+                Ok(Some(u64::from_be_bytes(arr)))
+            }
+            None => Ok(None),
+        }
     }
 
     async fn store_membership_proof(
@@ -350,6 +378,7 @@ pub mod testing {
         block_proofs: Mutex<HashMap<u64, StoredBlockProof>>,
         membership_proofs: Mutex<HashMap<u64, StoredMembershipProof>>,
         range_proofs: Mutex<Vec<StoredRangeProof>>,
+        range_cursor: Mutex<Option<u64>>,
     }
 
     impl MockProofStorage {
@@ -358,6 +387,7 @@ pub mod testing {
                 block_proofs: Mutex::new(HashMap::new()),
                 membership_proofs: Mutex::new(HashMap::new()),
                 range_proofs: Mutex::new(Vec::new()),
+                range_cursor: Mutex::new(None),
             }
         }
 
@@ -494,6 +524,15 @@ pub mod testing {
                 Some(height) => Ok(Some(self.membership_proofs.lock().unwrap()[&height].clone())),
                 None => Ok(None),
             }
+        }
+
+        async fn set_range_cursor(&self, cursor: u64) -> Result<(), ProofStorageError> {
+            *self.range_cursor.lock().unwrap() = Some(cursor);
+            Ok(())
+        }
+
+        async fn get_range_cursor(&self) -> Result<Option<u64>, ProofStorageError> {
+            Ok(*self.range_cursor.lock().unwrap())
         }
 
         async fn get_latest_block_proof(&self) -> Result<Option<StoredBlockProof>, ProofStorageError> {

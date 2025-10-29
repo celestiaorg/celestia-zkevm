@@ -27,9 +27,6 @@ enum Commands {
         /// Public values file path (hex encoded)
         #[arg(long)]
         public_values_file: String,
-        /// Block height for state transition
-        #[arg(long)]
-        height: u64,
     },
     /// Submit a state inclusion proof (MsgSubmitMessages)
     StateInclusion {
@@ -91,7 +88,6 @@ async fn main() -> Result<()> {
             id,
             proof_file,
             public_values_file,
-            height,
         } => {
             info!("Submitting state transition proof (MsgUpdateZKExecutionISM)...");
 
@@ -99,7 +95,7 @@ async fn main() -> Result<()> {
             let public_values = read_hex_file(public_values_file)?;
             let signer_address = client.signer_address().to_string();
 
-            let proof_msg = StateTransitionProofMsg::new(id.clone(), *height, proof, public_values, signer_address);
+            let proof_msg = StateTransitionProofMsg::new(id.clone(), proof, public_values, signer_address);
 
             let response = client.send_tx(proof_msg).await?;
             println!("State transition proof submitted successfully!");
