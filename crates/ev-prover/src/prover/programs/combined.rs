@@ -29,7 +29,7 @@ use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_primitives::genesis::Genesis;
 use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1ProvingKey, SP1Stdin, SP1VerifyingKey};
 use tokio::{sync::Mutex, time::sleep};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::prover::ProgramProver;
 use crate::prover::{prover_from_env, SP1Prover};
@@ -39,7 +39,6 @@ pub const EV_COMBINED_ELF: &[u8] = include_elf!("ev-combined-program");
 // hardcoded batch size for now
 pub const BATCH_SIZE: u64 = 50;
 pub const WARN_DISTANCE: u64 = 60;
-pub const ERR_DISTANCE: u64 = 120;
 
 pub struct AppContext {
     // reth http, for example http://127.0.0.1:8545
@@ -196,9 +195,7 @@ impl EvCombinedProver {
 
             let distance = latest_celestia_height.saturating_sub(trusted_celestia_height);
 
-            if distance >= ERR_DISTANCE {
-                error!("Prover is {distance} blocks behind Celestia head");
-            } else if distance >= WARN_DISTANCE {
+            if distance >= WARN_DISTANCE {
                 warn!("Prover is {distance} blocks behind Celestia head");
             } else {
                 info!("Prover is {distance} blocks behind Celestia head");

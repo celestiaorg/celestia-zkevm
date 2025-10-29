@@ -248,11 +248,14 @@ pub struct MsgUpdateZkExecutionIsmResponse {
     /// state commitment root of the remote chain
     #[prost(string, tag="1")]
     pub state_root: ::prost::alloc::string::String,
+    /// latest tracked height of the remote chain
+    #[prost(uint64, tag="2")]
+    pub height: u64,
     /// trusted celestia header hash
-    #[prost(string, tag="2")]
+    #[prost(string, tag="3")]
     pub celestia_header_hash: ::prost::alloc::string::String,
     /// trusted celestia height
-    #[prost(uint64, tag="3")]
+    #[prost(uint64, tag="4")]
     pub celestia_height: u64,
 }
 /// MsgSubmitMessages is the request type for SubmitMessages.
