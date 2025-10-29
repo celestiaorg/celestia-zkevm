@@ -77,24 +77,70 @@ func SetupZKIsm(ctx context.Context, broadcaster *Broadcaster, ethClient *ethcli
 }
 
 // SetupWithIsm deploys the cosmosnative Hyperlane components using the provided ism identifier.
-func SetupWithIsm(ctx context.Context, broadcaster *Broadcaster, ismID util.HexAddress) {
-	msgCreateNoopHooks := hooktypes.MsgCreateNoopHook{
-		Owner: broadcaster.address.String(),
+func SetupWithIsm(ctx context.Context, broadcaster *Broadcaster, ismID util.HexAddress, isMultisigIsm bool, localDomain uint32) {
+	var hooksID util.HexAddress
+	var mailboxID util.HexAddress
+
+	if isMultisigIsm {
+		// For multisig ISM, create mailbox first, then MerkleTreeHook with mailbox_id
+		log.Printf("Setting up with Multisig ISM - creating mailbox first\n")
+
+		msgCreateMailBox := coretypes.MsgCreateMailbox{
+			Owner:        broadcaster.address.String(),
+			DefaultIsm:   ismID,
+			LocalDomain:  localDomain,
+			DefaultHook:  nil,
+			RequiredHook: nil,
+		}
+
+		res := broadcaster.BroadcastTx(ctx, &msgCreateMailBox)
+		mailboxID = parseMailboxIDFromEvents(res.Events)
+
+		log.Printf("Created mailbox with ID: %s, now creating MerkleTreeHook\n", mailboxID)
+
+		// Create MerkleTreeHook with mailbox_id
+		msgCreateMerkleTreeHook := hooktypes.MsgCreateMerkleTreeHook{
+			Owner:     broadcaster.address.String(),
+			MailboxId: mailboxID,
+		}
+
+		res = broadcaster.BroadcastTx(ctx, &msgCreateMerkleTreeHook)
+		hooksID = parseMerkleTreeHookIDFromEvents(res.Events)
+
+		log.Printf("Created MerkleTreeHook with ID: %s, updating mailbox\n", hooksID)
+
+		// Update mailbox with the MerkleTreeHook
+		msgSetMailbox := coretypes.MsgSetMailbox{
+			Owner:             broadcaster.address.String(),
+			MailboxId:         mailboxID,
+			DefaultHook:       &hooksID,
+			RequiredHook:      &hooksID,
+			RenounceOwnership: false,
+		}
+
+		broadcaster.BroadcastTx(ctx, &msgSetMailbox)
+	} else {
+		// For non-multisig ISM, use NoopHook
+		log.Printf("Setting up with non-Multisig ISM - creating NoopHook\n")
+
+		msgCreateNoopHooks := hooktypes.MsgCreateNoopHook{
+			Owner: broadcaster.address.String(),
+		}
+
+		res := broadcaster.BroadcastTx(ctx, &msgCreateNoopHooks)
+		hooksID = parseHooksIDFromEvents(res.Events)
+
+		msgCreateMailBox := coretypes.MsgCreateMailbox{
+			Owner:        broadcaster.address.String(),
+			DefaultIsm:   ismID,
+			LocalDomain:  localDomain,
+			DefaultHook:  &hooksID,
+			RequiredHook: &hooksID,
+		}
+
+		res = broadcaster.BroadcastTx(ctx, &msgCreateMailBox)
+		mailboxID = parseMailboxIDFromEvents(res.Events)
 	}
-
-	res := broadcaster.BroadcastTx(ctx, &msgCreateNoopHooks)
-	hooksID := parseHooksIDFromEvents(res.Events)
-
-	msgCreateMailBox := coretypes.MsgCreateMailbox{
-		Owner:        broadcaster.address.String(),
-		DefaultIsm:   ismID,
-		LocalDomain:  69420,
-		DefaultHook:  &hooksID,
-		RequiredHook: &hooksID,
-	}
-
-	res = broadcaster.BroadcastTx(ctx, &msgCreateMailBox)
-	mailboxID := parseMailboxIDFromEvents(res.Events)
 
 	msgCreateCollateralToken := warptypes.MsgCreateCollateralToken{
 		Owner:         broadcaster.address.String(),
@@ -102,8 +148,8 @@ func SetupWithIsm(ctx context.Context, broadcaster *Broadcaster, ismID util.HexA
 		OriginDenom:   denom,
 	}
 
-	res = broadcaster.BroadcastTx(ctx, &msgCreateCollateralToken)
-	tokenID := parseCollateralTokenIDFromEvents(res.Events)
+	tokenRes := broadcaster.BroadcastTx(ctx, &msgCreateCollateralToken)
+	tokenID := parseCollateralTokenIDFromEvents(tokenRes.Events)
 
 	// set ism id on new collateral token (for some reason this can't be done on creation)
 	msgSetToken := warptypes.MsgSetToken{
