@@ -66,7 +66,7 @@ pub async fn start() -> Result<()> {
 }
 
 pub fn version() {
-    println!("version: {VERSION}");
+    info!("version: {VERSION}");
 }
 
 pub async fn query(query_cmd: QueryCommands) -> Result<()> {
@@ -77,13 +77,13 @@ pub async fn query(query_cmd: QueryCommands) -> Result<()> {
             let inner = response.into_inner();
 
             if let Some(proof) = inner.proof {
-                println!("Latest block proof:");
-                println!("  Height: {}", proof.celestia_height);
-                println!("  Proof size: {} bytes", proof.proof_data.len());
-                println!("  Public values size: {} bytes", proof.public_values.len());
-                println!("  Created at (Unix): {}", proof.created_at);
+                info!("Latest block proof:");
+                info!("  Height: {}", proof.celestia_height);
+                info!("  Proof size: {} bytes", proof.proof_data.len());
+                info!("  Public values size: {} bytes", proof.public_values.len());
+                info!("  Created at (Unix): {}", proof.created_at);
             } else {
-                println!("No proof data returned");
+                info!("No proof data returned");
             }
         }
         QueryCommands::Block { height, server } => {
@@ -95,13 +95,13 @@ pub async fn query(query_cmd: QueryCommands) -> Result<()> {
                 .await?;
 
             if let Some(proof) = response.into_inner().proof {
-                println!("Block proof for height {height}:");
-                println!("  Height: {}", proof.celestia_height);
-                println!("  Proof size: {} bytes", proof.proof_data.len());
-                println!("  Public values size: {} bytes", proof.public_values.len());
-                println!("  Created at (Unix): {}", proof.created_at);
+                info!("Block proof for height {height}:");
+                info!("  Height: {}", proof.celestia_height);
+                info!("  Proof size: {} bytes", proof.proof_data.len());
+                info!("  Public values size: {} bytes", proof.public_values.len());
+                info!("  Created at (Unix): {}", proof.created_at);
             } else {
-                println!("No proof data returned");
+                info!("No proof data returned");
             }
         }
         QueryCommands::BlockRange {
@@ -118,15 +118,15 @@ pub async fn query(query_cmd: QueryCommands) -> Result<()> {
                 .await?;
 
             let proofs = response.into_inner().proofs;
-            println!("Found {} block proof(s):\n", proofs.len());
+            info!("Found {} block proof(s):\n", proofs.len());
 
             for (i, proof) in proofs.iter().enumerate() {
-                println!("Proof {} of {}:", i + 1, proofs.len());
-                println!("  Height: {}", proof.celestia_height);
-                println!("  Proof size: {} bytes", proof.proof_data.len());
-                println!("  Public values size: {} bytes", proof.public_values.len());
-                println!("  Created at (Unix): {}", proof.created_at);
-                println!();
+                info!("Proof {} of {}:", i + 1, proofs.len());
+                info!("  Height: {}", proof.celestia_height);
+                info!("  Proof size: {} bytes", proof.proof_data.len());
+                info!("  Public values size: {} bytes", proof.public_values.len());
+                info!("  Created at (Unix): {}", proof.created_at);
+                info!("");
             }
         }
         QueryCommands::LatestMembership { server } => {
@@ -136,12 +136,12 @@ pub async fn query(query_cmd: QueryCommands) -> Result<()> {
                 .await?;
 
             if let Some(proof) = response.into_inner().proof {
-                println!("Latest membership proof:");
-                println!("  Proof size: {} bytes", proof.proof_data.len());
-                println!("  Public values size: {} bytes", proof.public_values.len());
-                println!("  Created at (Unix): {}", proof.created_at);
+                info!("Latest membership proof:");
+                info!("  Proof size: {} bytes", proof.proof_data.len());
+                info!("  Public values size: {} bytes", proof.public_values.len());
+                info!("  Created at (Unix): {}", proof.created_at);
             } else {
-                println!("No proof data returned");
+                info!("No proof data returned");
             }
         }
         QueryCommands::Membership { height, server } => {
@@ -151,12 +151,12 @@ pub async fn query(query_cmd: QueryCommands) -> Result<()> {
                 .await?;
 
             if let Some(proof) = response.into_inner().proof {
-                println!("Membership proof for height {height}:");
-                println!("  Proof size: {} bytes", proof.proof_data.len());
-                println!("  Public values size: {} bytes", proof.public_values.len());
-                println!("  Created at (Unix): {}", proof.created_at);
+                info!("Membership proof for height {height}:");
+                info!("  Proof size: {} bytes", proof.proof_data.len());
+                info!("  Public values size: {} bytes", proof.public_values.len());
+                info!("  Created at (Unix): {}", proof.created_at);
             } else {
-                println!("No proof data returned");
+                info!("No proof data returned");
             }
         }
         QueryCommands::RangeProofs {
@@ -173,15 +173,15 @@ pub async fn query(query_cmd: QueryCommands) -> Result<()> {
                 .await?;
 
             let proofs = response.into_inner().proofs;
-            println!("Found {} range proof(s):\n", proofs.len());
+            info!("Found {} range proof(s):\n", proofs.len());
 
             for (i, proof) in proofs.iter().enumerate() {
-                println!("Range Proof {} of {}:", i + 1, proofs.len());
-                println!("  Range: {} - {}", proof.start_height, proof.end_height);
-                println!("  Proof size: {} bytes", proof.proof_data.len());
-                println!("  Public values size: {} bytes", proof.public_values.len());
-                println!("  Created at (Unix): {}", proof.created_at);
-                println!();
+                info!("Range Proof {} of {}:", i + 1, proofs.len());
+                info!("  Range: {} - {}", proof.start_height, proof.end_height);
+                info!("  Proof size: {} bytes", proof.proof_data.len());
+                info!("  Public values size: {} bytes", proof.public_values.len());
+                info!("  Created at (Unix): {}", proof.created_at);
+                info!("");
             }
         }
     }
