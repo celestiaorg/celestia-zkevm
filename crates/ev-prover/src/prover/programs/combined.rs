@@ -188,7 +188,7 @@ impl EvCombinedProver {
 
             if trusted_celestia_height + BATCH_SIZE > latest_celestia_height {
                 let blocks_needed = (trusted_celestia_height + BATCH_SIZE).saturating_sub(latest_celestia_height);
-                warn!("Waiting for {blocks_needed} more blocks to reach required batch size");
+                debug!("Waiting for {blocks_needed} more blocks to reach required batch size");
                 sleep(Duration::from_secs(5)).await;
                 continue;
             }
