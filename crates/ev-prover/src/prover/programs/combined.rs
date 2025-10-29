@@ -249,6 +249,7 @@ impl EvCombinedProver {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn prepare_combined_inputs(
     celestia_client: &Client,
     evm_rpc: &str,
