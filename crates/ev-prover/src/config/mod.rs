@@ -20,7 +20,7 @@ pub struct Config {
     /// Configuration for outbound RPC connections (Celestia, EVM, etc.)
     pub rpc: RpcConfig,
 
-    /// Hex-encoded namespace ID for Celestia blob inclusion.
+    /// Namespace ID for Celestia blob inclusion.
     pub namespace: Namespace,
 
     /// Sequencer’s public key in hex.

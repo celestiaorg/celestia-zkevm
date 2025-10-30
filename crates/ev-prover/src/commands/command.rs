@@ -68,10 +68,10 @@ pub async fn create_zkism() -> Result<()> {
 
     let prover = ProverClient::builder().cpu().build();
     let (_, vk) = prover.setup(EV_COMBINED_ELF);
-    let state_transition_vkey = vk.hash_bytes().to_vec();
+    let state_transition_vkey = vk.bytes32_raw().to_vec();
 
     let (_, vk) = prover.setup(EV_HYPERLANE_ELF);
-    let state_membership_vkey = vk.hash_bytes().to_vec();
+    let state_membership_vkey = vk.bytes32_raw().to_vec();
 
     let groth16_vkey = Config::groth16_vkey();
 
@@ -130,7 +130,7 @@ async fn brute_force_head(celestia_client: &Client, namespace: Namespace) -> Res
                         break (state, blobs);
                     }
                     Ok(_) => {
-                        info!("No blobs at height {}, trying nexst height", current_height);
+                        info!("No blobs at height {}, trying next height", current_height);
                         search_height -= 1;
                     }
                     Err(e) => {
