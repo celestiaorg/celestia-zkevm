@@ -3,6 +3,9 @@ name = "ev-prover"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+combined = []
+
 [dependencies]
 alloy = { workspace = true }
 alloy-genesis = { workspace = true }
@@ -22,6 +25,7 @@ dotenvy = { workspace = true }
 ev-state-queries = { workspace = true }
 ev-types = { workspace = true, features = ["grpc"] }
 ev-zkevm-types = { workspace = true }
+eyre = { workspace = true }
 hex = { workspace = true }
 jsonrpsee-core = { workspace = true }
 nmt-rs = { workspace = true }

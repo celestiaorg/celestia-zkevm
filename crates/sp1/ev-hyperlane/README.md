@@ -3,7 +3,6 @@
 An SP1 program that verifies the existence of Hyperlane Messages against a given `state_root`.
 
 ### Program Inputs
-
 | Name | Type | Description |
 |---|---|---|
 | state_root | String | The state root of the execution client reth at the target height |

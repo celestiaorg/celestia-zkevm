@@ -2170,12 +2170,9 @@ dependencies = [
  "bech32",
  "bytes",
  "celestia-grpc",
- "celestia-types 0.15.0",
  "clap",
- "ed25519-dalek",
  "hex",
  "k256",
- "md5",
  "prost 0.13.5",
  "prost-types 0.13.5",
  "ripemd",
@@ -3267,6 +3264,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "ev-combined-program"
+version = "0.1.0"
+dependencies = [
+ "alloy-consensus",
+ "alloy-primitives",
+ "alloy-rlp",
+ "bincode",
+ "celestia-types 0.15.0",
+ "ed25519-dalek",
+ "ev-types",
+ "ev-zkevm-types",
+ "hex",
+ "nmt-rs",
+ "prost 0.12.6",
+ "reth-primitives",
+ "rsp-client-executor",
+ "serde",
+ "serde_cbor",
+ "sha2 0.10.9",
+ "sp1-zkvm",
+ "tendermint",
+ "tendermint-proto",
+]
+
+[[package]]
+name = "ev-combined-script"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "sp1-build",
+ "sp1-sdk",
+]
+
+[[package]]
 name = "ev-exec-program"
 version = "0.1.0"
 dependencies = [
@@ -3382,6 +3413,7 @@ dependencies = [
  "ev-state-queries",
  "ev-types",
  "ev-zkevm-types",
+ "eyre",
  "hex",
  "jsonrpsee-core",
  "nmt-rs",
@@ -3490,6 +3522,7 @@ dependencies = [
 name = "ev-zkevm-types"
 version = "0.1.0"
 dependencies = [
+ "alloy-consensus",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-rpc-types",
@@ -3497,11 +3530,19 @@ dependencies = [
  "alloy-trie",
  "anyhow",
  "bincode",
+ "bytes",
  "celestia-types 0.15.0",
+ "ed25519-dalek",
+ "ev-types",
  "hex",
+ "nmt-rs",
+ "prost 0.12.6",
+ "reth-primitives",
  "rsp-client-executor",
  "serde",
+ "serde_cbor",
  "sha3",
+ "tendermint",
 ]
 
 [[package]]
@@ -5089,12 +5130,6 @@ name = "matchit"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
-
-[[package]]
-name = "md5"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
 
 [[package]]
 name = "memchr"

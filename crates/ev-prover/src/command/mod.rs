@@ -1,8 +1,5 @@
-use std::{env, fs};
-
-use crate::get_sequencer_pubkey;
 use alloy_provider::{Provider, ProviderBuilder};
-use anyhow::{bail, Result};
+use anyhow::Result;
 use celestia_grpc_client::proto::celestia::zkism::v1::MsgCreateZkExecutionIsm;
 use celestia_grpc_client::proto::hyperlane::warp::v1::MsgSetToken;
 use celestia_grpc_client::types::ClientConfig;
@@ -12,10 +9,14 @@ use celestia_types::nmt::Namespace;
 use celestia_types::{Blob, ExtendedHeader};
 use ev_types::v1::SignedData;
 use prost::Message;
+use sp1_sdk::{HashableKey, Prover, ProverClient};
 use tracing::info;
 
-use crate::command::cli::VERSION;
-use crate::config::config::{Config, APP_HOME, CONFIG_DIR, CONFIG_FILE, DEFAULT_GENESIS_JSON, GENESIS_FILE};
+use crate::commands::cli::VERSION;
+use crate::config::Config;
+use crate::get_sequencer_pubkey;
+use crate::prover::programs::combined::EV_COMBINED_ELF;
+use crate::prover::programs::message::EV_HYPERLANE_ELF;
 use crate::server::start_server;
 use storage::proofs::{ProofStorage, RocksDbProofStorage};
 
@@ -23,52 +24,13 @@ pub mod cli;
 pub use cli::{Cli, Commands};
 
 pub fn init() -> Result<()> {
-    let home_dir = dirs::home_dir().expect("cannot find home directory").join(APP_HOME);
-
-    if !home_dir.exists() {
-        info!("creating home directory at {home_dir:?}");
-        fs::create_dir_all(&home_dir)?;
-    }
-
-    let config_dir = home_dir.join(CONFIG_DIR);
-    if !config_dir.exists() {
-        fs::create_dir_all(&config_dir)?;
-    }
-
-    let config_path = config_dir.join(CONFIG_FILE);
-    if !config_path.exists() {
-        info!("creating default config at {config_path:?}");
-        let config = Config::default();
-        let yaml = serde_yaml::to_string(&config)?;
-        fs::write(config_path, yaml)?;
-    } else {
-        info!("config file already exists at {config_path:?}");
-    }
-
-    let genesis_path = config_dir.join(GENESIS_FILE);
-    if !genesis_path.exists() {
-        info!("writing embedded genesis to {genesis_path:?}");
-        fs::write(&genesis_path, DEFAULT_GENESIS_JSON)?;
-    }
+    Config::init()?;
 
     Ok(())
 }
 
 pub async fn start() -> Result<()> {
-    let config_path = dirs::home_dir()
-        .expect("cannot find home directory")
-        .join(APP_HOME)
-        .join(CONFIG_DIR)
-        .join(CONFIG_FILE);
-
-    if !config_path.exists() {
-        bail!("config file not found at {}", config_path.display());
-    }
-
-    info!("reading config file at {}", config_path.display());
-    let config_yaml = fs::read_to_string(&config_path)?;
-    let config: Config = serde_yaml::from_str(&config_yaml)?;
-
+    let config = Config::load()?;
     info!("starting gRPC server at {}", config.grpc_address);
     start_server(config).await?;
 
@@ -90,28 +52,25 @@ pub fn unsafe_reset_db() -> Result<()> {
 }
 
 pub async fn create_zkism() -> Result<()> {
-    let celestia_rpc_url = env::var("CELESTIA_RPC_URL")?;
-    let reth_rpc_url = env::var("RETH_RPC_URL")?;
-    let sequencer_rpc_url = env::var("SEQUENCER_RPC_URL")?;
-    let namespace_hex = env::var("CELESTIA_NAMESPACE")?;
-    let config = ClientConfig::from_env()?;
-    let ism_client = CelestiaIsmClient::new(config).await?;
-    let celestia_client = Client::new(&celestia_rpc_url, None).await?;
-    let namespace: Namespace = Namespace::new_v0(&hex::decode(namespace_hex)?).unwrap();
+    let config = Config::load()?;
+    let ism_client = CelestiaIsmClient::new(ClientConfig::from_env()?).await?;
+
+    let celestia_client = Client::new(&config.rpc.celestia_rpc, None).await?;
+    let namespace = config.namespace;
 
     // Find a Celestia height with at least one blob (brute force backwards starting from head)
-    let (celestia_state, blobs) = brute_force_head(&celestia_client, namespace).await?;
+    let (header, blobs) = brute_force_head(&celestia_client, namespace).await?;
     // DA HEIGHT
-    let height: u64 = celestia_state.height().value();
+    let height: u64 = header.height().value();
     // DA BLOCK HASH
-    let block_hash = celestia_state.hash().as_bytes().to_vec();
+    let block_hash = header.hash().as_bytes().to_vec();
     let last_blob = blobs.last().expect("User Error: Can't use a 0-blob checkpoint");
     let data = SignedData::decode(last_blob.data.as_slice())?;
 
     // EV BLOCK HEIGHT
     let last_blob_height = data.data.unwrap().metadata.unwrap().height;
 
-    let provider = ProviderBuilder::new().connect_http(reth_rpc_url.parse()?);
+    let provider = ProviderBuilder::new().connect_http(config.rpc.evreth_rpc.parse()?);
 
     let block = provider
         .get_block(alloy_rpc_types::BlockId::Number(
@@ -123,11 +82,16 @@ pub async fn create_zkism() -> Result<()> {
     // EV STATE ROOT
     let last_blob_state_root = block.header.state_root;
     // todo: deploy the ISM and Update
-    let pub_key = get_sequencer_pubkey(sequencer_rpc_url).await?;
+    let pub_key = get_sequencer_pubkey(config.rpc.evnode_rpc).await?;
 
-    let ev_hyperlane_vkey = fs::read("testdata/vkeys/ev-hyperlane-vkey-hash")?;
-    let ev_combined_vkey = fs::read("testdata/vkeys/ev-range-exec-vkey-hash")?;
-    let groth16_vkey = fs::read("testdata/vkeys/groth16_vk.bin")?;
+    let prover = ProverClient::builder().cpu().build();
+    let (_, vk) = prover.setup(EV_COMBINED_ELF);
+    let state_transition_vkey = vk.bytes32_raw().to_vec();
+
+    let (_, vk) = prover.setup(EV_HYPERLANE_ELF);
+    let state_membership_vkey = vk.bytes32_raw().to_vec();
+
+    let groth16_vkey = Config::groth16_vkey();
 
     let create_message = MsgCreateZkExecutionIsm {
         creator: ism_client.signer_address().to_string(),
@@ -138,8 +102,8 @@ pub async fn create_zkism() -> Result<()> {
         namespace: namespace.as_bytes().to_vec(),
         sequencer_public_key: pub_key,
         groth16_vkey,
-        state_transition_vkey: hex::decode(&ev_combined_vkey[2..]).unwrap(),
-        state_membership_vkey: hex::decode(&ev_hyperlane_vkey[2..]).unwrap(),
+        state_transition_vkey,
+        state_membership_vkey,
     };
 
     let response = ism_client.send_tx(create_message).await?;
@@ -184,7 +148,7 @@ async fn brute_force_head(celestia_client: &Client, namespace: Namespace) -> Res
                         break (state, blobs);
                     }
                     Ok(_) => {
-                        info!("No blobs at height {}, trying nexst height", current_height);
+                        info!("No blobs at height {}, trying next height", current_height);
                         search_height -= 1;
                     }
                     Err(e) => {
