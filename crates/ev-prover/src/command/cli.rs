@@ -25,4 +25,6 @@ pub enum Commands {
 
     /// Show the service version
     Version {},
+    /// Reset all database state in the local data directory
+    UnsafeResetDb {},
 }

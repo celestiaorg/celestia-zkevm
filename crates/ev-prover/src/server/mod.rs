@@ -65,12 +65,7 @@ pub async fn start_server(config: Config) -> Result<()> {
     debug!("Successfully got trusted state from ism: {}", trusted_state);
 
     // Initialize RocksDB storage in the default data directory
-    let storage_path = dirs::home_dir()
-        .expect("cannot find home directory")
-        .join(Config::APP_HOME)
-        .join("data")
-        .join("proofs.db");
-
+    let storage_path = Config::storage_path().join("proofs.db");
     let storage = Arc::new(RocksDbProofStorage::new(storage_path)?);
     // shared resources
     let config = ClientConfig::from_env()?;
@@ -129,16 +124,8 @@ pub async fn start_server(config: Config) -> Result<()> {
 
     // Always spawn message prover
     tokio::spawn({
-        let message_storage_path = dirs::home_dir()
-            .expect("cannot find home directory")
-            .join(Config::APP_HOME)
-            .join("data")
-            .join("messages.db");
-        let snapshot_storage_path = dirs::home_dir()
-            .expect("cannot find home directory")
-            .join(Config::APP_HOME)
-            .join("data")
-            .join("snapshots.db");
+        let message_storage_path = Config::storage_path().join("messages.db");
+        let snapshot_storage_path = Config::storage_path().join("snapshots.db");
         let hyperlane_message_store = Arc::new(HyperlaneMessageStore::new(message_storage_path).unwrap());
         let hyperlane_snapshot_store = Arc::new(HyperlaneSnapshotStore::new(snapshot_storage_path, None).unwrap());
 

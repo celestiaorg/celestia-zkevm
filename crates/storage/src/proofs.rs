@@ -108,6 +108,8 @@ pub trait ProofStorage: Send + Sync {
 
     #[allow(dead_code)]
     async fn get_latest_block_proof(&self) -> Result<Option<StoredBlockProof>, ProofStorageError>;
+
+    fn unsafe_reset(&mut self) -> Result<(), ProofStorageError>;
 }
 
 pub struct RocksDbProofStorage {
@@ -359,6 +361,28 @@ impl ProofStorage for RocksDbProofStorage {
         }
         Ok(None)
     }
+
+    fn unsafe_reset(&mut self) -> Result<(), ProofStorageError> {
+        let db = Arc::get_mut(&mut self.db).ok_or_else(|| ProofStorageError::General(anyhow!("storage is shared")))?;
+
+        let mut opts = Options::default();
+        opts.create_if_missing(true);
+        opts.create_missing_column_families(true);
+
+        let cfs = vec![
+            ColumnFamilyDescriptor::new(CF_BLOCK_PROOFS, Options::default()),
+            ColumnFamilyDescriptor::new(CF_RANGE_PROOFS, Options::default()),
+            ColumnFamilyDescriptor::new(CF_MEMBERSHIP_PROOFS, Options::default()),
+            ColumnFamilyDescriptor::new(CF_METADATA, Options::default()),
+        ];
+
+        for cf in cfs {
+            db.drop_cf(cf.name()).ok();
+            db.create_cf(cf.name(), &opts).ok();
+        }
+
+        Ok(())
+    }
 }
 
 /// Testing utilities for ProofStorage implementations.
@@ -541,6 +565,14 @@ pub mod testing {
                 Some(height) => Ok(Some(self.block_proofs.lock().unwrap()[&height].clone())),
                 None => Ok(None),
             }
+        }
+
+        fn unsafe_reset(&mut self) -> Result<(), ProofStorageError> {
+            self.block_proofs.lock().unwrap().clear();
+            self.membership_proofs.lock().unwrap().clear();
+            self.range_proofs.lock().unwrap().clear();
+            *self.range_cursor.lock().unwrap() = None;
+            Ok(())
         }
     }
 }

@@ -12,12 +12,16 @@ use prost::Message;
 use sp1_sdk::{HashableKey, Prover, ProverClient};
 use tracing::info;
 
-use crate::commands::cli::VERSION;
+use crate::command::cli::VERSION;
 use crate::config::Config;
 use crate::get_sequencer_pubkey;
 use crate::prover::programs::combined::EV_COMBINED_ELF;
 use crate::prover::programs::message::EV_HYPERLANE_ELF;
 use crate::server::start_server;
+use storage::proofs::{ProofStorage, RocksDbProofStorage};
+
+pub mod cli;
+pub use cli::{Cli, Commands};
 
 pub fn init() -> Result<()> {
     Config::init()?;
@@ -30,6 +34,15 @@ pub async fn start() -> Result<()> {
     info!("starting gRPC server at {}", config.grpc_address);
     start_server(config).await?;
 
+    Ok(())
+}
+
+pub fn unsafe_reset_db() -> Result<()> {
+    let storage_path = Config::storage_path().join("proofs.db");
+    info!("resetting db state at {}", storage_path.display());
+
+    let mut storage = RocksDbProofStorage::new(storage_path)?;
+    storage.unsafe_reset()?;
     Ok(())
 }
 
@@ -114,7 +127,7 @@ pub async fn update_ism(ism_id: String, token_id: String) -> Result<()> {
 }
 
 pub fn version() {
-    println!("version: {VERSION}");
+    info!("version: {VERSION}");
 }
 
 async fn brute_force_head(celestia_client: &Client, namespace: Namespace) -> Result<(ExtendedHeader, Vec<Blob>)> {

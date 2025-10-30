@@ -80,6 +80,8 @@ impl Config {
     pub const CONFIG_DIR: &str = "config";
     /// The default configuration file in YAML format.
     pub const CONFIG_FILE: &str = "config.yaml";
+    /// The default data directory.
+    pub const DATA_DIR: &str = "data";
     /// The chain genesis file.
     pub const GENESIS_FILE: &str = "genesis.json";
     /// Default chain genesis file used for testing purposes.
@@ -131,6 +133,13 @@ impl Config {
             .join(Self::APP_HOME)
             .join(Self::CONFIG_DIR)
             .join(Self::GENESIS_FILE)
+    }
+
+    pub fn storage_path() -> PathBuf {
+        dirs::home_dir()
+            .expect("cannot find home directory")
+            .join(Self::APP_HOME)
+            .join(Self::DATA_DIR)
     }
 
     /// Returns the groth16 verifiying key.
