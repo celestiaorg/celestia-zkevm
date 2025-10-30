@@ -37,7 +37,8 @@ use crate::prover::{prover_from_env, SP1Prover};
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_COMBINED_ELF: &[u8] = include_elf!("ev-combined-program");
 // hardcoded batch size for now
-pub const BATCH_SIZE: u64 = 50;
+pub const BATCH_SIZE: u64 = 1000;
+pub const MIN_BATCH_SIZE: u64 = 10;
 pub const WARN_DISTANCE: u64 = 60;
 
 pub struct AppContext {
@@ -163,6 +164,12 @@ impl EvCombinedProver {
         let client = Client::new(&self.app.celestia_rpc, None).await?;
         let sequencer_rpc_url = std::env::var("SEQUENCER_RPC_URL").expect("SEQUENCER_RPC_URL must be set");
         let mut known_celestia_height: u64 = 0;
+        let mut dynamic_batch_size: u64 = BATCH_SIZE;
+        let resp = ism_client.ism(QueryIsmRequest { id: ISM_ID.to_string() }).await?;
+        let ism = resp.ism.ok_or_else(|| anyhow::anyhow!("ZKISM not found"))?;
+        let mut range_head: u64 = ism.celestia_height;
+        let namespace_hex = env::var("CELESTIA_NAMESPACE")?;
+        let namespace = Namespace::new_v0(&hex::decode(namespace_hex)?)?;
         let (genesis, chain_spec) = AppContext::load_genesis_and_chainspec()?;
 
         loop {
@@ -185,7 +192,16 @@ impl EvCombinedProver {
                 continue;
             }
 
-            if trusted_celestia_height + BATCH_SIZE > latest_celestia_height {
+            for height in range_head..latest_celestia_height {
+                if !is_empty_block(&client, height, namespace.clone()).await? {
+                    dynamic_batch_size = MIN_BATCH_SIZE;
+                    debug!(
+                        "Found non-empty block at height {height}, setting dynamic batch size to {dynamic_batch_size}"
+                    );
+                    break;
+                }
+            }
+            if trusted_celestia_height + dynamic_batch_size > latest_celestia_height {
                 let blocks_needed = (trusted_celestia_height + BATCH_SIZE).saturating_sub(latest_celestia_height);
                 debug!("Waiting for {blocks_needed} more blocks to reach required batch size");
                 sleep(Duration::from_secs(5)).await;
@@ -193,7 +209,6 @@ impl EvCombinedProver {
             }
 
             let distance = latest_celestia_height.saturating_sub(trusted_celestia_height);
-
             if distance >= WARN_DISTANCE {
                 warn!("Prover is {distance} blocks behind Celestia head");
             } else {
@@ -207,6 +222,7 @@ impl EvCombinedProver {
                 celestia_start_height,
                 &mut trusted_height,
                 BATCH_SIZE,
+                namespace.clone(),
                 &mut trusted_root,
                 &sequencer_rpc_url,
                 genesis.clone(),
@@ -227,13 +243,18 @@ impl EvCombinedProver {
                 proof.public_values.as_slice().to_vec(),
                 ism_client.signer_address().to_string(),
             );
+
             info!("Updating ZKISM on Celestia...");
             let response = ism_client.send_tx(block_proof_msg).await?;
             assert!(response.success);
             info!("[Done] ZKISM was updated successfully");
             let public_values: BlockRangeExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
             known_celestia_height = public_values.celestia_height;
+
             *is_proving_messages.lock().await = true;
+            range_head = latest_celestia_height;
+            dynamic_batch_size = BATCH_SIZE;
+
             // use shared channel to request message proof for new height and root
             self.range_tx
                 .send(RangeProofCommitted {
@@ -252,13 +273,12 @@ async fn prepare_combined_inputs(
     start_height: u64,
     trusted_height: &mut u64,
     num_blocks: u64,
+    namespace: Namespace,
     trusted_root: &mut FixedBytes<32>,
     sequencer_rpc_url: &str,
     genesis: Genesis,
     chain_spec: Arc<ChainSpec>,
 ) -> Result<SP1Stdin> {
-    let namespace_hex = env::var("CELESTIA_NAMESPACE")?;
-    let namespace = Namespace::new_v0(&hex::decode(namespace_hex)?)?;
     let pub_key = get_sequencer_pubkey(sequencer_rpc_url.to_string()).await?;
     let mut block_inputs: Vec<BlockExecInput> = Vec::new();
     for block_number in start_height..=(start_height + num_blocks) {
@@ -300,7 +320,7 @@ pub async fn get_block_inputs(
     let blobs: Vec<Blob> = celestia_client
         .blob_get_all(block_number, &[namespace])
         .await?
-        .unwrap_or_default();
+        .ok_or_else(|| anyhow!("Failed to get blobs for block: {}", block_number))?;
     debug!("Got {} blobs for block: {}", blobs.len(), block_number);
 
     let extended_header = celestia_client.header_get_by_height(block_number).await?;
@@ -377,4 +397,23 @@ pub async fn get_block_inputs(
     );
 
     Ok(input)
+}
+
+async fn is_empty_block(celestia_client: &Client, block_number: u64, namespace: Namespace) -> Result<bool> {
+    let blobs: Vec<Blob> = celestia_client
+        .blob_get_all(block_number, &[namespace])
+        .await?
+        .ok_or_else(|| anyhow!("Failed to get blobs for block: {}", block_number))?;
+    let extended_header = celestia_client.header_get_by_height(block_number).await?;
+    let namespace_data = celestia_client
+        .share_get_namespace_data(&extended_header, namespace)
+        .await?;
+    let mut proofs: Vec<NamespaceProof> = Vec::new();
+    for row in namespace_data.rows {
+        proofs.push(row.proof);
+    }
+    if !blobs.is_empty() {
+        return Ok(false);
+    }
+    Ok(true)
 }
