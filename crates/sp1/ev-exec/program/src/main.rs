@@ -32,11 +32,11 @@
 //! - Public Key
 #![no_main]
 
-use ev_zkevm_types::programs::block::{verify_block, BlockExecInput};
+use ev_zkevm_types::programs::block::{BlockExecInput, BlockVerifier};
 sp1_zkvm::entrypoint!(main);
 
 pub fn main() {
     let inputs: BlockExecInput = sp1_zkvm::io::read::<BlockExecInput>();
-    let output = verify_block(inputs).expect("failed to verify block");
+    let output = BlockVerifier::verify_block(inputs).expect("failed to verify block");
     sp1_zkvm::io::commit(&output);
 }
