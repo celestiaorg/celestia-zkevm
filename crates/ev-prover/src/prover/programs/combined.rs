@@ -201,8 +201,10 @@ impl EvCombinedProver {
                     break;
                 }
             }
+
             if trusted_celestia_height + dynamic_batch_size > latest_celestia_height {
-                let blocks_needed = (trusted_celestia_height + BATCH_SIZE).saturating_sub(latest_celestia_height);
+                let blocks_needed =
+                    (trusted_celestia_height + dynamic_batch_size).saturating_sub(latest_celestia_height);
                 debug!("Waiting for {blocks_needed} more blocks to reach required batch size");
                 sleep(Duration::from_secs(5)).await;
                 continue;
@@ -216,12 +218,13 @@ impl EvCombinedProver {
             }
 
             let celestia_start_height = ism.celestia_height + 1;
+            info!("Preparing combined inputs for blocks from {celestia_start_height} to {latest_celestia_height}");
             let stdin = prepare_combined_inputs(
                 &client,
                 &self.app.evm_rpc,
                 celestia_start_height,
                 &mut trusted_height,
-                BATCH_SIZE,
+                dynamic_batch_size,
                 namespace.clone(),
                 &mut trusted_root,
                 &sequencer_rpc_url,
@@ -296,6 +299,7 @@ async fn prepare_combined_inputs(
             )
             .await?,
         );
+        debug!("Prepared input for block {block_number}");
     }
 
     // reinitialize the prover client
@@ -321,7 +325,6 @@ pub async fn get_block_inputs(
         .blob_get_all(block_number, &[namespace])
         .await?
         .unwrap_or_default();
-    debug!("Got {} blobs for block: {}", blobs.len(), block_number);
 
     let extended_header = celestia_client.header_get_by_height(block_number).await?;
     let namespace_data = celestia_client
@@ -331,14 +334,9 @@ pub async fn get_block_inputs(
     for row in namespace_data.rows {
         proofs.push(row.proof);
     }
-    debug!("Got NamespaceProofs, total: {}", proofs.len());
 
     let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
     if blobs.is_empty() {
-        debug!(
-            "No blobs for Celestia height {}, keeping trusted_height={} and trusted_root unchanged",
-            block_number, trusted_height
-        );
         return Ok(BlockExecInput {
             header_raw: serde_cbor::to_vec(&extended_header.header)?,
             dah: extended_header.dah,
