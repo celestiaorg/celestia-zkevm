@@ -39,7 +39,7 @@ pub const EV_COMBINED_ELF: &[u8] = include_elf!("ev-combined-program");
 // hardcoded batch size for now
 pub const BATCH_SIZE: u64 = 1000;
 pub const MIN_BATCH_SIZE: u64 = 10;
-pub const WARN_DISTANCE: u64 = 60;
+pub const WARN_DISTANCE: u64 = 1500;
 
 pub struct AppContext {
     // reth http, for example http://127.0.0.1:8545
