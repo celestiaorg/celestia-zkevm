@@ -209,27 +209,27 @@ impl Default for Buffer {
 pub struct BlockVerifier;
 
 impl BlockVerifier {
-    pub fn verify_block(inputs: BlockExecInput) -> Result<BlockExecOutput, Box<dyn Error>> {
+    pub fn verify_block(input: BlockExecInput) -> Result<BlockExecOutput, Box<dyn Error>> {
         let celestia_header: Header =
-            serde_cbor::from_slice(&inputs.header_raw).expect("failed to deserialize celestia header");
-        let blobs: Vec<Blob> = serde_cbor::from_slice(&inputs.blobs_raw).expect("failed to deserialize blob data");
+            serde_cbor::from_slice(&input.header_raw).expect("failed to deserialize celestia header");
+        let blobs: Vec<Blob> = serde_cbor::from_slice(&input.blobs_raw).expect("failed to deserialize blob data");
 
         assert_eq!(
             celestia_header.data_hash.unwrap(),
-            inputs.dah.hash(),
+            input.dah.hash(),
             "DataHash mismatch for DataAvailabilityHeader"
         );
 
         let mut roots = Vec::<&NamespacedHash>::new();
-        for row_root in inputs.dah.row_roots() {
-            if row_root.contains::<NamespacedSha2Hasher<29>>(inputs.namespace.into()) {
+        for row_root in input.dah.row_roots() {
+            if row_root.contains::<NamespacedSha2Hasher<29>>(input.namespace.into()) {
                 roots.push(row_root);
             }
         }
 
         assert_eq!(
             roots.len(),
-            inputs.proofs.len(),
+            input.proofs.len(),
             "Number of proofs must equal the number of row roots"
         );
 
@@ -248,10 +248,10 @@ impl BlockVerifier {
             .collect();
 
         let mut cursor = 0;
-        for (proof, root) in inputs.proofs.iter().zip(roots) {
+        for (proof, root) in input.proofs.iter().zip(roots) {
             if proof.is_of_absence() {
                 proof
-                    .verify_complete_namespace(root, EMPTY_LEAVES, inputs.namespace.into())
+                    .verify_complete_namespace(root, EMPTY_LEAVES, input.namespace.into())
                     .expect("Failed to verify proof");
                 break;
             }
@@ -261,24 +261,24 @@ impl BlockVerifier {
             let raw_leaves = &blob_data[cursor..end];
 
             proof
-                .verify_complete_namespace(root, raw_leaves, inputs.namespace.into())
+                .verify_complete_namespace(root, raw_leaves, input.namespace.into())
                 .expect("Failed to verify proof");
 
             cursor = end;
         }
 
-        let mut headers = Vec::with_capacity(inputs.executor_inputs.len());
+        let mut headers = Vec::with_capacity(input.executor_inputs.len());
         if headers.capacity() != 0 {
-            let first_input = inputs.executor_inputs.first().unwrap();
+            let first_input = input.executor_inputs.first().unwrap();
 
             assert_eq!(
-                inputs.trusted_root,
+                input.trusted_root,
                 first_input.state_anchor(),
                 "State anchor must be equal to trusted root"
             );
 
             assert!(
-                inputs.trusted_height <= first_input.parent_header().number(),
+                input.trusted_height <= first_input.parent_header().number(),
                 "Trusted height must be less than or equal to parent header height",
             );
 
@@ -287,7 +287,7 @@ impl BlockVerifier {
                 first_input.custom_beneficiary,
             );
 
-            for input in &inputs.executor_inputs {
+            for input in &input.executor_inputs {
                 let header = executor.execute(input.clone()).expect("EVM block execution failed");
                 headers.push(header);
             }
@@ -303,12 +303,12 @@ impl BlockVerifier {
             let signer = sd.signer.as_ref().expect("SignedData must contain signer");
 
             // NOTE: Trim 4 byte Protobuf encoding prefix
-            if signer.pub_key[4..] != inputs.pub_key {
+            if signer.pub_key[4..] != input.pub_key {
                 continue;
             }
 
             let data_bytes = sd.data.as_ref().expect("SignedData must contain data").encode_to_vec();
-            Self::verify_ed25519(&inputs.pub_key, &data_bytes, &sd.signature)
+            Self::verify_ed25519(&input.pub_key, &data_bytes, &sd.signature)
                 .expect("Sequencer signature verification failed");
 
             tx_data.push(sd.data.unwrap());
@@ -341,8 +341,8 @@ impl BlockVerifier {
             );
         }
 
-        let new_height: u64 = headers.last().map(|h| h.number).unwrap_or(inputs.trusted_height);
-        let new_state_root: B256 = headers.last().map(|h| h.state_root).unwrap_or(inputs.trusted_root);
+        let new_height: u64 = headers.last().map(|h| h.number).unwrap_or(input.trusted_height);
+        let new_state_root: B256 = headers.last().map(|h| h.state_root).unwrap_or(input.trusted_root);
 
         let output = BlockExecOutput {
             celestia_header_hash: celestia_header
@@ -360,17 +360,17 @@ impl BlockVerifier {
                 .expect("prev_celestia_header_hash must be exactly 32 bytes"),
             new_height,
             new_state_root: new_state_root.into(),
-            prev_height: inputs.trusted_height,
-            prev_state_root: inputs.trusted_root.into(),
-            namespace: inputs.namespace,
-            public_key: inputs.pub_key.try_into().expect("public key must be exactly 32 bytes"),
+            prev_height: input.trusted_height,
+            prev_state_root: input.trusted_root.into(),
+            namespace: input.namespace,
+            public_key: input.pub_key.try_into().expect("public key must be exactly 32 bytes"),
         };
         Ok(output)
     }
 
-    pub fn verify_range(inputs: EvCombinedInput) -> Result<BlockRangeExecOutput, Box<dyn Error>> {
+    pub fn verify_range(inputs: Vec<BlockExecInput>) -> Result<BlockRangeExecOutput, Box<dyn Error>> {
         let mut outputs: Vec<BlockExecOutput> = Vec::new();
-        for block in inputs.blocks {
+        for block in inputs {
             outputs.push(Self::verify_block(block)?);
         }
 

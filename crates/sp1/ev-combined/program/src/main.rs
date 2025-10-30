@@ -35,7 +35,7 @@ sp1_zkvm::entrypoint!(main);
 use ev_zkevm_types::programs::block::{BlockVerifier, EvCombinedInput};
 
 pub fn main() {
-    let inputs: EvCombinedInput = sp1_zkvm::io::read::<EvCombinedInput>();
-    let output = BlockVerifier::verify_range(inputs).expect("failed to verify range");
+    let input: EvCombinedInput = sp1_zkvm::io::read::<EvCombinedInput>();
+    let output = BlockVerifier::verify_range(input.blocks).expect("failed to verify range");
     sp1_zkvm::io::commit(&output);
 }
