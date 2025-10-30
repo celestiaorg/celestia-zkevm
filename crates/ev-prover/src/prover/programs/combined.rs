@@ -224,7 +224,7 @@ impl EvCombinedProver {
                 &self.app.evm_rpc,
                 celestia_start_height,
                 &mut trusted_height,
-                dynamic_batch_size,
+                latest_celestia_height - celestia_start_height,
                 namespace.clone(),
                 &mut trusted_root,
                 &sequencer_rpc_url,
