@@ -85,7 +85,7 @@ impl Config {
     /// Default chain genesis file used for testing purposes.
     const DEFAULT_GENESIS_JSON: &str = include_str!("../../resources/genesis.json");
     /// The groth16 verifier key.
-    // const GROTH16VK:
+    const GROTH16_VK: &[u8] = include_bytes!("../../resources/groth16_vk.bin");
 
     /// Initializes the local configuration directory and writes default files if missing.
     pub fn init() -> Result<()> {
@@ -135,6 +135,11 @@ impl Config {
             .join(Self::GENESIS_FILE);
 
         genesis_path
+    }
+
+    /// Returns the groth16 verifiying key.
+    pub fn groth16_vkey() -> Vec<u8> {
+        Self::GROTH16_VK.to_vec()
     }
 
     /// Loads the application config from the service home directory.

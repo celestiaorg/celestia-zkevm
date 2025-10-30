@@ -1,8 +1,3 @@
-use std::fs;
-
-use crate::get_sequencer_pubkey;
-use crate::prover::programs::combined::EV_COMBINED_ELF;
-use crate::prover::programs::message::EV_HYPERLANE_ELF;
 use alloy_provider::{Provider, ProviderBuilder};
 use anyhow::Result;
 use celestia_grpc_client::proto::celestia::zkism::v1::MsgCreateZkExecutionIsm;
@@ -14,12 +9,14 @@ use celestia_types::nmt::Namespace;
 use celestia_types::{Blob, ExtendedHeader};
 use ev_types::v1::SignedData;
 use prost::Message;
-use sp1_sdk::client::ProverClientBuilder;
 use sp1_sdk::{HashableKey, Prover, ProverClient};
 use tracing::info;
 
 use crate::commands::cli::VERSION;
 use crate::config::Config;
+use crate::get_sequencer_pubkey;
+use crate::prover::programs::combined::EV_COMBINED_ELF;
+use crate::prover::programs::message::EV_HYPERLANE_ELF;
 use crate::server::start_server;
 
 pub fn init() -> Result<()> {
@@ -76,8 +73,7 @@ pub async fn create_zkism() -> Result<()> {
     let (_, vk) = prover.setup(EV_HYPERLANE_ELF);
     let state_membership_vkey = vk.hash_bytes().to_vec();
 
-    // TODO:
-    let groth16_vkey = fs::read("testdata/vkeys/groth16_vk.bin")?;
+    let groth16_vkey = Config::groth16_vkey();
 
     let create_message = MsgCreateZkExecutionIsm {
         creator: ism_client.signer_address().to_string(),
