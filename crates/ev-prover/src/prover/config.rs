@@ -4,6 +4,10 @@ use std::sync::Arc;
 use sp1_sdk::{SP1ProofMode, SP1ProvingKey, SP1VerifyingKey};
 use tracing::warn;
 
+pub const BATCH_SIZE: u64 = 1000;
+pub const MIN_BATCH_SIZE: u64 = 10;
+pub const WARN_DISTANCE: u64 = 1500;
+
 /// ProverConfig defines a core capability trait for configs used by a ProgramProver.
 pub trait ProverConfig {
     fn pk(&self) -> Arc<SP1ProvingKey>;
