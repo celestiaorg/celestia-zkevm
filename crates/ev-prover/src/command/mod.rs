@@ -38,12 +38,7 @@ pub async fn start() -> Result<()> {
 }
 
 pub fn unsafe_reset_db() -> Result<()> {
-    let storage_path = dirs::home_dir()
-        .expect("cannot find home directory")
-        .join(Config::APP_HOME)
-        .join("data")
-        .join("proofs.db");
-
+    let storage_path = Config::storage_path().join("proofs.db");
     info!("resetting db state at {}", storage_path.display());
 
     let mut storage = RocksDbProofStorage::new(storage_path)?;
