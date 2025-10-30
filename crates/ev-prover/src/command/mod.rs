@@ -12,9 +12,14 @@ use prost::Message;
 use sp1_sdk::{HashableKey, Prover, ProverClient};
 use tracing::info;
 
-use crate::command::cli::VERSION;
+use crate::command::cli::{QueryCommands, VERSION};
 use crate::config::Config;
 use crate::get_sequencer_pubkey;
+use crate::proto::celestia::prover::v1::prover_client::ProverClient as GrpcProverClient;
+use crate::proto::celestia::prover::v1::{
+    GetBlockProofRequest, GetBlockProofsInRangeRequest, GetLatestBlockProofRequest, GetLatestMembershipProofRequest,
+    GetMembershipProofRequest, GetRangeProofsRequest,
+};
 use crate::prover::programs::combined::EV_COMBINED_ELF;
 use crate::prover::programs::message::EV_HYPERLANE_ELF;
 use crate::server::start_server;
@@ -128,6 +133,126 @@ pub async fn update_ism(ism_id: String, token_id: String) -> Result<()> {
 
 pub fn version() {
     info!("version: {VERSION}");
+}
+
+pub async fn query(query_cmd: QueryCommands) -> Result<()> {
+    match query_cmd {
+        QueryCommands::LatestBlock { server } => {
+            let mut client = GrpcProverClient::connect(server).await?;
+            let response = client.get_latest_block_proof(GetLatestBlockProofRequest {}).await?;
+            let inner = response.into_inner();
+
+            if let Some(proof) = inner.proof {
+                info!("Latest block proof:");
+                info!("  Height: {}", proof.celestia_height);
+                info!("  Proof size: {} bytes", proof.proof_data.len());
+                info!("  Public values size: {} bytes", proof.public_values.len());
+                info!("  Created at (Unix): {}", proof.created_at);
+            } else {
+                info!("No proof data returned");
+            }
+        }
+        QueryCommands::Block { height, server } => {
+            let mut client = GrpcProverClient::connect(server).await?;
+            let response = client
+                .get_block_proof(GetBlockProofRequest {
+                    celestia_height: height,
+                })
+                .await?;
+
+            if let Some(proof) = response.into_inner().proof {
+                info!("Block proof for height {height}:");
+                info!("  Height: {}", proof.celestia_height);
+                info!("  Proof size: {} bytes", proof.proof_data.len());
+                info!("  Public values size: {} bytes", proof.public_values.len());
+                info!("  Created at (Unix): {}", proof.created_at);
+            } else {
+                info!("No proof data returned");
+            }
+        }
+        QueryCommands::BlockRange {
+            start_height,
+            end_height,
+            server,
+        } => {
+            let mut client = GrpcProverClient::connect(server).await?;
+            let response = client
+                .get_block_proofs_in_range(GetBlockProofsInRangeRequest {
+                    start_height,
+                    end_height,
+                })
+                .await?;
+
+            let proofs = response.into_inner().proofs;
+            info!("Found {} block proof(s):\n", proofs.len());
+
+            for (i, proof) in proofs.iter().enumerate() {
+                info!("Proof {} of {}:", i + 1, proofs.len());
+                info!("  Height: {}", proof.celestia_height);
+                info!("  Proof size: {} bytes", proof.proof_data.len());
+                info!("  Public values size: {} bytes", proof.public_values.len());
+                info!("  Created at (Unix): {}", proof.created_at);
+                info!("");
+            }
+        }
+        QueryCommands::LatestMembership { server } => {
+            let mut client = GrpcProverClient::connect(server).await?;
+            let response = client
+                .get_latest_membership_proof(GetLatestMembershipProofRequest {})
+                .await?;
+
+            if let Some(proof) = response.into_inner().proof {
+                info!("Latest membership proof:");
+                info!("  Proof size: {} bytes", proof.proof_data.len());
+                info!("  Public values size: {} bytes", proof.public_values.len());
+                info!("  Created at (Unix): {}", proof.created_at);
+            } else {
+                info!("No proof data returned");
+            }
+        }
+        QueryCommands::Membership { height, server } => {
+            let mut client = GrpcProverClient::connect(server).await?;
+            let response = client
+                .get_membership_proof(GetMembershipProofRequest { height })
+                .await?;
+
+            if let Some(proof) = response.into_inner().proof {
+                info!("Membership proof for height {height}:");
+                info!("  Proof size: {} bytes", proof.proof_data.len());
+                info!("  Public values size: {} bytes", proof.public_values.len());
+                info!("  Created at (Unix): {}", proof.created_at);
+            } else {
+                info!("No proof data returned");
+            }
+        }
+        QueryCommands::RangeProofs {
+            start_height,
+            end_height,
+            server,
+        } => {
+            let mut client = GrpcProverClient::connect(server).await?;
+            let response = client
+                .get_range_proofs(GetRangeProofsRequest {
+                    start_height,
+                    end_height,
+                })
+                .await?;
+
+            let proofs = response.into_inner().proofs;
+            info!("Found {} range proof(s):\n", proofs.len());
+
+            for (i, proof) in proofs.iter().enumerate() {
+                info!("Range Proof {} of {}:", i + 1, proofs.len());
+                info!("  Range: {} - {}", proof.start_height, proof.end_height);
+                info!("  Proof size: {} bytes", proof.proof_data.len());
+                info!("  Public values size: {} bytes", proof.public_values.len());
+                info!("  Created at (Unix): {}", proof.created_at);
+                info!("");
+            }
+        }
+    }
+
+    Ok(())
 }
 
 async fn brute_force_head(celestia_client: &Client, namespace: Namespace) -> Result<(ExtendedHeader, Vec<Blob>)> {

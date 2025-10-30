@@ -20,8 +20,6 @@ use rsp_rpc_db::RpcDb;
 use std::{fs, sync::Arc};
 use tracing::debug;
 
-pub const ISM_ID: &str = "0x726f757465725f69736d000000000000000000000000002a0000000000000001";
-
 /// Generates the client executor input (STF) for an EVM block.
 pub async fn generate_client_executor_input(
     rpc_url: &str,

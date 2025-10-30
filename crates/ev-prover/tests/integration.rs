@@ -17,6 +17,9 @@ use tracing_subscriber::EnvFilter;
 #[tokio::test]
 async fn test_run_message_prover() {
     dotenvy::dotenv().ok();
+    let ism_id = std::env::var("CELESTIA_ISM_ID").expect("CELESTIA_ISM_ID must be set");
+    let mailbox_address = std::env::var("MAILBOX_ADDRESS").expect("MAILBOX_ADDRESS must be set");
+    let merkle_tree_address = std::env::var("MERKLE_TREE_ADDRESS").expect("MERKLE_TREE_ADDRESS must be set");
     let config = ClientConfig::from_env().unwrap();
     let ism_client = Arc::new(CelestiaIsmClient::new(config).await.unwrap());
     // Configure logging for ev-prover
@@ -48,8 +51,9 @@ async fn test_run_message_prover() {
     let app = AppContext {
         evm_rpc: "http://127.0.0.1:8545".to_string(),
         evm_ws: "ws://127.0.0.1:8546".to_string(),
-        mailbox_address: Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap(),
-        merkle_tree_address: Address::from_str("0xfcb1d485ef46344029d9e8a7925925e146b3430e").unwrap(),
+        mailbox_address: Address::from_str(&mailbox_address).unwrap(),
+        merkle_tree_address: Address::from_str(&merkle_tree_address).unwrap(),
+        ism_id,
     };
 
     let evm_provider: DefaultProvider =
