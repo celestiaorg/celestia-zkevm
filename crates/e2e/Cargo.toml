@@ -32,7 +32,7 @@ celestia-types = { workspace = true }
 chrono = { workspace = true }
 dirs = { workspace = true }
 dotenvy = { workspace = true }
-ev-prover = { path = "../ev-prover" }
+ev-prover = { workspace = true }
 ev-state-queries = { workspace = true }
 ev-types = { workspace = true, features = ["grpc"] }
 ev-zkevm-types = { workspace = true }

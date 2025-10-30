@@ -1,10 +1,7 @@
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
-use ev_prover::commands::{
-    self,
-    cli::{Cli, Commands},
-};
+use ev_prover::command::{create_zkism, init, query, start, unsafe_reset_db, update_ism, version, Cli, Commands};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -27,12 +24,13 @@ async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
 
     match cli.command {
-        Commands::Init {} => commands::command::init()?,
-        Commands::Start {} => commands::command::start().await?,
-        Commands::Create {} => commands::command::create_zkism().await?,
-        Commands::Update { ism_id, token_id } => commands::command::update_ism(ism_id, token_id).await?,
-        Commands::Version {} => commands::command::version(),
-        Commands::Query(query_cmd) => commands::command::query(query_cmd).await?,
+        Commands::Init {} => init()?,
+        Commands::Start {} => start().await?,
+        Commands::Create {} => create_zkism().await?,
+        Commands::Update { ism_id, token_id } => update_ism(ism_id, token_id).await?,
+        Commands::Version {} => version(),
+        Commands::Query(query_cmd) => query(query_cmd).await?,
+        Commands::UnsafeResetDb {} => unsafe_reset_db()?,
     }
 
     Ok(())

@@ -83,6 +83,8 @@ async fn main() -> Result<()> {
     let config = ClientConfig::from_env()?;
     let client = CelestiaIsmClient::new(config).await?;
 
+    info!("CelestiaISMClient using signer address: {}", client.signer_address());
+
     match &cli.command {
         Commands::StateTransition {
             id,

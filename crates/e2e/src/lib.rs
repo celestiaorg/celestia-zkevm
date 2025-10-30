@@ -1,2 +1,2 @@
 pub mod config;
-pub mod prover;
+pub mod utils;

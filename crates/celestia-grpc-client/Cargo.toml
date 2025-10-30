@@ -10,12 +10,9 @@ async-trait = { workspace = true }
 bech32 = { workspace = true }
 bytes = { workspace = true }
 celestia-grpc = { workspace = true }
-celestia-types = { workspace = true }
 clap = { version = "4", features = ["derive"] }
-ed25519-dalek = { workspace = true }
 hex = { workspace = true }
 k256 = "0.13"
-md5 = "0.7"
 prost = "0.13"
 ripemd = "0.1.3"
 prost-types = "0.13"

@@ -18,7 +18,11 @@ impl StoredHyperlaneMessage {
 
 #[cfg(test)]
 mod tests {
-    use crate::hyperlane::{StoredHyperlaneMessage, message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
+    use crate::hyperlane::{
+        StoredHyperlaneMessage,
+        message::HyperlaneMessageStore,
+        snapshot::{HyperlaneSnapshot, HyperlaneSnapshotStore},
+    };
     use ev_zkevm_types::{hyperlane::decode_hyperlane_message, programs::hyperlane::tree::MerkleTree};
     use tempfile::TempDir;
 
@@ -64,12 +68,14 @@ mod tests {
             .join(&tmp)
             .join("data")
             .join("snapshots.db");
-        let store = HyperlaneSnapshotStore::new(snapshot_storage_path).unwrap();
+        let store = HyperlaneSnapshotStore::new(snapshot_storage_path, None).unwrap();
         let snapshot = MerkleTree::default();
         let current_index = store.current_index().unwrap();
-        store.insert_snapshot(current_index, snapshot.clone()).unwrap();
+        store
+            .insert_snapshot(current_index, HyperlaneSnapshot::new(0, snapshot.clone()))
+            .unwrap();
         let retrieved_snapshot = store.get_snapshot(current_index).unwrap();
-        assert_eq!(retrieved_snapshot, snapshot);
+        assert_eq!(retrieved_snapshot, HyperlaneSnapshot::new(0, snapshot));
         store.reset_db().unwrap();
     }
 }

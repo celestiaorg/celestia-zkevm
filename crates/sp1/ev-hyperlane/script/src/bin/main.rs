@@ -13,7 +13,7 @@
 use alloy_primitives::{hex::FromHex, Address, FixedBytes};
 use alloy_provider::{Provider, ProviderBuilder};
 use anyhow::{Context, Result};
-use clap::{command, Parser};
+use clap::Parser;
 use ev_zkevm_types::programs::hyperlane::{
     tree::MerkleTree,
     types::{

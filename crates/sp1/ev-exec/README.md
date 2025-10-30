@@ -3,28 +3,37 @@
 An SP1 program that verifies inclusion of EVM reth blocks in the Celestia data availability network 
 and executes their state transition functions.
 
-### Program Inputs
 
-- `CelestiaHeader`: A celestia block header at height H.
-- `DAH`: The associated data availability header at height H.
-- `Namespace`: The namespace containing blob data.
-- `PublicKey`: The public key of the sequencer signing blob data.
-- `Blobs`: All blobs in the namespace for the current block.
-- `NamespaceProofs`: Namespaced Merkle Tree proofs for the complete namespace.
-- `EthClientExecutorInputs`: List of RSP based EVM state transition functions for N blocks included at height H.
-- `TrustedHeight`: A trusted height containing the trusted state root.
-- `TrustedStateRoot`: A trusted state root for the trusted height.
+### Program Inputs
+| Name | Type | Description |
+|---|---|---|
+| header_raw | Vec<u8> | the Celestia block header |
+| dah | DataAvailabilityHeader | the Celestia DA header |
+| blobs_raw | Vec<u8> | The bytes of the data blobs |
+| pub_key | Vec<u8> | The sequencer pubkey for verification |
+| namespace | Namespace | the Celestia namespace that contains the data blobs which themselves contain EV blocks |
+| proofs | Vec<NamespaceProof> | Merkle Proofs for the Namespace data, can be exclusion |
+| executor_inputs | Vec<EthClientExecutorInput> | Struct that aggregates the RETH inputs for block execution |
+| trusted_height | u64 | Trusted EV height from the previous block |
+| trusted_root | [u8;32] | Trusted EV root from the previous block |
+
+
+Note that by design proofs are written separately in recursive circuits like this one.
+We use the standard SP1 approach to write compressed proofs generated using `ev-exec`.
 
 ### Program Outputs
+| Name | Type | Description |
+|---|---|---|
+| celestia_header_hash | [u8;32] | the new Celestia header hash after applying the blocks |
+| prev_celestia_height | u64 | the trusted Celestia height in the ISM |
+| prev_celestia_header_hash | [u8;32] | the trusted Celestia header hash in the ISM |
+| new_height | u64 | the new EV height after applying the blocks |
+| new_state_root | [u8;32] | the new EV state root after applying the blocks |
+| prev_height | u64 | the height of the previous EV block |
+| prev_state_root | [u8;32] | the EV state root of the previous block |
+| namespace | [u8;29] | the Celestia namespace that contains the data blobs which themselves contain EV blocks | |
+| public_key | [u8;32] | the sequencer's public key for verification |
 
-- `CelestiaHeaderHash`: A hash of the celestia block header at height H.
-- `PreviousCelestiaHeaderHash`: A hash of the previous celestia block header at height H-1.
-- `NewHeight`: The height of the EVM application after applying N blocks.
-- `NewStateRoot`: The state root of the EVM application after applying N blocks.
-- `TrustedHeight`: The trusted height of the EVM application before applying N blocks.
-- `TrustedStateRoot`: The trusted state root of the EVM application before applying N blocks.
-- `Namespace`: The namespace containing blob data.
-- `PublicKey`: The public key of the sequencer signing blob data.
 
 ### Equivocation Tolerance
 
