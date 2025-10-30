@@ -193,7 +193,7 @@ impl EvCombinedProver {
             }
 
             for height in range_head..latest_celestia_height {
-                if !is_empty_block(&client, height, namespace.clone()).await? {
+                if !is_empty_block(&client, height, namespace).await? {
                     dynamic_batch_size = MIN_BATCH_SIZE;
                     debug!(
                         "Found non-empty block at height {height}, setting dynamic batch size to {dynamic_batch_size}"
@@ -225,7 +225,7 @@ impl EvCombinedProver {
                 celestia_start_height,
                 &mut trusted_height,
                 latest_celestia_height - celestia_start_height,
-                namespace.clone(),
+                namespace,
                 &mut trusted_root,
                 &sequencer_rpc_url,
                 genesis.clone(),
