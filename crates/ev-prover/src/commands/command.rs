@@ -84,8 +84,8 @@ pub async fn create_zkism() -> Result<()> {
         namespace: namespace.as_bytes().to_vec(),
         sequencer_public_key: pub_key,
         groth16_vkey,
-        state_transition_vkey: state_transition_vkey,
-        state_membership_vkey: state_membership_vkey,
+        state_transition_vkey,
+        state_membership_vkey,
     };
 
     let response = ism_client.send_tx(create_message).await?;

@@ -117,24 +117,20 @@ impl Config {
 
     /// Returns the default application config path.
     pub fn config_path() -> PathBuf {
-        let config_path = dirs::home_dir()
+        dirs::home_dir()
             .expect("cannot find home directory")
             .join(Self::APP_HOME)
             .join(Self::CONFIG_DIR)
-            .join(Self::CONFIG_FILE);
-
-        config_path
+            .join(Self::CONFIG_FILE)
     }
 
     /// Returns the default chain genesis path.
     pub fn genesis_path() -> PathBuf {
-        let genesis_path = dirs::home_dir()
+        dirs::home_dir()
             .expect("cannot find home directory")
             .join(Self::APP_HOME)
             .join(Self::CONFIG_DIR)
-            .join(Self::GENESIS_FILE);
-
-        genesis_path
+            .join(Self::GENESIS_FILE)
     }
 
     /// Returns the groth16 verifiying key.
