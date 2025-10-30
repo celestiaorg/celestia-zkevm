@@ -109,7 +109,6 @@ pub trait ProofStorage: Send + Sync {
     #[allow(dead_code)]
     async fn get_latest_block_proof(&self) -> Result<Option<StoredBlockProof>, ProofStorageError>;
 
-    #[allow(dead_code)]
     fn unsafe_reset(&mut self) -> Result<(), ProofStorageError>;
 }
 

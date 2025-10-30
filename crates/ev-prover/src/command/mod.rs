@@ -12,7 +12,7 @@ use prost::Message;
 use sp1_sdk::{HashableKey, Prover, ProverClient};
 use tracing::info;
 
-use crate::commands::cli::VERSION;
+use crate::command::cli::VERSION;
 use crate::config::Config;
 use crate::get_sequencer_pubkey;
 use crate::prover::programs::combined::EV_COMBINED_ELF;
@@ -40,7 +40,7 @@ pub async fn start() -> Result<()> {
 pub fn unsafe_reset_db() -> Result<()> {
     let storage_path = dirs::home_dir()
         .expect("cannot find home directory")
-        .join(APP_HOME)
+        .join(Config::APP_HOME)
         .join("data")
         .join("proofs.db");
 
