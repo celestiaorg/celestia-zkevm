@@ -387,7 +387,7 @@ pub async fn get_block_inputs(
     let block = provider
         .get_block_by_number(last_height.into())
         .await?
-        .ok_or_else(|| anyhow::anyhow!("Block {last_height} not found"))?;
+        .unwrap_or_default();
 
     *trusted_height = last_height;
     *trusted_root = block.header.state_root;
@@ -403,7 +403,7 @@ async fn is_empty_block(celestia_client: &Client, block_number: u64, namespace: 
     let blobs: Vec<Blob> = celestia_client
         .blob_get_all(block_number, &[namespace])
         .await?
-        .ok_or_else(|| anyhow!("Failed to get blobs for block: {}", block_number))?;
+        .unwrap_or_default();
     let extended_header = celestia_client.header_get_by_height(block_number).await?;
     let namespace_data = celestia_client
         .share_get_namespace_data(&extended_header, namespace)
