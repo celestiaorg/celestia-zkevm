@@ -320,7 +320,7 @@ pub async fn get_block_inputs(
     let blobs: Vec<Blob> = celestia_client
         .blob_get_all(block_number, &[namespace])
         .await?
-        .ok_or_else(|| anyhow!("Failed to get blobs for block: {}", block_number))?;
+        .unwrap_or_default();
     debug!("Got {} blobs for block: {}", blobs.len(), block_number);
 
     let extended_header = celestia_client.header_get_by_height(block_number).await?;
