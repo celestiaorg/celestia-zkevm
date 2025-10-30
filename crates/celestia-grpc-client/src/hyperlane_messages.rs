@@ -105,10 +105,10 @@ pub struct MsgCreateMerkleTreeHookResponse {
 pub struct MsgCreateMailbox {
     #[prost(string, tag = "1")]
     pub owner: String,
-    #[prost(string, tag = "2")]
-    pub default_ism: String,
-    #[prost(uint32, tag = "3")]
+    #[prost(uint32, tag = "2")]
     pub local_domain: u32,
+    #[prost(string, tag = "3")]
+    pub default_ism: String,
     #[prost(string, optional, tag = "4")]
     pub default_hook: Option<String>,
     #[prost(string, optional, tag = "5")]

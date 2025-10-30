@@ -105,12 +105,16 @@ pub async fn create_ism(
         }
         IsmType::MerkleRootMultisig => {
             info!("Creating Merkle Root Multisig ISM");
-            let validators = validators.ok_or_else(|| anyhow!("Validators required for multisig ISM"))?;
+            let mut validators = validators.ok_or_else(|| anyhow!("Validators required for multisig ISM"))?;
             let threshold = threshold.ok_or_else(|| anyhow!("Threshold required for multisig ISM"))?;
 
             if threshold as usize > validators.len() {
                 bail!("Threshold ({}) cannot be greater than number of validators ({})", threshold, validators.len());
             }
+
+            // Sort validators in ascending order (required by the chain)
+            validators.sort();
+            info!("Validators sorted: {:?}", validators);
 
             let msg = MsgCreateMerkleRootMultisigIsm {
                 creator: signer_address,
