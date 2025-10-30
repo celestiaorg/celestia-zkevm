@@ -7,7 +7,6 @@ use std::{
 use crate::{
     generate_client_executor_input, get_sequencer_pubkey,
     prover::{ProverConfig, RangeProofCommitted},
-    ISM_ID,
 };
 use alloy::hex::FromHex;
 use alloy_primitives::FixedBytes;
@@ -46,16 +45,22 @@ pub struct AppContext {
     pub evm_rpc: String,
     // celestia rpc, for example http://127.0.0.1:26658
     pub celestia_rpc: String,
+    pub ism_id: String,
 }
 impl AppContext {
-    pub fn new(evm_rpc: String, celestia_rpc: String) -> Self {
-        Self { evm_rpc, celestia_rpc }
+    pub fn new(evm_rpc: String, celestia_rpc: String, ism_id: String) -> Self {
+        Self {
+            evm_rpc,
+            celestia_rpc,
+            ism_id,
+        }
     }
 
     pub fn from_env() -> Result<Self> {
         let evm_rpc = std::env::var("RETH_RPC_URL").expect("RETH_RPC_URL must be set");
         let celestia_rpc = std::env::var("CELESTIA_RPC_URL").expect("CELESTIA_RPC_URL must be set");
-        Ok(Self::new(evm_rpc, celestia_rpc))
+        let ism_id = std::env::var("CELESTIA_ISM_ID").expect("CELESTIA_ISM_ID must be set");
+        Ok(Self::new(evm_rpc, celestia_rpc, ism_id))
     }
 
     pub fn load_genesis_and_chainspec() -> Result<(Genesis, Arc<ChainSpec>)> {
@@ -74,6 +79,7 @@ impl Default for AppContext {
         Self::new(
             "http://127.0.0.1:8545".to_string(),
             "http://127.0.0.1:26658".to_string(),
+            "0x726f757465725f69736d000000000000000000000000002a0000000000000001".to_string(),
         )
     }
 }
@@ -165,7 +171,11 @@ impl EvCombinedProver {
         let sequencer_rpc_url = std::env::var("SEQUENCER_RPC_URL").expect("SEQUENCER_RPC_URL must be set");
         let mut known_celestia_height: u64 = 0;
         let mut dynamic_batch_size: u64 = BATCH_SIZE;
-        let resp = ism_client.ism(QueryIsmRequest { id: ISM_ID.to_string() }).await?;
+        let resp = ism_client
+            .ism(QueryIsmRequest {
+                id: self.app.ism_id.clone(),
+            })
+            .await?;
         let ism = resp.ism.ok_or_else(|| anyhow::anyhow!("ZKISM not found"))?;
         let mut range_head: u64 = ism.celestia_height;
         let namespace_hex = env::var("CELESTIA_NAMESPACE")?;
@@ -178,7 +188,11 @@ impl EvCombinedProver {
                 sleep(Duration::from_secs(10)).await;
                 continue;
             }
-            let resp = ism_client.ism(QueryIsmRequest { id: ISM_ID.to_string() }).await?;
+            let resp = ism_client
+                .ism(QueryIsmRequest {
+                    id: self.app.ism_id.clone(),
+                })
+                .await?;
             let ism = resp.ism.ok_or_else(|| anyhow::anyhow!("ZKISM not found"))?;
             let trusted_root_hex = alloy::hex::encode(ism.state_root);
             let latest_celestia_header = client.header_local_head().await?;
@@ -241,7 +255,7 @@ impl EvCombinedProver {
             info!("Proof generation time: {}", start_time.elapsed().as_millis());
 
             let block_proof_msg = MsgUpdateZkExecutionIsm::new(
-                ISM_ID.to_string(),
+                self.app.ism_id.clone(),
                 proof.bytes(),
                 proof.public_values.as_slice().to_vec(),
                 ism_client.signer_address().to_string(),
