@@ -6,12 +6,14 @@
 
 pub mod client;
 pub mod error;
+pub mod hyperlane_messages;
 pub mod message;
 pub mod proto;
 pub mod types;
 
 pub use client::CelestiaIsmClient;
 pub use error::{IsmClientError, Result};
+pub use hyperlane_messages::*;
 pub use message::{StateInclusionProofMsg, StateTransitionProofMsg};
 pub use proto::celestia::zkism::v1::{
     MsgCreateZkExecutionIsm, MsgSubmitMessages, MsgSubmitMessagesResponse, MsgUpdateZkExecutionIsm,

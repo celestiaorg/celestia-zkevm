@@ -30,7 +30,43 @@ async fn main() -> anyhow::Result<()> {
         Commands::Init {} => commands::command::init()?,
         Commands::Start {} => commands::command::start().await?,
         Commands::Version {} => commands::command::version(),
-        Commands::CreateIsm {} => commands::command::create_ism().await?,
+        Commands::CreateIsm {
+            ism_type,
+            validators,
+            threshold,
+        } => commands::command::create_ism(ism_type, validators, threshold).await?,
+        Commands::DeployStack {
+            ism_id,
+            local_domain,
+            use_merkle_hook,
+            denom,
+        } => commands::command::deploy_stack(ism_id, local_domain, use_merkle_hook, denom).await?,
+        Commands::CreateMailbox {
+            ism_id,
+            local_domain,
+            default_hook,
+            required_hook,
+        } => commands::command::create_mailbox(ism_id, local_domain, default_hook, required_hook).await?,
+        Commands::CreateHook {
+            hook_type,
+            mailbox_id,
+        } => commands::command::create_hook(hook_type, mailbox_id).await?,
+        Commands::CreateWarpToken {
+            mailbox_id,
+            ism_id,
+            denom,
+        } => commands::command::create_warp_token(mailbox_id, ism_id, denom).await?,
+        Commands::EnrollRouter {
+            token_id,
+            remote_domain,
+            remote_contract,
+        } => commands::command::enroll_router(token_id, remote_domain, remote_contract).await?,
+        Commands::AnnounceValidator {
+            validator,
+            storage_location,
+            signature,
+            mailbox_id,
+        } => commands::command::announce_validator(validator, storage_location, signature, mailbox_id).await?,
     }
 
     Ok(())
