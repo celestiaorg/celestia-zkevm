@@ -5,15 +5,14 @@ use std::{
 };
 
 use crate::{
-    config::config::APP_HOME,
-    generate_client_executor_input, get_sequencer_pubkey, load_chain_spec_from_genesis,
+    generate_client_executor_input, get_sequencer_pubkey,
     prover::{ProverConfig, RangeProofCommitted},
     ISM_ID,
 };
 use alloy::hex::FromHex;
 use alloy_primitives::FixedBytes;
 use alloy_provider::{Provider, ProviderBuilder};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use celestia_grpc_client::{CelestiaIsmClient, MsgUpdateZkExecutionIsm, QueryIsmRequest};
 use celestia_rpc::{BlobClient, Client, HeaderClient, ShareClient};
@@ -31,6 +30,7 @@ use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1ProvingKey
 use tokio::{sync::Mutex, time::sleep};
 use tracing::{debug, info, warn};
 
+use crate::config::Config;
 use crate::prover::ProgramProver;
 use crate::prover::{prover_from_env, SP1Prover};
 
@@ -50,22 +50,21 @@ impl AppContext {
     pub fn new(evm_rpc: String, celestia_rpc: String) -> Self {
         Self { evm_rpc, celestia_rpc }
     }
+
     pub fn from_env() -> Result<Self> {
         let evm_rpc = std::env::var("RETH_RPC_URL").expect("RETH_RPC_URL must be set");
         let celestia_rpc = std::env::var("CELESTIA_RPC_URL").expect("CELESTIA_RPC_URL must be set");
         Ok(Self::new(evm_rpc, celestia_rpc))
     }
+
     pub fn load_genesis_and_chainspec() -> Result<(Genesis, Arc<ChainSpec>)> {
-        let genesis_path = dirs::home_dir()
-            .ok_or_else(|| anyhow::anyhow!("cannot find home directory"))?
-            .join(APP_HOME)
-            .join("config")
-            .join("genesis.json");
-        let (genesis, chain_spec) = load_chain_spec_from_genesis(
-            genesis_path
-                .to_str()
-                .ok_or_else(|| anyhow::anyhow!("Invalid genesis path"))?,
-        )?;
+        let genesis = Config::load_genesis()?;
+        let chain_spec: Arc<ChainSpec> = Arc::new(
+            (&genesis)
+                .try_into()
+                .map_err(|e| anyhow!("Failed to convert genesis to chain spec: {e}"))?,
+        );
+
         Ok((genesis, chain_spec))
     }
 }

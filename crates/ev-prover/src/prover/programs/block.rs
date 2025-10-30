@@ -3,11 +3,9 @@ use celestia_types::ExtendedHeader;
 use std::collections::BTreeMap;
 use std::env;
 use std::fmt::Display;
-use std::fs;
 use std::result::Result::{Err, Ok};
 use std::sync::Arc;
 
-use alloy_genesis::Genesis as AlloyGenesis;
 use alloy_primitives::FixedBytes;
 use alloy_provider::ProviderBuilder;
 use anyhow::{anyhow, Context, Result};
@@ -33,7 +31,7 @@ use tokio::{
 };
 use tracing::{debug, error, info};
 
-use crate::config::config::{Config, APP_HOME, CONFIG_DIR, GENESIS_FILE};
+use crate::config::Config;
 use crate::prover::prover_from_env;
 use crate::prover::SP1Prover;
 use crate::prover::{BlockProofCommitted, ProgramProver, ProverConfig};
@@ -110,15 +108,14 @@ impl Display for TrustedState {
 
 impl AppContext {
     pub fn new(config: Config, trusted_state: TrustedState) -> Result<Self> {
-        let genesis = AppContext::load_genesis().context("Error loading app genesis")?;
+        let genesis = Config::load_genesis()?;
         let chain_spec: Arc<ChainSpec> = Arc::new(
             (&genesis)
                 .try_into()
                 .map_err(|e| anyhow!("Failed to convert genesis to chain spec: {e}"))?,
         );
 
-        let raw_ns = hex::decode(config.namespace_hex)?;
-        let namespace = Namespace::new_v0(raw_ns.as_ref()).context("Failed to construct Namespace")?;
+        let namespace = config.namespace;
         let pub_key = hex::decode(config.pub_key)?;
         let trusted_state = RwLock::new(trusted_state);
 
@@ -126,25 +123,11 @@ impl AppContext {
             chain_spec,
             genesis,
             namespace,
-            celestia_rpc: config.celestia_rpc,
-            evm_rpc: config.evm_rpc,
+            celestia_rpc: config.rpc.celestia_rpc,
+            evm_rpc: config.rpc.evreth_rpc,
             pub_key,
             trusted_state,
         })
-    }
-
-    fn load_genesis() -> Result<Genesis> {
-        let path = dirs::home_dir()
-            .expect("cannot find home directory")
-            .join(APP_HOME)
-            .join(CONFIG_DIR)
-            .join(GENESIS_FILE);
-
-        let raw_genesis = fs::read_to_string(path).context("Failed to read genesis file from path")?;
-        let alloy_genesis: AlloyGenesis = serde_json::from_str(&raw_genesis)?;
-
-        let genesis = Genesis::Custom(alloy_genesis.config);
-        Ok(genesis)
     }
 }
 
