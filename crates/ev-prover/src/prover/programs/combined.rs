@@ -255,7 +255,7 @@ impl EvCombinedProver {
             known_celestia_height = public_values.celestia_height;
 
             *is_proving_messages.lock().await = true;
-            range_head = latest_celestia_height;
+            range_head = latest_celestia_height + 1;
             dynamic_batch_size = BATCH_SIZE;
 
             // use shared channel to request message proof for new height and root
