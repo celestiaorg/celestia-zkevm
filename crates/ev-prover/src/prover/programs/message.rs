@@ -4,7 +4,6 @@
 #![allow(dead_code)]
 use crate::prover::{prover_from_env, RangeProofCommitted, SP1Prover};
 use crate::prover::{ProgramProver, ProverConfig};
-use crate::ISM_ID;
 use alloy::hex::FromHex;
 use alloy_primitives::{Address, FixedBytes};
 use alloy_provider::{Provider, ProviderBuilder, WsConnect};
@@ -43,6 +42,7 @@ pub struct AppContext {
     pub evm_ws: String,
     pub mailbox_address: Address,
     pub merkle_tree_address: Address,
+    pub ism_id: String,
 }
 
 #[derive(Clone)]
@@ -277,7 +277,7 @@ impl HyperlaneMessageProver {
         info!("Message proof generated successfully");
 
         let message_proof_msg = MsgSubmitMessages::new(
-            ISM_ID.to_string(),
+            self.ctx.ism_id.clone(),
             height,
             message_proof.0.bytes(),
             message_proof.0.public_values.as_slice().to_vec(),
