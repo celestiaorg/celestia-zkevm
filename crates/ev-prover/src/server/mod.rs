@@ -23,7 +23,7 @@ use tonic::transport::Server;
 use tonic_reflection::server::Builder as ReflectionBuilder;
 use tracing::{debug, error};
 
-use crate::config::config::{Config, APP_HOME};
+use crate::config::Config;
 use crate::proto::celestia::prover::v1::prover_server::ProverServer;
 use crate::prover::programs::block::TrustedState;
 use crate::prover::programs::message::HyperlaneMessageProver;
@@ -67,7 +67,7 @@ pub async fn start_server(config: Config) -> Result<()> {
     // Initialize RocksDB storage in the default data directory
     let storage_path = dirs::home_dir()
         .expect("cannot find home directory")
-        .join(APP_HOME)
+        .join(Config::APP_HOME)
         .join("data")
         .join("proofs.db");
 
@@ -131,12 +131,12 @@ pub async fn start_server(config: Config) -> Result<()> {
     tokio::spawn({
         let message_storage_path = dirs::home_dir()
             .expect("cannot find home directory")
-            .join(APP_HOME)
+            .join(Config::APP_HOME)
             .join("data")
             .join("messages.db");
         let snapshot_storage_path = dirs::home_dir()
             .expect("cannot find home directory")
-            .join(APP_HOME)
+            .join(Config::APP_HOME)
             .join("data")
             .join("snapshots.db");
         let hyperlane_message_store = Arc::new(HyperlaneMessageStore::new(message_storage_path).unwrap());
