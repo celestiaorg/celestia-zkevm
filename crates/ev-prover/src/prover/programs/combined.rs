@@ -185,7 +185,6 @@ impl EvCombinedProver {
     }
 
     pub async fn run(self, message_sync: Arc<MessageProofSync>) -> Result<()> {
-        let mut last_celestia_height: u64 = 0;
         let mut batch_size = BATCH_SIZE;
         let mut scan_head: Option<u64> = None;
         let mut poll = interval(Duration::from_secs(6)); // BlockTime=6s
@@ -210,11 +209,6 @@ impl EvCombinedProver {
                         batch_size,
                     )
                     .await?;
-            }
-
-            if status.celestia_head == last_celestia_height {
-                debug!("Celestia height unchanged at {}", status.celestia_head);
-                continue;
             }
 
             if !status.has_required_batch(batch_size) {
@@ -258,14 +252,10 @@ impl EvCombinedProver {
 
             // reset batch size and fast forward checkpoints
             batch_size = BATCH_SIZE;
-            last_celestia_height = status.celestia_head;
             scan_head = Some(status.celestia_head + 1);
 
             let permit = message_sync.begin().await;
-            let commit = RangeProofCommitted {
-                trusted_height: public_values.new_height,
-                trusted_root: public_values.new_state_root,
-            };
+            let commit = RangeProofCommitted::new(public_values.new_height, public_values.new_state_root);
             let request = MessageProofRequest::with_permit(commit, permit);
             self.range_tx.send(request).await?;
         }
@@ -364,7 +354,6 @@ impl EvCombinedProver {
         chain_spec: Arc<ChainSpec>,
         genesis: Genesis,
     ) -> Result<BlockExecInput> {
-        // let namespace_clone = namespace.clone();
         let blobs: Vec<Blob> = self
             .app
             .celestia_client
