@@ -20,7 +20,6 @@ use celestia_types::{
 };
 use ev_types::v1::SignedData;
 use ev_zkevm_types::programs::block::{BlockExecInput, BlockRangeExecOutput, EvCombinedInput};
-use hex::decode;
 use prost::Message;
 use reth_chainspec::ChainSpec;
 use rsp_client_executor::io::EthClientExecutorInput;
@@ -36,6 +35,10 @@ use crate::prover::{prover_from_env, SP1Prover};
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const EV_COMBINED_ELF: &[u8] = include_elf!("ev-combined-program");
 
+/// ProverStatus of the latest Celestia state relevant to the prover loop.
+///
+/// The methods on this type encapsulate small pieces of batching logic so
+/// the main control flow stays readable.
 struct ProverStatus {
     trusted_height: u64,
     trusted_root: FixedBytes<32>,
@@ -44,19 +47,26 @@ struct ProverStatus {
 }
 
 impl ProverStatus {
-    fn has_required_batch(&self, batch_size: u64) -> bool {
+    /// Returns true if enough new blocks have been produced to start proving a batch.
+    fn is_batch_ready(&self, batch_size: u64) -> bool {
         self.trusted_celestia_height + batch_size <= self.celestia_head
     }
 
-    fn blocks_needed(&self, batch_size: u64) -> u64 {
+    /// Returns how many more blocks are needed to reach a full batch.
+    fn blocks_remaining(&self, batch_size: u64) -> u64 {
         (self.trusted_celestia_height + batch_size).saturating_sub(self.celestia_head)
     }
 
+    /// Returns how far ahead the Celestia head is from the trusted height.
     fn distance(&self) -> u64 {
         self.celestia_head.saturating_sub(self.trusted_celestia_height)
     }
 }
 
+/// AppContext contains RPC clients and configuration required by the prover.
+///
+/// This encapsulates the dependencies required to query on-chain state and build proof inputs
+/// including chain spec, genesis, namespace, sequencer key and rpc clients.
 pub struct AppContext {
     pub celestia_client: Arc<Client>,
     pub evm_rpc: String,
@@ -64,19 +74,15 @@ pub struct AppContext {
     pub chain_spec: Arc<ChainSpec>,
     pub genesis: Genesis,
     pub namespace: Namespace,
-    pub pub_key: Arc<Vec<u8>>,
+    pub pub_key: Vec<u8>,
 }
+
 impl AppContext {
     pub async fn from_config(config: &Config, ism_client: Arc<CelestiaIsmClient>) -> Result<Self> {
         let celestia_client = Client::new(&config.rpc.celestia_rpc, None).await?;
-        let pub_key_hex = config.pub_key.trim_start_matches("0x");
-        let sequencer_pubkey = Arc::new(decode(pub_key_hex)?);
         let genesis = Config::load_genesis()?;
-        let chain_spec: Arc<ChainSpec> = Arc::new(
-            (&genesis)
-                .try_into()
-                .map_err(|e| anyhow!("Failed to convert genesis to chain spec: {e}"))?,
-        );
+        let chain_spec = Self::chain_spec_from_genesis(&genesis)?;
+        let pub_key = hex::decode(config.pub_key.clone())?;
 
         Ok(Self {
             celestia_client: Arc::new(celestia_client),
@@ -85,19 +91,16 @@ impl AppContext {
             chain_spec,
             genesis,
             namespace: config.namespace,
-            pub_key: sequencer_pubkey,
+            pub_key,
         })
     }
 
-    pub fn load_genesis_and_chainspec() -> Result<(Genesis, Arc<ChainSpec>)> {
-        let genesis = Config::load_genesis()?;
-        let chain_spec: Arc<ChainSpec> = Arc::new(
-            (&genesis)
-                .try_into()
-                .map_err(|e| anyhow!("Failed to convert genesis to chain spec: {e}"))?,
-        );
+    pub fn chain_spec_from_genesis(genesis: &Genesis) -> Result<Arc<ChainSpec>> {
+        let chain_spec: ChainSpec = genesis
+            .try_into()
+            .map_err(|e| anyhow!("Failed to convert genesis to chain spec: {e}"))?;
 
-        Ok((genesis, chain_spec))
+        Ok(Arc::new(chain_spec))
     }
 }
 
@@ -211,8 +214,8 @@ impl EvCombinedProver {
                     .await?;
             }
 
-            if !status.has_required_batch(batch_size) {
-                let blocks_needed = status.blocks_needed(batch_size);
+            if !status.is_batch_ready(batch_size) {
+                let blocks_needed = status.blocks_remaining(batch_size);
                 let current_height = status.celestia_head;
                 debug!("Waiting for {blocks_needed} more blocks to reach required batch size. Current height: {current_height}");
                 continue;
