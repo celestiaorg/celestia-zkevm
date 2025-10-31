@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package hyperlane.core.v1;
+
+// This file exists solely to trigger buf generate to include
+// the ISM and hook modules from hyperlane-cosmos dependency.
+// We need these for creating ISMs, hooks, and mailboxes.
+
+import "hyperlane/core/interchain_security/v1/tx.proto";
+import "hyperlane/core/post_dispatch/v1/tx.proto";
+
+// Empty message - this file just triggers imports
+message Placeholder {}

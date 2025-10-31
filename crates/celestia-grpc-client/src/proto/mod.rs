@@ -24,6 +24,16 @@ pub mod hyperlane {
         pub mod v1 {
             include!("hyperlane.core.v1.rs");
         }
+        pub mod interchain_security {
+            pub mod v1 {
+                include!("hyperlane.core.interchain_security.v1.rs");
+            }
+        }
+        pub mod post_dispatch {
+            pub mod v1 {
+                include!("hyperlane.core.post_dispatch.v1.rs");
+            }
+        }
     }
     pub mod warp {
         pub mod v1 {
