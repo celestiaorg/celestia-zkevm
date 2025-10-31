@@ -220,9 +220,14 @@ hyperlane warp deploy --registry ./hyperlane/registry --warp  --symbol ETH
 #### Deploy a `Synthetic` token on Celestia
 
 Create a new `Synthetic` token using the `celestia-appd` binary. 
-Note the flag `--ism-id` is optional, the default mailbox ism will be used if this is omitted.
 ```
-celestia-appd tx warp create-synthetic-token 0x68797065726c616e650000000000000000000000000000000000000000000000 --ism-id 0x726f757465725f69736d000000000000000000000000002a0000000000000001 --from hyp --fees 800utia
+celestia-appd tx warp create-synthetic-token 0x68797065726c616e650000000000000000000000000000000000000000000000 --from hyp --fees 800utia
+```
+
+Set the ism identifier for the new token on Celestia. By default the docker network will use the mailbox default ism, which is a `NoopISM`.
+Here we set the `Synthetic` token ism to be the zk ism verifier.
+```
+celestia-appd tx warp set-token 0x726f757465725f61707000000000000000000000000000020000000000000001 --ism-id 0x726f757465725f69736d000000000000000000000000002a0000000000000001 --from hyp --fees 800utia
 ```
 
 Query warp tokens using the `celestia-appd` binary.
