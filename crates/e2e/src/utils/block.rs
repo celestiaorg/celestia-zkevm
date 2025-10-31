@@ -166,7 +166,7 @@ pub async fn parallel_prover(
                     &celestia_client,
                     rpc_config::EVM_RPC_URL,
                     block_number,
-                    namespace.clone(),
+                    namespace,
                     &mut trusted_heights[(block_number - start_height) as usize],
                     &mut trusted_roots[(block_number - start_height) as usize],
                     chain_spec.clone(),
@@ -294,7 +294,7 @@ pub async fn synchronous_prover(
             &celestia_client,
             rpc_config::EVM_RPC_URL,
             block_number,
-            namespace.clone(),
+            namespace,
             &mut *trusted_height,
             &mut *trusted_root,
             chain_spec.clone(),
@@ -360,6 +360,7 @@ pub async fn synchronous_prover(
     Ok(proof)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn get_block_inputs(
     celestia_client: &Client,
     evm_rpc: &str,

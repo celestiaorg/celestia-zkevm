@@ -84,7 +84,7 @@ impl AppContext {
             ism_client,
             chain_spec,
             genesis,
-            namespace: config.namespace.clone(),
+            namespace: config.namespace,
             pub_key: sequencer_pubkey,
         })
     }
@@ -302,24 +302,25 @@ impl EvCombinedProver {
             return Ok(current_batch);
         }
 
-        let namespace = self.app.namespace.clone();
+        let namespace = self.app.namespace;
         for height in scan_start..latest_head {
-            if !self.is_empty_block(height, &namespace).await? {
-                let blocks_since_trusted = height.saturating_sub(trusted_celestia_height);
-                let adjusted = blocks_since_trusted.max(MIN_BATCH_SIZE).min(BATCH_SIZE);
-                debug!("Found non-empty block at height {height}, adjusting batch size to {adjusted}");
-                return Ok(adjusted);
+            if !self.is_empty_block(height, namespace).await? {
+                // Ensure batch size stays within allowed range
+                let blocks_elapsed = height.saturating_sub(trusted_celestia_height);
+                let batch_size = blocks_elapsed.clamp(MIN_BATCH_SIZE, BATCH_SIZE);
+                debug!("Found non-empty block at height {height}, adjusting batch size to {batch_size}");
+                return Ok(batch_size);
             }
         }
 
         Ok(BATCH_SIZE)
     }
 
-    async fn is_empty_block(&self, height: u64, namespace: &Namespace) -> Result<bool> {
+    async fn is_empty_block(&self, height: u64, namespace: Namespace) -> Result<bool> {
         let blobs: Vec<Blob> = self
             .app
             .celestia_client
-            .blob_get_all(height, &[namespace.clone()])
+            .blob_get_all(height, &[namespace])
             .await?
             .unwrap_or_default();
 
@@ -330,7 +331,7 @@ impl EvCombinedProver {
         let mut current_height = status.trusted_height;
         let mut current_root = status.trusted_root;
 
-        let namespace = self.app.namespace.clone();
+        let namespace = self.app.namespace;
         let end_height = start_height + batch_size - 1;
 
         let mut block_inputs: Vec<BlockExecInput> = Vec::new();
@@ -338,7 +339,7 @@ impl EvCombinedProver {
             let input = self
                 .build_block_input(
                     block_number,
-                    &namespace,
+                    namespace,
                     &mut current_height,
                     &mut current_root,
                     self.app.chain_spec.clone(),
@@ -357,17 +358,17 @@ impl EvCombinedProver {
     async fn build_block_input(
         &self,
         block_number: u64,
-        namespace: &Namespace,
+        namespace: Namespace,
         trusted_height: &mut u64,
         trusted_root: &mut FixedBytes<32>,
         chain_spec: Arc<ChainSpec>,
         genesis: Genesis,
     ) -> Result<BlockExecInput> {
-        let namespace_clone = namespace.clone();
+        // let namespace_clone = namespace.clone();
         let blobs: Vec<Blob> = self
             .app
             .celestia_client
-            .blob_get_all(block_number, &[namespace_clone])
+            .blob_get_all(block_number, &[namespace])
             .await?
             .unwrap_or_default();
         debug!("Got {} blobs for block: {}", blobs.len(), block_number);
@@ -376,7 +377,7 @@ impl EvCombinedProver {
         let namespace_data = self
             .app
             .celestia_client
-            .share_get_namespace_data(&extended_header, namespace.clone())
+            .share_get_namespace_data(&extended_header, namespace)
             .await?;
         let mut proofs: Vec<NamespaceProof> = Vec::new();
         for row in namespace_data.rows {
@@ -395,7 +396,7 @@ impl EvCombinedProver {
                 dah: extended_header.dah,
                 blobs_raw: serde_cbor::to_vec(&blobs)?,
                 pub_key: self.app.pub_key.to_vec(),
-                namespace: namespace.clone(),
+                namespace,
                 proofs,
                 executor_inputs: vec![],
                 trusted_height: *trusted_height,
@@ -424,7 +425,7 @@ impl EvCombinedProver {
             dah: extended_header.dah,
             blobs_raw: serde_cbor::to_vec(&blobs)?,
             pub_key: self.app.pub_key.to_vec(),
-            namespace: namespace.clone(),
+            namespace,
             proofs,
             executor_inputs: executor_inputs.clone(),
             trusted_height: *trusted_height,

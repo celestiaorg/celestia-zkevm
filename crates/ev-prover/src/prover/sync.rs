@@ -13,6 +13,7 @@ enum MessageProofState {
     Running,
 }
 
+/// Coordinates access to the message prover so only one proof runs at a time.
 #[derive(Debug)]
 pub struct MessageProofSync {
     state: Mutex<MessageProofState>,
@@ -20,6 +21,7 @@ pub struct MessageProofSync {
 }
 
 impl MessageProofSync {
+    /// Creates a new lock in the idle state.
     pub fn new() -> Self {
         Self {
             state: Mutex::new(MessageProofState::Idle),
@@ -27,10 +29,12 @@ impl MessageProofSync {
         }
     }
 
+    /// Returns an `Arc` around a freshly created sync helper.
     pub fn shared() -> Arc<Self> {
-        Arc::new(Self::new())
+        Arc::new(Self::default())
     }
 
+    /// Waits until no message proof is currently running.
     pub async fn wait_for_idle(self: &Arc<Self>) {
         loop {
             if matches!(*self.state.lock().unwrap(), MessageProofState::Idle) {
@@ -40,6 +44,8 @@ impl MessageProofSync {
         }
     }
 
+    /// Marks the message prover as running and returns a permit that will reset
+    /// the state when dropped.
     pub async fn begin(self: &Arc<Self>) -> MessageProofPermit {
         self.wait_for_idle().await;
         {
@@ -58,6 +64,13 @@ impl MessageProofSync {
     }
 }
 
+impl Default for MessageProofSync {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// RAII guard that holds the prover lock until dropped.
 #[derive(Debug)]
 pub struct MessageProofPermit {
     sync: Arc<MessageProofSync>,
@@ -69,6 +82,7 @@ impl Drop for MessageProofPermit {
     }
 }
 
+/// Message prover work item delivered over the channel.
 pub struct MessageProofRequest {
     pub commit: RangeProofCommitted,
     pub permit: Option<MessageProofPermit>,
@@ -84,10 +98,12 @@ impl fmt::Debug for MessageProofRequest {
 }
 
 impl MessageProofRequest {
+    /// Creates a request that can run immediately (no permit).
     pub fn new(commit: RangeProofCommitted) -> Self {
         Self { commit, permit: None }
     }
 
+    /// Attaches a permit to the request so the receiver releases the lock once finished.
     pub fn with_permit(commit: RangeProofCommitted, permit: MessageProofPermit) -> Self {
         Self {
             commit,
