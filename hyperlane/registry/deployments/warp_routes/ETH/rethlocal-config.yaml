@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=../schema.json
+tokens:
+  - addressOrDenom: "0x032e1B988eB5Ac8F0C8617E09de92a664cABf37D"
+    chainName: rethlocal
+    decimals: 18
+    name: Ether
+    standard: EvmHypNative
+    symbol: ETH
