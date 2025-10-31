@@ -170,6 +170,7 @@ impl ProgramProver for EvCombinedProver {
 }
 
 impl EvCombinedProver {
+    /// Creates a new prover instance.
     pub fn new(app: AppContext, range_tx: mpsc::Sender<MessageProofRequest>) -> Result<Self> {
         let prover = prover_from_env();
         let config = EvCombinedProver::default_config(prover.as_ref());
@@ -182,11 +183,13 @@ impl EvCombinedProver {
         })
     }
 
+    /// Returns the prover config.
     pub fn default_config(prover: &SP1Prover) -> CombinedProverConfig {
         let (pk, vk) = prover.setup(EV_COMBINED_ELF);
         CombinedProverConfig::new(pk, vk, SP1ProofMode::Groth16)
     }
 
+    /// Starts the batched prover loop.
     pub async fn run(self, message_sync: Arc<MessageProofSync>) -> Result<()> {
         let mut batch_size = BATCH_SIZE;
         let mut scan_head: Option<u64> = None;
@@ -250,6 +253,8 @@ impl EvCombinedProver {
         }
     }
 
+    /// Loads the ProverStatus by querying the trusted state from the on-chain ism and the
+    /// the latest header from Celestia.
     async fn load_prover_status(&self) -> Result<ProverStatus> {
         let resp = self
             .app
@@ -270,6 +275,8 @@ impl EvCombinedProver {
         })
     }
 
+    /// Calculates the block prover batch size given the starting height, latest height and trusted height.
+    /// If a non-empty block is found then the batch is reduced.
     async fn calculate_batch_size(
         &self,
         scan_start: u64,
@@ -295,6 +302,7 @@ impl EvCombinedProver {
         Ok(BATCH_SIZE)
     }
 
+    /// Retruns true if the block contains zero blobs for the given Namespace.
     async fn is_empty_block(&self, height: u64, namespace: Namespace) -> Result<bool> {
         let blobs: Vec<Blob> = self
             .app
@@ -306,6 +314,7 @@ impl EvCombinedProver {
         Ok(blobs.is_empty())
     }
 
+    /// Submits a state transition proof msg to the zk verifier on-chain.
     async fn submit_proof_msg(&self, proof: &SP1ProofWithPublicValues) -> Result<()> {
         let id = self.app.ism_client.ism_id().to_string();
         let public_values = proof.public_values.as_slice().to_vec();
@@ -322,6 +331,7 @@ impl EvCombinedProver {
         Ok(())
     }
 
+    /// Builds the proof input structure for the given batch size starting from the provided height.
     async fn build_proof_inputs(
         &self,
         start_height: u64,
@@ -355,9 +365,10 @@ impl EvCombinedProver {
         Ok(EvCombinedInput { blocks: block_inputs })
     }
 
+    /// Builds a single block prover input for the given height.
     async fn build_block_input(
         &self,
-        block_number: u64,
+        height: u64,
         namespace: Namespace,
         trusted_height: &mut u64,
         trusted_root: &mut FixedBytes<32>,
@@ -367,12 +378,12 @@ impl EvCombinedProver {
         let blobs: Vec<Blob> = self
             .app
             .celestia_client
-            .blob_get_all(block_number, &[namespace])
+            .blob_get_all(height, &[namespace])
             .await?
             .unwrap_or_default();
-        debug!("Got {} blobs for block: {}", blobs.len(), block_number);
+        debug!("Got {} blobs for block: {}", blobs.len(), height);
 
-        let extended_header = self.app.celestia_client.header_get_by_height(block_number).await?;
+        let extended_header = self.app.celestia_client.header_get_by_height(height).await?;
         let namespace_data = self
             .app
             .celestia_client
@@ -388,7 +399,7 @@ impl EvCombinedProver {
         if blobs.is_empty() {
             debug!(
                 "No blobs for Celestia height {}, keeping trusted_height={} and trusted_root unchanged",
-                block_number, trusted_height
+                height, trusted_height
             );
             return Ok(BlockExecInput {
                 header_raw: serde_cbor::to_vec(&extended_header.header)?,

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use sp1_sdk::{SP1ProofMode, SP1ProvingKey, SP1VerifyingKey};
 use tracing::warn;
 
+// TODO: move these values to config.yaml
 pub const BATCH_SIZE: u64 = 1000;
 pub const MIN_BATCH_SIZE: u64 = 10;
 pub const WARN_DISTANCE: u64 = 1500;
