@@ -2,13 +2,13 @@
 //! two given heights against a given EVM block height.
 
 #![allow(dead_code)]
-use crate::prover::{prover_from_env, RangeProofCommitted, SP1Prover};
+use crate::prover::{prover_from_env, MessageProofRequest, MessageProofSync, RangeProofCommitted, SP1Prover};
 use crate::prover::{ProgramProver, ProverConfig};
 use alloy::hex::FromHex;
 use alloy_primitives::{Address, FixedBytes};
 use alloy_provider::{Provider, ProviderBuilder, WsConnect};
 use alloy_rpc_types::{EIP1186AccountProofResponse, Filter};
-use anyhow::{Context as AnyhowContext, Result};
+use anyhow::Result;
 use celestia_grpc_client::{CelestiaIsmClient, MsgProcessMessage, MsgSubmitMessages};
 use ev_state_queries::{hyperlane::indexer::HyperlaneIndexer, DefaultProvider, StateQueryProvider};
 use ev_zkevm_types::events::Dispatch;
@@ -24,7 +24,6 @@ use storage::hyperlane::StoredHyperlaneMessage;
 use storage::hyperlane::{message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore};
 use storage::proofs::ProofStorage;
 use tokio::sync::mpsc::Receiver;
-use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
@@ -158,23 +157,26 @@ impl HyperlaneMessageProver {
     /// Run the message prover with indexer
     pub async fn run(
         self: Arc<Self>,
-        mut range_rx: Receiver<RangeProofCommitted>,
+        mut range_rx: Receiver<MessageProofRequest>,
         ism_client: Arc<CelestiaIsmClient>,
-        is_proving_messages: Arc<Mutex<bool>>,
+        message_sync: Arc<MessageProofSync>,
     ) -> Result<()> {
         let evm_provider: DefaultProvider = ProviderBuilder::new().connect_http(Url::from_str(&self.ctx.evm_rpc)?);
         let socket = WsConnect::new(&self.ctx.evm_ws);
         let contract_address = self.ctx.mailbox_address;
         let filter = Filter::new().address(contract_address).event(&Dispatch::id());
         let mut indexer = HyperlaneIndexer::new(socket, contract_address, filter.clone());
-        loop {
-            // Wait for the next range proof to be committed
-            let commit_message: RangeProofCommitted =
-                range_rx.recv().await.context("Failed to receive commit message")?;
-
+        while let Some(request) = range_rx.recv().await {
+            let commit_message: RangeProofCommitted = request.commit;
             info!("Received commit message: {:?}", commit_message);
-            let committed_height = commit_message.trusted_height;
-            let committed_state_root = commit_message.trusted_root;
+
+            let committed_height = commit_message.trusted_height();
+            let committed_state_root = commit_message.trusted_root();
+
+            let _permit = match request.permit {
+                Some(permit) => permit,
+                None => message_sync.begin().await,
+            };
 
             let merkle_proof = evm_provider
                 .get_proof(
@@ -210,8 +212,9 @@ impl HyperlaneMessageProver {
                     )
                 );
             }
-            *is_proving_messages.lock().await = false;
         }
+
+        Ok(())
     }
 
     async fn run_inner(

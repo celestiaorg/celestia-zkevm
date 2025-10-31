@@ -3,7 +3,10 @@ use std::{str::FromStr, sync::Arc};
 use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
 use celestia_grpc_client::{types::ClientConfig, CelestiaIsmClient};
-use ev_prover::prover::programs::message::{AppContext, HyperlaneMessageProver};
+use ev_prover::prover::{
+    programs::message::{AppContext, HyperlaneMessageProver},
+    MessageProofSync,
+};
 use ev_state_queries::{DefaultProvider, MockStateQueryProvider};
 use reqwest::Url;
 use storage::{
@@ -11,7 +14,7 @@ use storage::{
     proofs::RocksDbProofStorage,
 };
 use tempfile::TempDir;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::mpsc;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::test]
@@ -68,5 +71,5 @@ async fn test_run_message_prover() {
         Arc::new(MockStateQueryProvider::new(evm_provider)),
     )
     .unwrap();
-    prover.run(rx, ism_client, Arc::new(Mutex::new(false))).await.unwrap();
+    prover.run(rx, ism_client, MessageProofSync::shared()).await.unwrap();
 }

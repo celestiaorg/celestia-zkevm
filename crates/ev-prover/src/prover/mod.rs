@@ -11,8 +11,10 @@ use tracing::debug;
 pub mod config;
 pub mod programs;
 pub mod service;
+pub mod sync;
 
 pub use config::{ProverConfig, ProverMode};
+pub use sync::{MessageProofPermit, MessageProofRequest, MessageProofSync};
 
 pub type SP1Prover = dyn Prover<CpuProverComponents>;
 
