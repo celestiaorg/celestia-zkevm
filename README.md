@@ -1,4 +1,4 @@
-# ZK EVM Hyperlane
+# Celestia zkEVM
 
 > [!WARNING]
 > This repository is a work in progress and under active development.
