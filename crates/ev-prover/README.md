@@ -12,12 +12,23 @@ when using the succinct prover network, because in default mode the base fee wil
     make start
     ```
 
-2. Deploy the ZKISM
+2. Initialize a new `ev-prover` home directory and configuration file with defaults:
+    ```shell
+    ev-prover init
+    ```
+
+3. (Optional) In case you have auth enabled on celestia node, you need to create an auth token and set it to the config:
+    ```shell
+    CELESTIA_NODE_AUTH_TOKEN=$(docker compose exec celestia-bridge celestia bridge auth read)
+    sed "s|celestia_auth_token: .*|celestia_auth_token: '${CELESTIA_NODE_AUTH_TOKEN}'|" ~/.ev-prover/config/config.yaml > ~/.ev-prover/config/config.yaml.tmp && mv ~/.ev-prover/config/config.yaml.tmp ~/.ev-prover/config/config.yaml
+    ```
+
+4. Deploy the ZKISM
     ```shell
     make deploy-ism
     ```
 
-3. Update the ISM used by Hyperlane to the new ZKISM 
+4 Update the ISM used by Hyperlane to the new ZKISM 
     ```shell
     make update-ism
     ```
@@ -29,10 +40,10 @@ Run the following commands from the root of the repository.
     cargo install --path ./crates/ev-prover --features combined
     ```
 
-2. Initialize a new `ev-prover` home directory and configuration file with defaults:
+<!-- 2. Initialize a new `ev-prover` home directory and configuration file with defaults:
     ```shell
     ev-prover init
-    ```
+    ``` -->
 
 3. Start the `ev-prover` application binary using:
 
