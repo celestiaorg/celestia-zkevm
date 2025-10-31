@@ -84,10 +84,12 @@ pub async fn create_zkism() -> Result<()> {
     // todo: deploy the ISM and Update
     let pub_key = get_sequencer_pubkey(config.rpc.evnode_rpc).await?;
 
+    info!("setting up ELF for state proofs");
     let prover = ProverClient::builder().cpu().build();
     let (_, vk) = prover.setup(EV_COMBINED_ELF);
     let state_transition_vkey = vk.bytes32_raw().to_vec();
 
+    info!("setting up ELF for membership proofs");
     let (_, vk) = prover.setup(EV_HYPERLANE_ELF);
     let state_membership_vkey = vk.bytes32_raw().to_vec();
 
