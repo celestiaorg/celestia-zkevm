@@ -2,8 +2,8 @@
 The `ev-prover` service is a simple gRPC service designed to serve ZK proofs to clients.
 It encapsulates the SP1 programs maintained under `sp1`, and uses the `sp1_sdk::ProverClient` in order to interface with them.
 
-## Running the ev-prover service in `combined` mode for a private or public testnet
-The combined mode aggregates a range of blocks and proves them in one go, using a single GPU instance. This mode is better than default
+## Running the ev-prover service in `batch_mode` mode for a private or public testnet
+The batch mode aggregates a range of blocks and proves them in one go, using a single GPU instance. This mode is better than default
 when using the succinct prover network, because in default mode the base fee will accumulate and cause huge costs.
 
 ### Setup
@@ -26,7 +26,7 @@ Run the following commands from the root of the repository.
 
 1. Install the binary to Cargo binary directory ~/.cargo/bin
     ```shell
-    cargo install --path ./crates/ev-prover --features combined
+    cargo install --path ./crates/ev-prover --features batch_mode
     ```
 
 2. Initialize a new `ev-prover` home directory and configuration file with defaults:
@@ -40,10 +40,10 @@ Run the following commands from the root of the repository.
     RUST_LOG="ev_prover=debug" ev-prover start
     ```
 
-The service will join the tasks in `src/prover/programs/combined.rs` and `src/prover/programs/message.rs`.
+The service will join the tasks in `src/prover/programs/batch.rs` and `src/prover/programs/message.rs`.
 
 ## Running the ev-prover service using the `ev-exec` and `ev-range-exec` circuits
-The default mode, without the `combined` feature enabled, will prove every single blocks and recursively verify block proofs in a
+The default mode, without the `batch_mode` feature enabled, will prove every single blocks and recursively verify block proofs in a
 range circuit. This is ideal for minimum latency, but expensive when running on Succinct's prover network / when paying for every prover instance
 launch. 
 

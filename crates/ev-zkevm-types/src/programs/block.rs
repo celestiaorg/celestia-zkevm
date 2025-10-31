@@ -91,7 +91,7 @@ pub struct BlockRangeExecInput {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct EvCombinedInput {
+pub struct BatchExecInput {
     pub blocks: Vec<BlockExecInput>,
 }
 

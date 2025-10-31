@@ -20,7 +20,7 @@ use crate::proto::celestia::prover::v1::{
     GetBlockProofRequest, GetBlockProofsInRangeRequest, GetLatestBlockProofRequest, GetLatestMembershipProofRequest,
     GetMembershipProofRequest, GetRangeProofsRequest,
 };
-use crate::prover::programs::combined::EV_COMBINED_ELF;
+use crate::prover::programs::batch::BATCH_ELF;
 use crate::prover::programs::message::EV_HYPERLANE_ELF;
 use crate::server::start_server;
 use storage::proofs::{ProofStorage, RocksDbProofStorage};
@@ -86,7 +86,7 @@ pub async fn create_zkism() -> Result<()> {
 
     info!("setting up ELF for state proofs");
     let prover = ProverClient::builder().cpu().build();
-    let (_, vk) = prover.setup(EV_COMBINED_ELF);
+    let (_, vk) = prover.setup(BATCH_ELF);
     let state_transition_vkey = vk.bytes32_raw().to_vec();
 
     info!("setting up ELF for membership proofs");
