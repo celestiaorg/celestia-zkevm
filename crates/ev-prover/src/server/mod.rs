@@ -1,3 +1,4 @@
+use std::env;
 use std::sync::Arc;
 
 use alloy_primitives::Address;
@@ -122,6 +123,9 @@ pub async fn start_server(config: Config) -> Result<()> {
 
     // Always spawn message prover
     tokio::spawn({
+        let ism_id = env::var("CELESTIA_ISM_ID").expect("CELESTIA_ISM_ID must be set");
+        let mailbox_address = env::var("MAILBOX_ADDRESS").expect("MAILBOX_ADDRESS must be set");
+        let merkle_tree_address = env::var("MERKLE_TREE_ADDRESS").expect("MERKLE_TREE_ADDRESS must be set");
         let message_storage_path = Config::storage_path().join("messages.db");
         let snapshot_storage_path = Config::storage_path().join("snapshots.db");
         let hyperlane_message_store = Arc::new(HyperlaneMessageStore::new(message_storage_path).unwrap());
@@ -130,8 +134,9 @@ pub async fn start_server(config: Config) -> Result<()> {
         let ctx = MessageAppContext {
             evm_rpc: reth_rpc_url.clone(),
             evm_ws: reth_ws_url,
-            mailbox_address: Address::from_str("0xb1c938f5ba4b3593377f399e12175e8db0c787ff").unwrap(),
-            merkle_tree_address: Address::from_str("0xfcb1d485ef46344029d9e8a7925925e146b3430e").unwrap(),
+            mailbox_address: Address::from_str(&mailbox_address).unwrap(),
+            merkle_tree_address: Address::from_str(&merkle_tree_address).unwrap(),
+            ism_id,
         };
 
         let evm_provider: DefaultProvider = ProviderBuilder::new().connect_http(Url::from_str(&reth_rpc_url).unwrap());
