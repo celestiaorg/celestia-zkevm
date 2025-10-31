@@ -1,0 +1,16 @@
+[package]
+version = "0.1.0"
+name = "ev-batch-script"
+edition = "2021"
+default-run = "vkey-ev-batch"
+
+[[bin]]
+name = "vkey-ev-batch"
+path = "src/bin/vkey.rs"
+
+[dependencies]
+bincode = { workspace = true }
+sp1-sdk = { workspace = true }
+
+[build-dependencies]
+sp1-build = { workspace = true }

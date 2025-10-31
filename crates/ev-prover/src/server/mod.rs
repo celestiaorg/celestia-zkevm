@@ -30,14 +30,14 @@ use crate::prover::programs::message::HyperlaneMessageProver;
 use crate::prover::service::ProverService;
 use crate::prover::{MessageProofRequest, MessageProofSync};
 
-#[cfg(not(feature = "combined"))]
+#[cfg(not(feature = "batch_mode"))]
 use crate::prover::programs::{
     block::{AppContext, BlockExecProver},
     range::{BlockRangeExecProver, BlockRangeExecService},
 };
 
-#[cfg(feature = "combined")]
-use crate::prover::programs::combined::AppContext as CombinedAppContext;
+#[cfg(feature = "batch_mode")]
+use crate::prover::programs::batch::AppContext as BatchAppContext;
 
 use crate::prover::programs::message::AppContext as MessageAppContext;
 
@@ -75,7 +75,7 @@ pub async fn start_server(config: Config) -> Result<()> {
     let (tx_range, rx_range) = mpsc::channel::<MessageProofRequest>(256);
     let message_sync = MessageProofSync::shared();
 
-    #[cfg(not(feature = "combined"))]
+    #[cfg(not(feature = "batch_mode"))]
     {
         let batch_size = config_clone.batch_size;
         let concurrency = config_clone.concurrency;
@@ -107,16 +107,16 @@ pub async fn start_server(config: Config) -> Result<()> {
         });
     }
 
-    #[cfg(feature = "combined")]
+    #[cfg(feature = "batch_mode")]
     {
-        use crate::prover::programs::combined::EvCombinedProver;
+        use crate::prover::programs::batch::BatchExecProver;
 
-        let combined_context = CombinedAppContext::from_config(&config_clone, Arc::clone(&ism_client)).await?;
-        let combined_prover = EvCombinedProver::new(combined_context, tx_range.clone())?;
+        let app_context = BatchAppContext::from_config(&config_clone, Arc::clone(&ism_client)).await?;
+        let batch_prover = BatchExecProver::new(app_context, tx_range.clone())?;
         let message_sync = Arc::clone(&message_sync);
         tokio::spawn(async move {
-            if let Err(e) = combined_prover.run(message_sync).await {
-                error!("Combined prover task failed: {e:?}");
+            if let Err(e) = batch_prover.run(message_sync).await {
+                error!("batch execution prover task failed: {e:?}");
             }
         });
     }
