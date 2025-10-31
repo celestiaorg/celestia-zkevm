@@ -32,7 +32,7 @@
 #![no_main]
 sp1_zkvm::entrypoint!(main);
 
-use ev_zkevm_types::programs::block::{BlockVerifier, BatchExecInput};
+use ev_zkevm_types::programs::block::{BatchExecInput, BlockVerifier};
 
 pub fn main() {
     let input: BatchExecInput = sp1_zkvm::io::read::<BatchExecInput>();
