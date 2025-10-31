@@ -17,7 +17,6 @@ use storage::hyperlane::snapshot::HyperlaneSnapshotStore;
 use storage::proofs::RocksDbProofStorage;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
-use tokio::sync::Mutex;
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server;
 use tonic_reflection::server::Builder as ReflectionBuilder;
@@ -28,6 +27,7 @@ use crate::proto::celestia::prover::v1::prover_server::ProverServer;
 use crate::prover::programs::block::TrustedState;
 use crate::prover::programs::message::HyperlaneMessageProver;
 use crate::prover::service::ProverService;
+use crate::prover::{MessageProofRequest, MessageProofSync};
 
 #[cfg(not(feature = "combined"))]
 use crate::prover::programs::{
@@ -71,8 +71,8 @@ pub async fn start_server(config: Config) -> Result<()> {
     let config = ClientConfig::from_env()?;
     let ism_client = Arc::new(CelestiaIsmClient::new(config).await?);
     #[allow(unused_mut)]
-    let (tx_range, mut rx_range) = mpsc::channel(256);
-    let is_proving_messages: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+    let (tx_range, rx_range) = mpsc::channel::<MessageProofRequest>(256);
+    let message_sync = MessageProofSync::shared();
 
     #[cfg(not(feature = "combined"))]
     {
@@ -108,16 +108,14 @@ pub async fn start_server(config: Config) -> Result<()> {
 
     #[cfg(feature = "combined")]
     {
-        tokio::spawn({
-            use crate::prover::programs::combined::EvCombinedProver;
+        use crate::prover::programs::combined::EvCombinedProver;
 
-            let ism_client = ism_client.clone();
-            let combined_prover = EvCombinedProver::new(CombinedAppContext::from_env()?, tx_range).unwrap();
-            let is_proving_messages = is_proving_messages.clone();
-            async move {
-                if let Err(e) = combined_prover.run(ism_client, is_proving_messages).await {
-                    error!("Combined prover task failed: {e:?}");
-                }
+        let combined_context = CombinedAppContext::from_config(&config_clone, Arc::clone(&ism_client)).await?;
+        let combined_prover = EvCombinedProver::new(combined_context, tx_range.clone())?;
+        let message_sync = Arc::clone(&message_sync);
+        tokio::spawn(async move {
+            if let Err(e) = combined_prover.run(message_sync).await {
+                error!("Combined prover task failed: {e:?}");
             }
         });
     }
@@ -147,11 +145,11 @@ pub async fn start_server(config: Config) -> Result<()> {
         )
         .unwrap();
 
-        let is_proving_messages = is_proving_messages.clone();
+        let message_sync = Arc::clone(&message_sync);
 
         async move {
             let ism_client = ism_client.clone();
-            if let Err(e) = message_prover.run(rx_range, ism_client, is_proving_messages).await {
+            if let Err(e) = message_prover.run(rx_range, ism_client, message_sync).await {
                 error!("Message prover task failed: {e:?}");
             }
         }

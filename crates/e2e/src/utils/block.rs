@@ -3,17 +3,18 @@
 
 use alloy_primitives::{FixedBytes, hex};
 use alloy_provider::{Provider, ProviderBuilder};
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use celestia_rpc::{BlobClient, Client, HeaderClient, ShareClient};
 use celestia_types::Blob;
 use celestia_types::nmt::{Namespace, NamespaceProof};
-use ev_prover::prover::programs::combined::get_block_inputs;
 use ev_prover::{generate_client_executor_input, get_sequencer_pubkey, load_chain_spec_from_genesis};
 use ev_types::v1::SignedData;
 use ev_zkevm_types::programs::block::{BlockExecOutput, BlockRangeExecInput, BlockRangeExecOutput};
 use eyre::Context;
 use prost::Message;
+use reth_chainspec::ChainSpec;
 use rsp_client_executor::io::EthClientExecutorInput;
+use rsp_primitives::genesis::Genesis;
 use sp1_sdk::{EnvProver, HashableKey, SP1Proof, SP1ProofWithPublicValues, SP1Stdin};
 use std::env;
 use std::error::Error;
@@ -165,12 +166,12 @@ pub async fn parallel_prover(
                     &celestia_client,
                     rpc_config::EVM_RPC_URL,
                     block_number,
-                    namespace,
+                    namespace.clone(),
                     &mut trusted_heights[(block_number - start_height) as usize],
                     &mut trusted_roots[(block_number - start_height) as usize],
                     chain_spec.clone(),
                     genesis.clone(),
-                    pub_key.clone(),
+                    &pub_key,
                 )
                 .await
                 .expect("Failed to write inputs");
@@ -293,12 +294,12 @@ pub async fn synchronous_prover(
             &celestia_client,
             rpc_config::EVM_RPC_URL,
             block_number,
-            namespace,
+            namespace.clone(),
             &mut *trusted_height,
             &mut *trusted_root,
             chain_spec.clone(),
             genesis.clone(),
-            pub_key.clone(),
+            &pub_key,
         )
         .await
         .expect("Failed to write inputs");
@@ -357,4 +358,94 @@ pub async fn synchronous_prover(
     debug!("Target state root: {:?}", public_values.new_state_root);
 
     Ok(proof)
+}
+
+pub async fn get_block_inputs(
+    celestia_client: &Client,
+    evm_rpc: &str,
+    block_number: u64,
+    namespace: Namespace,
+    trusted_height: &mut u64,
+    trusted_root: &mut FixedBytes<32>,
+    chain_spec: Arc<ChainSpec>,
+    genesis: Genesis,
+    pub_key: &[u8],
+) -> Result<ev_zkevm_types::programs::block::BlockExecInput> {
+    let blobs: Vec<Blob> = celestia_client
+        .blob_get_all(block_number, &[namespace])
+        .await?
+        .unwrap_or_default();
+    debug!("Got {} blobs for block: {}", blobs.len(), block_number);
+
+    let extended_header = celestia_client.header_get_by_height(block_number).await?;
+    let namespace_data = celestia_client
+        .share_get_namespace_data(&extended_header, namespace)
+        .await?;
+    let mut proofs: Vec<NamespaceProof> = Vec::new();
+    for row in namespace_data.rows {
+        proofs.push(row.proof);
+    }
+    debug!("Got NamespaceProofs, total: {}", proofs.len());
+
+    let mut executor_inputs: Vec<EthClientExecutorInput> = Vec::new();
+    if blobs.is_empty() {
+        debug!(
+            "No blobs for Celestia height {}, keeping trusted_height={} and trusted_root unchanged",
+            block_number, trusted_height
+        );
+        return Ok(ev_zkevm_types::programs::block::BlockExecInput {
+            header_raw: serde_cbor::to_vec(&extended_header.header)?,
+            dah: extended_header.dah,
+            blobs_raw: serde_cbor::to_vec(&blobs)?,
+            pub_key: pub_key.to_vec(),
+            namespace,
+            proofs,
+            executor_inputs: vec![],
+            trusted_height: *trusted_height,
+            trusted_root: *trusted_root,
+        });
+    }
+
+    let mut last_height = 0;
+    for blob in blobs.as_slice() {
+        let signed_data = match SignedData::decode(blob.data.as_slice()) {
+            Ok(data) => data,
+            Err(_) => continue,
+        };
+        let data = signed_data.data.ok_or_else(|| anyhow!("Data not found"))?;
+        let height = data.metadata.ok_or_else(|| anyhow!("Metadata not found"))?.height;
+        last_height = height;
+        debug!("Got SignedData for EVM block {height}");
+
+        let client_executor_input =
+            generate_client_executor_input(evm_rpc, height, chain_spec.clone(), genesis.clone()).await?;
+        executor_inputs.push(client_executor_input);
+    }
+
+    let input = ev_zkevm_types::programs::block::BlockExecInput {
+        header_raw: serde_cbor::to_vec(&extended_header.header)?,
+        dah: extended_header.dah,
+        blobs_raw: serde_cbor::to_vec(&blobs)?,
+        pub_key: pub_key.to_vec(),
+        namespace,
+        proofs,
+        executor_inputs: executor_inputs.clone(),
+        trusted_height: *trusted_height,
+        trusted_root: *trusted_root,
+    };
+
+    let provider = ProviderBuilder::new().connect_http(evm_rpc.parse()?);
+    let block = provider
+        .get_block_by_number(last_height.into())
+        .await?
+        .ok_or_else(|| anyhow!("Block {last_height} not found"))?;
+
+    *trusted_height = last_height;
+    *trusted_root = block.header.state_root;
+    debug!(
+        "Updated trusted_height to {} and trusted_root to {:?}",
+        trusted_height, trusted_root
+    );
+
+    Ok(input)
 }

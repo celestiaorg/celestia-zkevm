@@ -15,7 +15,8 @@ use tokio::sync::Semaphore;
 use tracing::{debug, error, info};
 
 use crate::prover::{
-    programs::block::EV_EXEC_ELF, BlockProofCommitted, ProgramProver, ProverConfig, RangeProofCommitted,
+    programs::block::EV_EXEC_ELF, BlockProofCommitted, MessageProofRequest, ProgramProver, ProverConfig,
+    RangeProofCommitted,
 };
 use crate::prover::{prover_from_env, SP1Prover};
 
@@ -185,7 +186,7 @@ pub struct BlockRangeExecService {
     prover: Arc<BlockRangeExecProver>,
     storage: Arc<dyn ProofStorage>,
     rx_block: Receiver<BlockProofCommitted>,
-    tx_range: Sender<RangeProofCommitted>,
+    tx_range: Sender<MessageProofRequest>,
 
     batch_size: usize,
     concurrency: Arc<Semaphore>,
@@ -200,7 +201,7 @@ impl BlockRangeExecService {
         prover: Arc<BlockRangeExecProver>,
         storage: Arc<dyn ProofStorage>,
         rx_block: Receiver<BlockProofCommitted>,
-        tx_range: Sender<RangeProofCommitted>,
+        tx_range: Sender<MessageProofRequest>,
         batch_size: usize,
         concurrency: usize,
     ) -> Result<Self> {
@@ -250,7 +251,8 @@ impl BlockRangeExecService {
                             }
 
                             let event = RangeProofCommitted::new(output.new_height, output.new_state_root);
-                            if let Err(e) = tx.send(event).await {
+                            let message = MessageProofRequest::new(event);
+                            if let Err(e) = tx.send(message).await {
                                 error!(?e, "failed to send RangeProofCommitted event on channel");
                             }
                         }
