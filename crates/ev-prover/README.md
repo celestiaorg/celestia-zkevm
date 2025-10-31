@@ -19,8 +19,8 @@ when using the succinct prover network, because in default mode the base fee wil
 
 3. (Optional) In case you have auth enabled on celestia node, you need to create an auth token and set it to the config:
     ```shell
-    CELESTIA_NODE_AUTH_TOKEN=$(celestia bridge auth read | tail -n 1)
-    sed -i "s|celestia_auth_token: .*|celestia_auth_token: '${CELESTIA_NODE_AUTH_TOKEN}'|" ~/.ev-prover/config/config.yaml
+    CELESTIA_NODE_AUTH_TOKEN=$(docker compose exec celestia-bridge celestia bridge auth read)
+    sed "s|celestia_auth_token: .*|celestia_auth_token: '${CELESTIA_NODE_AUTH_TOKEN}'|" ~/.ev-prover/config/config.yaml > ~/.ev-prover/config/config.yaml.tmp && mv ~/.ev-prover/config/config.yaml.tmp ~/.ev-prover/config/config.yaml
     ```
 
 4. Deploy the ZKISM
