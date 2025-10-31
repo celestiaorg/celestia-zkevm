@@ -10,7 +10,7 @@ use crate::{
 };
 use alloy_primitives::FixedBytes;
 use alloy_provider::{Provider, ProviderBuilder};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use celestia_grpc_client::{CelestiaIsmClient, MsgUpdateZkExecutionIsm, QueryIsmRequest};
 use celestia_rpc::{BlobClient, Client, HeaderClient, ShareClient};
@@ -26,7 +26,7 @@ use rsp_client_executor::io::EthClientExecutorInput;
 use rsp_primitives::genesis::Genesis;
 use sp1_sdk::{include_elf, SP1ProofMode, SP1ProofWithPublicValues, SP1ProvingKey, SP1Stdin, SP1VerifyingKey};
 use tokio::{sync::mpsc, time::interval};
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::config::Config;
 use crate::prover::ProgramProver;
@@ -229,36 +229,22 @@ impl EvCombinedProver {
             }
 
             let start_height = status.trusted_celestia_height + 1;
-            let stdin = self.build_proof_inputs(start_height, &status, batch_size).await?;
+            let input = self.build_proof_inputs(start_height, &status, batch_size).await?;
 
             let start_time = Instant::now();
-            // TODO: we can use the self.prove() method to get (proof, outputs)
-            let proof = self
-                .prover
-                .prove(&self.config.pk, &stdin, SP1ProofMode::Groth16)
-                .context("Failed to prove")?;
+            let (proof, output) = self.prove(input).await?;
             info!("Proof generation time: {}", start_time.elapsed().as_millis());
 
-            let block_proof_msg = MsgUpdateZkExecutionIsm::new(
-                self.app.ism_client.ism_id().to_string(),
-                proof.bytes(),
-                proof.public_values.as_slice().to_vec(),
-                self.app.ism_client.signer_address().to_string(),
-            );
-
-            info!("Updating ZKISM on Celestia...");
-            let response = self.app.ism_client.send_tx(block_proof_msg).await?;
-            assert!(response.success);
-            info!("[Done] ZKISM was updated successfully");
-
-            let public_values: BlockRangeExecOutput = bincode::deserialize(proof.public_values.as_slice())?;
+            if let Err(e) = self.submit_proof_msg(&proof).await {
+                error!(?e, "failed to submit tx to ism");
+            }
 
             // reset batch size and fast forward checkpoints
             batch_size = BATCH_SIZE;
             scan_head = Some(status.celestia_head + 1);
 
             let permit = message_sync.begin().await;
-            let commit = RangeProofCommitted::new(public_values.new_height, public_values.new_state_root);
+            let commit = RangeProofCommitted::new(output.new_height, output.new_state_root);
             let request = MessageProofRequest::with_permit(commit, permit);
             self.range_tx.send(request).await?;
         }
@@ -320,7 +306,28 @@ impl EvCombinedProver {
         Ok(blobs.is_empty())
     }
 
-    async fn build_proof_inputs(&self, start_height: u64, status: &ProverStatus, batch_size: u64) -> Result<SP1Stdin> {
+    async fn submit_proof_msg(&self, proof: &SP1ProofWithPublicValues) -> Result<()> {
+        let id = self.app.ism_client.ism_id().to_string();
+        let public_values = proof.public_values.as_slice().to_vec();
+        let signer = self.app.ism_client.signer_address().to_string();
+
+        let msg = MsgUpdateZkExecutionIsm::new(id, proof.bytes(), public_values, signer);
+
+        info!("Updating ZKISM on Celestia...");
+        let res = self.app.ism_client.send_tx(msg).await?;
+        assert!(res.success);
+
+        info!("[Done] Proof tx submitted to ism with hash: {}", res.tx_hash);
+
+        Ok(())
+    }
+
+    async fn build_proof_inputs(
+        &self,
+        start_height: u64,
+        status: &ProverStatus,
+        batch_size: u64,
+    ) -> Result<EvCombinedInput> {
         let mut current_height = status.trusted_height;
         let mut current_root = status.trusted_root;
 
@@ -343,9 +350,9 @@ impl EvCombinedProver {
             block_inputs.push(input);
         }
 
-        let mut stdin = SP1Stdin::new();
-        stdin.write(&EvCombinedInput { blocks: block_inputs });
-        Ok(stdin)
+        // let mut stdin = SP1Stdin::new();
+        // stdin.write(&);
+        Ok(EvCombinedInput { blocks: block_inputs })
     }
 
     async fn build_block_input(
