@@ -123,6 +123,28 @@ impl MerkleTree {
         Ok(item)
     }
 
+    /// Get the merkle branch of `leaves[index]` in a tree containing exactly `leaves`, in insertion order.
+    pub fn merkle_proof(leaves: &[String], index: usize) -> Result<[String; TREE_DEPTH]> {
+        anyhow::ensure!(
+            index < leaves.len(),
+            "leaf index {index} out of range for {} leaves",
+            leaves.len()
+        );
+        let zeroes = Self::zero_hashes();
+        let mut branch: [String; TREE_DEPTH] = std::array::from_fn(|_| String::new());
+        let mut level = leaves.to_vec();
+        let mut idx = index;
+        for (depth, zero) in zeroes.iter().enumerate() {
+            branch[depth] = level.get(idx ^ 1).unwrap_or(zero).clone();
+            level = level
+                .chunks(2)
+                .map(|pair| keccak256_concat(&pair[0], pair.get(1).unwrap_or(zero)))
+                .collect::<Result<_>>()?;
+            idx /= 2;
+        }
+        Ok(branch)
+    }
+
     /// Get the zero hash.
     pub fn zero_bytes() -> String {
         ZERO_BYTES.to_string()
@@ -134,12 +156,51 @@ impl MerkleTree {
     }
 }
 
+/// Encode the ISM metadata for a message: leaf index (u32, big-endian) followed by the 32 branch nodes.
+pub fn encode_merkle_proof_metadata(index: u32, branch: &[String; TREE_DEPTH]) -> Result<Vec<u8>> {
+    let mut metadata = index.to_be_bytes().to_vec();
+    for node in branch {
+        let node = hex::decode(node)?;
+        anyhow::ensure!(node.len() == HASH_LENGTH, "branch node must be {HASH_LENGTH} bytes");
+        metadata.extend(node);
+    }
+    Ok(metadata)
+}
+
 #[cfg(test)]
 mod tests {
     use alloy_primitives::Keccak256;
     use anyhow::Result;
 
-    use super::{MerkleTree, ZERO_HASHES};
+    use super::{MerkleTree, TREE_DEPTH, ZERO_HASHES, encode_merkle_proof_metadata};
+
+    #[test]
+    fn test_merkle_proof_matches_incremental_root() {
+        let leaves: Vec<String> = (0u8..7).map(|i| hex::encode([i + 1; 32])).collect();
+        let mut tree = MerkleTree::default();
+        for leaf in &leaves {
+            tree.insert(leaf.clone()).unwrap();
+        }
+        let root = tree.root_with_ctx(&MerkleTree::zero_hashes()).unwrap();
+
+        for (index, leaf) in leaves.iter().enumerate() {
+            let branch = MerkleTree::merkle_proof(&leaves, index).unwrap();
+            assert_eq!(
+                MerkleTree::branch_root(leaf.clone(), &branch, index as u128).unwrap(),
+                root
+            );
+        }
+        assert!(MerkleTree::merkle_proof(&leaves, leaves.len()).is_err());
+    }
+
+    #[test]
+    fn test_encode_merkle_proof_metadata() {
+        let branch: [String; TREE_DEPTH] = std::array::from_fn(|i| hex::encode([i as u8; 32]));
+        let metadata = encode_merkle_proof_metadata(0x01020304, &branch).unwrap();
+        assert_eq!(metadata.len(), 4 + TREE_DEPTH * 32);
+        assert_eq!(&metadata[..4], &[1, 2, 3, 4]);
+        assert_eq!(&metadata[4 + 31 * 32..], &[31u8; 32]);
+    }
 
     #[test]
     fn test_insert() {

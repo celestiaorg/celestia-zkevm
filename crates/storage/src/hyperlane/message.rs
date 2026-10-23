@@ -66,6 +66,22 @@ impl HyperlaneMessageStore {
         Ok(result)
     }
 
+    /// Get all stored Hyperlane messages up to and including the given block height, ordered by block and index.
+    pub fn get_up_to_block(&self, block: u64) -> Result<Vec<StoredHyperlaneMessage>> {
+        let db = self.db.read().map_err(|e| anyhow::anyhow!("lock error: {e}"))?;
+        let cf = db.cf_handle("messages").context("Missing CF")?;
+        let mut result = Vec::new();
+        for kv in db.iterator_cf(cf, IteratorMode::Start) {
+            let (k, v) = kv?;
+            let key_block = u64::from_be_bytes(k[..8].try_into().context("messages CF key too short")?);
+            if key_block > block {
+                break;
+            }
+            result.push(bincode::deserialize(&v)?);
+        }
+        Ok(result)
+    }
+
     /// Get the next index to use for insertion.
     pub fn current_index(&self) -> Result<u64> {
         let db = self.db.read().map_err(|e| anyhow::anyhow!("lock error: {e}"))?;

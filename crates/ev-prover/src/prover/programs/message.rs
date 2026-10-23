@@ -1,5 +1,5 @@
-//! The prover implementation of the Hyperlane Message circuit proves all messages that have occurred in between
-//! two given heights against a given EVM block height.
+//! The prover implementation of the Hyperlane Message circuit proves the Hyperlane merkle tree root and count against
+//! a given EVM block height. Messages are then relayed with a merkle proof against the proven root as ISM metadata.
 
 #![allow(dead_code)]
 use crate::prover::chain::ChainContext;
@@ -14,8 +14,9 @@ use celestia_grpc_client::{MsgProcessMessage, MsgSubmitMessages};
 use ev_state_queries::StateQueryProvider;
 use ev_zkevm_types::hyperlane::encode_hyperlane_message;
 use ev_zkevm_types::hyperlane::{
-    io::{HyperlaneMessageInputs, HyperlaneMessageOutputs},
-    proof::{HyperlaneBranchProof, HyperlaneBranchProofInputs, HYPERLANE_MERKLE_TREE_KEYS},
+    io::{HyperlaneTreeInputs, HyperlaneTreeOutputs},
+    merkle::{encode_merkle_proof_metadata, MerkleTree},
+    proof::{hyperlane_merkle_tree_state_keys, HyperlaneBranchProof, HyperlaneBranchProofInputs},
 };
 use sp1_sdk::{Elf, Prover, ProvingKey, SP1ProofMode, SP1ProofWithPublicValues, SP1Stdin};
 use std::sync::Arc;
@@ -54,8 +55,8 @@ pub struct HyperlaneMessageProver {
 
 impl ProgramProver for HyperlaneMessageProver {
     type Config = StandardProverConfig;
-    type Input = HyperlaneMessageInputs;
-    type Output = HyperlaneMessageOutputs;
+    type Input = HyperlaneTreeInputs;
+    type Output = HyperlaneTreeOutputs;
 
     fn cfg(&self) -> &Self::Config {
         &self.config
@@ -68,7 +69,7 @@ impl ProgramProver for HyperlaneMessageProver {
     }
 
     fn post_process(&self, proof: SP1ProofWithPublicValues) -> Result<Self::Output> {
-        Ok(bincode::deserialize::<HyperlaneMessageOutputs>(
+        Ok(bincode::deserialize::<HyperlaneTreeOutputs>(
             proof.public_values.as_slice(),
         )?)
     }
@@ -127,7 +128,7 @@ impl HyperlaneMessageProver {
                 None => message_sync.begin().await,
             };
 
-            let keys: Vec<FixedBytes<32>> = HYPERLANE_MERKLE_TREE_KEYS
+            let keys: Vec<FixedBytes<32>> = hyperlane_merkle_tree_state_keys()
                 .iter()
                 .map(|k| FixedBytes::from_hex(k).map_err(|e| anyhow::anyhow!("Failed to parse fixed bytes: {e}")))
                 .collect::<Result<Vec<_>>>()?;
@@ -180,16 +181,11 @@ impl HyperlaneMessageProver {
             return Ok(());
         }
 
-        // Prepare the branch proof for verification
-        let branch_proof = HyperlaneBranchProof::new(proof);
-
-        // Construct program inputs from values
-        let input = HyperlaneMessageInputs::new(
+        // Construct program inputs from the storage proof of the tree branch and count
+        let input = HyperlaneTreeInputs::new(
             state_root.to_string(),
             self.ctx.merkle_tree_address().to_string(),
-            messages.clone().into_iter().map(|m| m.message).collect(),
-            HyperlaneBranchProofInputs::from(branch_proof),
-            snapshot.tree.clone(),
+            HyperlaneBranchProofInputs::from(HyperlaneBranchProof::new(proof)),
         );
 
         // Update the snapshot's merkle tree with new messages
@@ -202,10 +198,26 @@ impl HyperlaneMessageProver {
             messages.iter().map(|m| m.message.id()).collect::<Vec<String>>()
         );
 
-        // Generate the message proof
+        // Generate the tree proof
         let ism_client = self.ctx.ism_client();
         let message_proof = self.prove(input).await?;
-        info!("Message proof generated successfully");
+        info!("Tree proof generated successfully");
+
+        // Every message is relayed with a merkle proof against the proven root, which needs all leaves of the tree.
+        let leaves: Vec<String> = self
+            .message_store
+            .get_up_to_block(committed_height)?
+            .into_iter()
+            .map(|m| m.message.id())
+            .collect();
+        let tree_root = alloy::hex::decode(snapshot.tree.root_with_ctx(&MerkleTree::zero_hashes())?)?;
+        if leaves.len() as u64 != message_proof.1.count || tree_root != message_proof.1.tree_root {
+            return Err(anyhow::anyhow!(
+                "Local message store does not match the proven tree: {} leaves, proven count {}",
+                leaves.len(),
+                message_proof.1.count
+            ));
+        }
 
         // Prepare the proof submission message
         let message_proof_msg = MsgSubmitMessages::new(
@@ -244,11 +256,19 @@ impl HyperlaneMessageProver {
         info!("Relaying verified Hyperlane messages to Celestia...");
 
         for message in messages.clone() {
+            let index = message.message.nonce;
+            if leaves.get(index as usize) != Some(&message.message.id()) {
+                return Err(anyhow::anyhow!(
+                    "Message nonce {index} is not its leaf index in the tree"
+                ));
+            }
+            let branch = MerkleTree::merkle_proof(&leaves, index as usize)?;
+            let metadata = encode_merkle_proof_metadata(index, &branch)?;
             let message_hex = alloy::hex::encode(encode_hyperlane_message(&message.message)?);
             let msg = MsgProcessMessage::new(
                 self.ctx.config().hyperlane.celestia.mailbox_id.clone(),
                 ism_client.signer_address().to_string(),
-                alloy::hex::encode(vec![]), // empty metadata; messages are pre-authorized before submission
+                alloy::hex::encode(metadata),
                 message_hex,
             );
 
