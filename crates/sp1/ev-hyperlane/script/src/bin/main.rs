@@ -5,10 +5,6 @@
 //! ```shell
 //! RUST_LOG=info cargo run -p ev-hyperlane-script --release -- --execute --contract 0x6007cE81D2FD7b9b7f22e71cE9896e00d6017ba8 --height 268 --rpc-url http://127.0.0.1:8545
 //! ```
-//! or, to write a Groth16 proof and its public values to a directory:
-//! ```shell
-//! RUST_LOG=info cargo run -p ev-hyperlane-script --release -- --prove --contract 0x6007cE81D2FD7b9b7f22e71cE9896e00d6017ba8 --height 268 --rpc-url http://127.0.0.1:8545 --out-dir ./out
-//! ```
 
 use alloy_primitives::{hex::FromHex, Address, FixedBytes};
 use alloy_provider::{Provider, ProviderBuilder};
@@ -60,10 +56,6 @@ struct Args {
 
     #[arg(long)]
     rpc_url: String,
-
-    /// When proving, generate a Groth16 proof and write proof.bin and public_values.bin to this directory.
-    #[arg(long)]
-    out_dir: Option<std::path::PathBuf>,
 }
 
 #[derive(Parser, Debug)]
@@ -119,25 +111,13 @@ async fn main() {
                 .expect("failed to setup prover");
             let vk = pk.verifying_key();
             let start_time = Instant::now();
-            let proof = match &args.out_dir {
-                Some(_) => client.prove(&pk, stdin).groth16().await,
-                None => client.prove(&pk, stdin).await,
-            }
-            .expect("failed to generate proof");
+            let proof = client.prove(&pk, stdin).await.expect("failed to generate proof");
             println!("Proof generation time: {:?}", Instant::now() - start_time);
             client.verify(&proof, vk, None).expect("failed to verify proof");
             println!("Successfully verified proof!");
             let proof_outputs: HyperlaneTreeOutputs =
                 bincode::deserialize(proof.public_values.as_slice()).expect("Failed to deserialize proof outputs");
             println!("Proof outputs: {proof_outputs:?}");
-
-            if let Some(out_dir) = &args.out_dir {
-                std::fs::create_dir_all(out_dir).expect("failed to create output directory");
-                std::fs::write(out_dir.join("proof.bin"), proof.bytes()).expect("failed to write proof");
-                std::fs::write(out_dir.join("public_values.bin"), proof.public_values.as_slice())
-                    .expect("failed to write public values");
-                println!("Wrote proof.bin and public_values.bin to {}", out_dir.display());
-            }
         }
     }
 
