@@ -49,35 +49,45 @@ impl HyperlaneTreeInputs {
     }
 }
 
+/// Version of the `HyperlaneTreeOutputs` layout. Bump it whenever the committed fields change so that
+/// celestia-app x/zkism can reject public values produced by any other program version.
+pub const HYPERLANE_TREE_OUTPUTS_VERSION: u8 = 1;
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-/// Outputs of the hyperlane merkle tree circuit. Bincode encodes this as a fixed 104 bytes.
+/// Outputs of the hyperlane merkle tree circuit. Bincode encodes this as a fixed 101 bytes:
+/// `version (u8) || state_root (32) || merkle_tree_address (32) || tree_root (32) || count (u32 LE)`.
 pub struct HyperlaneTreeOutputs {
+    /// Always `HYPERLANE_TREE_OUTPUTS_VERSION`.
+    pub version: u8,
     pub state_root: [u8; 32],
     pub merkle_tree_address: [u8; 32],
     pub tree_root: [u8; 32],
-    pub count: u64,
+    pub count: u32,
 }
 
 #[cfg(test)]
 mod tests {
-    use super::HyperlaneTreeOutputs;
+    use super::{HYPERLANE_TREE_OUTPUTS_VERSION, HyperlaneTreeOutputs};
 
     #[test]
     fn test_hyperlane_tree_outputs_encoding() {
         let output = HyperlaneTreeOutputs {
+            version: HYPERLANE_TREE_OUTPUTS_VERSION,
             state_root: [1u8; 32],
             merkle_tree_address: [2u8; 32],
             tree_root: [3u8; 32],
             count: 0x0102,
         };
 
-        // celestia-app x/zkism decodes exactly this fixed 104 byte layout.
+        // celestia-app x/zkism decodes exactly this fixed 101 byte layout. The length can never collide with the
+        // legacy message id layout (72 + 32 * n bytes) and the version byte rejects any other program version.
         let serialized = bincode::serialize(&output).unwrap();
-        assert_eq!(serialized.len(), 104);
-        assert_eq!(&serialized[..32], &[1u8; 32]);
-        assert_eq!(&serialized[32..64], &[2u8; 32]);
-        assert_eq!(&serialized[64..96], &[3u8; 32]);
-        assert_eq!(&serialized[96..], &0x0102u64.to_le_bytes());
+        assert_eq!(serialized.len(), 101);
+        assert_eq!(serialized[0], 1);
+        assert_eq!(&serialized[1..33], &[1u8; 32]);
+        assert_eq!(&serialized[33..65], &[2u8; 32]);
+        assert_eq!(&serialized[65..97], &[3u8; 32]);
+        assert_eq!(&serialized[97..], &0x0102u32.to_le_bytes());
 
         let deserialized: HyperlaneTreeOutputs = bincode::deserialize(&serialized).unwrap();
         assert_eq!(output, deserialized);

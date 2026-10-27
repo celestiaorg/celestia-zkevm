@@ -211,7 +211,7 @@ impl HyperlaneMessageProver {
             .map(|m| m.message.id())
             .collect();
         let tree_root = alloy::hex::decode(snapshot.tree.root_with_ctx(&MerkleTree::zero_hashes())?)?;
-        if leaves.len() as u64 != message_proof.1.count || tree_root != message_proof.1.tree_root {
+        if leaves.len() != message_proof.1.count as usize || tree_root != message_proof.1.tree_root {
             return Err(anyhow::anyhow!(
                 "Local message store does not match the proven tree: {} leaves, proven count {}",
                 leaves.len(),

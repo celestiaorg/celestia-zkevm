@@ -12,14 +12,16 @@ Individual messages are then verified on the destination chain with a merkle pro
 | tree_proof | HyperlaneBranchProofInputs | Storage proof of the 32 tree branch nodes (slots 151-182) and the count (slot 183) |
 
 ### Program Outputs
-Bincode encoded as a fixed 104 bytes.
+Bincode encoded as a fixed 101 bytes. The version byte lets the destination chain reject public values produced by
+any other program version, and the length can never match the legacy message id layout.
 
 | Name | Type | Description |
 |---|---|---|
+| version | u8 | The output layout version, currently `1` |
 | state_root | [u8; 32] | The state root of the execution client reth at the target height |
 | merkle_tree_address | [u8; 32] | The MerkleTreeHook contract address, left-padded to 32 bytes |
 | tree_root | [u8; 32] | The root of the incremental tree |
-| count | u64 | The number of leaves in the incremental tree |
+| count | u32 | The number of leaves in the incremental tree |
 
 
 ## Usage
