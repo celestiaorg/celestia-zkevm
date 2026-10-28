@@ -51,6 +51,16 @@ pub const HYPERLANE_MERKLE_TREE_KEYS: [&str; 32] = [
     "0x00000000000000000000000000000000000000000000000000000000000000b6",
 ];
 
+/// The storage key of the Hyperlane Tree count in the MerkleTreeHook contract (slot 183).
+pub const HYPERLANE_MERKLE_TREE_COUNT_KEY: &str = "0x00000000000000000000000000000000000000000000000000000000000000b7";
+
+/// Returns the storage keys of the full Hyperlane Tree state: the 32 branch nodes followed by the count.
+pub fn hyperlane_merkle_tree_state_keys() -> Vec<&'static str> {
+    let mut keys = HYPERLANE_MERKLE_TREE_KEYS.to_vec();
+    keys.push(HYPERLANE_MERKLE_TREE_COUNT_KEY);
+    keys
+}
+
 /// HyperlaneBranchProof contains a Patricia Trie merkle proof (storage proof) for Hyperlane Tree branch nodes.
 #[derive(Serialize, Deserialize)]
 pub struct HyperlaneBranchProof {
@@ -212,18 +222,24 @@ impl HyperlaneBranchProofInputs {
             println!("Failed to verify account proof");
             return Ok(false);
         }
+        // Every key must have a proof and a value, otherwise zip would silently skip unproven keys.
+        if keys.len() != self.storage_proofs.len() || keys.len() != self.storage_values.len() {
+            println!("Storage proof count does not match key count");
+            return Ok(false);
+        }
         let storage_root = self.get_state_root()?;
         for (key, (proof, value)) in keys
             .iter()
             .zip(self.storage_proofs.iter().zip(self.storage_values.iter()))
         {
-            if value.as_slice() == U256::from(0).to_be_bytes::<32>().as_slice() {
-                continue;
-            }
+            let value: [u8; 32] = value.as_slice().try_into().context("storage value must be 32 bytes")?;
+            let value = U256::from_be_bytes(value);
+            // A zero value is absent from the storage trie and must be proven with an exclusion proof.
+            let expected = if value.is_zero() { None } else { Some(encode(value)) };
             if verify_proof(
                 storage_root,
                 Nibbles::unpack(digest_keccak(&alloy_primitives::hex::decode(key).unwrap())),
-                Some(encode(U256::from_be_bytes::<32>(value.as_slice().try_into().unwrap()))),
+                expected,
                 &proof.iter().map(|b| Bytes::from(b.to_vec())).collect::<Vec<Bytes>>(),
             )
             .is_err()

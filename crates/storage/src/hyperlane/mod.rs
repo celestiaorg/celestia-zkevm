@@ -60,6 +60,38 @@ mod tests {
     }
 
     #[test]
+    fn test_get_up_to_block() {
+        let tmp = TempDir::new().expect("cannot create temp directory");
+        let storage_path = dirs::home_dir()
+            .expect("cannot find home directory")
+            .join(&tmp)
+            .join("data");
+        let store = HyperlaneMessageStore::from_path(storage_path).unwrap();
+        let message = decode_hyperlane_message(&hex::decode(DEFAULT_MESSAGE).unwrap()).unwrap();
+        for (index, block) in [(0, 5), (1, 5), (2, 7), (3, 300)] {
+            let mut message = message.clone();
+            message.nonce = index as u32;
+            store
+                .insert_message(index, StoredHyperlaneMessage::new(message, Some(block)))
+                .unwrap();
+        }
+
+        let nonces = |block| -> Vec<u32> {
+            store
+                .get_up_to_block(block)
+                .unwrap()
+                .into_iter()
+                .map(|m| m.message.nonce)
+                .collect()
+        };
+        assert_eq!(nonces(4), Vec::<u32>::new());
+        assert_eq!(nonces(5), vec![0, 1]);
+        assert_eq!(nonces(299), vec![0, 1, 2]);
+        assert_eq!(nonces(300), vec![0, 1, 2, 3]);
+        store.reset_db().unwrap();
+    }
+
+    #[test]
     fn test_insert_snapshot() {
         let tmp = TempDir::new().expect("cannot create temp directory");
         let storage_path = dirs::home_dir()

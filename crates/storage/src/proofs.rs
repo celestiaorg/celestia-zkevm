@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use ev_zkevm_types::{
     block::{BatchExecOutput, BlockExecOutput},
-    hyperlane::io::HyperlaneMessageOutputs,
+    hyperlane::io::HyperlaneTreeOutputs,
 };
 use rocksdb::{ColumnFamily, ColumnFamilyDescriptor, DB, Options};
 use serde::{Deserialize, Serialize};
@@ -91,7 +91,7 @@ pub trait ProofStorage: Send + Sync {
         &self,
         height: u64,
         proof: &SP1ProofWithPublicValues,
-        output: &HyperlaneMessageOutputs,
+        output: &HyperlaneTreeOutputs,
     ) -> Result<(), ProofStorageError>;
 
     #[allow(dead_code)]
@@ -245,7 +245,7 @@ impl ProofStorage for RocksDbProofStorage {
         &self,
         height: u64,
         proof: &SP1ProofWithPublicValues,
-        _output: &HyperlaneMessageOutputs,
+        _output: &HyperlaneTreeOutputs,
     ) -> Result<(), ProofStorageError> {
         let cf = self.get_cf(CF_MEMBERSHIP_PROOFS)?;
 
@@ -523,7 +523,7 @@ pub mod testing {
             &self,
             height: u64,
             _proof: &SP1ProofWithPublicValues,
-            _output: &HyperlaneMessageOutputs,
+            _output: &HyperlaneTreeOutputs,
         ) -> Result<(), ProofStorageError> {
             let stored_proof = StoredMembershipProof {
                 proof_data: vec![9, 10, 11, 12],
