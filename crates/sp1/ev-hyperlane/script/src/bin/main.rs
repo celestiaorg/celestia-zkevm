@@ -10,13 +10,17 @@ use alloy_primitives::{hex::FromHex, Address, FixedBytes};
 use alloy_provider::{Provider, ProviderBuilder};
 use anyhow::{Context, Result};
 use clap::Parser;
+#[cfg(not(feature = "retry"))]
+use ev_zkevm_types::hyperlane::io::HyperlaneTreeOutputs;
 use ev_zkevm_types::hyperlane::{
-    io::{HyperlaneTreeInputs, HyperlaneTreeOutputs},
+    io::HyperlaneTreeInputs,
     proof::{hyperlane_merkle_tree_state_keys, HyperlaneBranchProof, HyperlaneBranchProofInputs},
 };
+#[cfg(feature = "retry")]
+use sp1_sdk::ProveRequest;
 #[cfg(not(feature = "retry"))]
 use sp1_sdk::ProvingKey;
-use sp1_sdk::{include_elf, Elf, ProveRequest, Prover, ProverClient, SP1Stdin};
+use sp1_sdk::{include_elf, Elf, Prover, ProverClient, SP1Stdin};
 use std::{str::FromStr, time::Instant};
 use url::Url;
 #[cfg(feature = "retry")]
