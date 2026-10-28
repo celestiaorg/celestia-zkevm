@@ -1,4 +1,4 @@
-FROM node:24-slim
+FROM node:24.22.1-slim
 
 # Install the hyperlane CLI (used for evm deployment)
 RUN npm install -g @hyperlane-xyz/cli
