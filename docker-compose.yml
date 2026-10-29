@@ -1,9 +1,9 @@
 services:
   celestia-init:
-    # celestia-app main (v9) + SP1 v6 zkism verifier (celestia-app branch
-    # jonas/update-sp1-v6). Pinned to the published remote image by digest.
+    # celestia-app branch jonas/root-history-hyperlane @ 71d90a17 (x/zkism root
+    # history, SP1 v6 verifier). Pinned to the published remote image by digest.
     # Override with CELESTIA_IMAGE to run a locally built celestia-app image.
-    image: ${CELESTIA_IMAGE:-docker.io/celestiaorg/celestia-app-standalone@sha256:82abe4e4985f6a37de8fc38a08f2587681d201c1721a25b2c29094359db06b23}
+    image: ${CELESTIA_IMAGE:-docker.io/celestiaorg/celestia-app-standalone@sha256:7c3118993893b874da537417c748452bcc00d471f488eaac0cb0221694bf2504}
     container_name: celestia-init
     entrypoint: /scripts/init.sh
     volumes:
@@ -12,10 +12,10 @@ services:
     restart: "no"
 
   celestia-validator:
-    # celestia-app main (v9) + SP1 v6 zkism verifier (celestia-app branch
-    # jonas/update-sp1-v6). Pinned to the published remote image by digest.
+    # celestia-app branch jonas/root-history-hyperlane @ 71d90a17 (x/zkism root
+    # history, SP1 v6 verifier). Pinned to the published remote image by digest.
     # Override with CELESTIA_IMAGE to run a locally built celestia-app image.
-    image: ${CELESTIA_IMAGE:-docker.io/celestiaorg/celestia-app-standalone@sha256:82abe4e4985f6a37de8fc38a08f2587681d201c1721a25b2c29094359db06b23}
+    image: ${CELESTIA_IMAGE:-docker.io/celestiaorg/celestia-app-standalone@sha256:7c3118993893b874da537417c748452bcc00d471f488eaac0cb0221694bf2504}
     container_name: celestia-validator
     ports:
       - "26656:26656"

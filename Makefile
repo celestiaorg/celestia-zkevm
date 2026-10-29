@@ -1,8 +1,9 @@
 PROJECT_NAME=$(shell basename "$(PWD)")
 
-# Pinned celestia-app image (x/zkism Groth16 verifier patched for SP1 v6 proofs).
+# Pinned celestia-app image: celestia-app jonas/root-history-hyperlane @ 71d90a17 (x/zkism root history,
+# tag 71d90a1 of celestiaorg/celestia-app-standalone). Groth16 verifier patched for SP1 v6 proofs.
 # Must match the digest referenced in docker-compose.yml.
-CELESTIA_IMAGE ?= docker.io/celestiaorg/celestia-app-standalone@sha256:82abe4e4985f6a37de8fc38a08f2587681d201c1721a25b2c29094359db06b23
+CELESTIA_IMAGE ?= docker.io/celestiaorg/celestia-app-standalone@sha256:7c3118993893b874da537417c748452bcc00d471f488eaac0cb0221694bf2504
 
 ## help: Get more info on make commands.
 help: Makefile
