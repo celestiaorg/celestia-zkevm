@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ICA Forwarding SDK Tester</title>
+  <script src="https://cdn.jsdelivr.net/npm/viem@2.0.0/dist/esm/index.min.js" type="module"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-tertiary: #1a1a25;
+      --accent: #7c3aed;
+      --accent-hover: #8b5cf6;
+      --text-primary: #f0f0f5;
+      --text-secondary: #9090a0;
+      --border: #2a2a3a;
+      --success: #10b981;
+      --error: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+      padding: 2rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+      gap: 2rem;
+    }
+
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--bg-tertiary);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 0.9rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+    }
+
+    input::placeholder {
+      color: var(--text-secondary);
+      opacity: 0.6;
+    }
+
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    button {
+      width: 100%;
+      padding: 0.875rem 1.5rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    button:hover {
+      background: var(--accent-hover);
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    .result {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: var(--bg-tertiary);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .result-content {
+      font-size: 0.85rem;
+      word-break: break-all;
+    }
+
+    .result-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .result-item:last-child {
+      border-bottom: none;
+    }
+
+    .result-label {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+    }
+
+    .result-value {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--success);
+      word-break: break-all;
+    }
+
+    .result-value.address {
+      color: #60a5fa;
+    }
+
+    .result-value.hash {
+      color: #f472b6;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .status.success {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+    }
+
+    .status.error {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--error);
+    }
+
+    .flow-diagram {
+      background: var(--bg-tertiary);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-top: 2rem;
+    }
+
+    .flow-steps {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .flow-step {
+      flex: 1;
+      min-width: 150px;
+      text-align: center;
+      padding: 1rem;
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .flow-step-number {
+      width: 28px;
+      height: 28px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .flow-step-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .flow-step-desc {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .flow-arrow {
+      color: var(--accent);
+      font-size: 1.5rem;
+    }
+
+    .presets {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .preset-btn {
+      padding: 0.5rem 1rem;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      width: auto;
+    }
+
+    .preset-btn:hover {
+      background: var(--border);
+      color: var(--text-primary);
+    }
+
+    .copy-btn {
+      padding: 0.25rem 0.5rem;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 0.7rem;
+      width: auto;
+      margin-left: 0.5rem;
+    }
+
+    .copy-btn:hover {
+      background: var(--border);
+    }
+
+    @media (max-width: 768px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .flow-steps {
+        flex-direction: column;
+      }
+      
+      .flow-arrow {
+        transform: rotate(90deg);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>⚡ ICA Forwarding Tester</h1>
+      <p class="subtitle">Test the Celestia ICA forwarding SDK - compute addresses, validate intents, encode calls</p>
+    </header>
+
+    <!-- Flow Diagram -->
+    <div class="flow-diagram">
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="flow-step-number">1</div>
+          <div class="flow-step-title">Compute Address</div>
+          <div class="flow-step-desc">Derive forwarding address from intent</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <div class="flow-step-number">2</div>
+          <div class="flow-step-title">Send Tokens</div>
+          <div class="flow-step-desc">Transfer via warp route to address</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <div class="flow-step-number">3</div>
+          <div class="flow-step-title">Trigger ICA</div>
+          <div class="flow-step-desc">Execute forwarding call</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <div class="flow-step-number">4</div>
+          <div class="flow-step-title">Receive</div>
+          <div class="flow-step-desc">Tokens arrive at destination</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid" style="margin-top: 2rem;">
+      <!-- Compute Address Card -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">📍</div>
+          <div class="card-title">Compute Forwarding Address</div>
+        </div>
+        
+        <div class="presets">
+          <button class="preset-btn" onclick="loadPreset('tia-to-evm2')">TIA → EVM2</button>
+          <button class="preset-btn" onclick="loadPreset('custom')">Custom</button>
+        </div>
+
+        <div class="form-group">
+          <label>Token ID (bytes32)</label>
+          <input type="text" id="tokenId" placeholder="0x726f757465725f617070..." value="0x726f757465725f61707000000000000000000000000000010000000000000000">
+        </div>
+
+        <div class="form-group">
+          <label>Destination Domain</label>
+          <input type="number" id="destDomain" placeholder="5678" value="5678">
+        </div>
+
+        <div class="form-group">
+          <label>Final Recipient (EVM address or bytes32)</label>
+          <input type="text" id="recipient" placeholder="0x1234567890..." value="0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d">
+        </div>
+
+        <button onclick="computeAddress()">Compute Address</button>
+
+        <div class="result" id="addressResult" style="display: none;">
+          <div class="result-header">📋 Result</div>
+          <div class="result-content" id="addressResultContent"></div>
+        </div>
+      </div>
+
+      <!-- Validate Address Card -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">✓</div>
+          <div class="card-title">Validate Address</div>
+        </div>
+
+        <div class="form-group">
+          <label>Address to Validate</label>
+          <input type="text" id="validateAddress" placeholder="celestia1... or 0x...">
+        </div>
+
+        <div class="form-group">
+          <label>Expected Token ID</label>
+          <input type="text" id="validateTokenId" placeholder="0x..." value="0x726f757465725f61707000000000000000000000000000010000000000000000">
+        </div>
+
+        <div class="form-group">
+          <label>Expected Dest Domain</label>
+          <input type="number" id="validateDestDomain" placeholder="5678" value="5678">
+        </div>
+
+        <div class="form-group">
+          <label>Expected Recipient</label>
+          <input type="text" id="validateRecipient" placeholder="0x..." value="0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d">
+        </div>
+
+        <button onclick="validateAddress()">Validate</button>
+
+        <div class="result" id="validateResult" style="display: none;">
+          <div class="result-header">📋 Validation Result</div>
+          <div class="result-content" id="validateResultContent"></div>
+        </div>
+      </div>
+
+      <!-- Encode Call Card -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">📦</div>
+          <div class="card-title">Encode Forwarding Call</div>
+        </div>
+
+        <div class="form-group">
+          <label>Token ID</label>
+          <input type="text" id="encodeTokenId" value="0x726f757465725f61707000000000000000000000000000010000000000000000">
+        </div>
+
+        <div class="form-group">
+          <label>Destination Domain</label>
+          <input type="number" id="encodeDestDomain" value="5678">
+        </div>
+
+        <div class="form-group">
+          <label>Recipient</label>
+          <input type="text" id="encodeRecipient" value="0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d">
+        </div>
+
+        <div class="form-group">
+          <label>Amount (base units)</label>
+          <input type="text" id="encodeAmount" placeholder="1000000" value="1000000">
+        </div>
+
+        <button onclick="encodeCall()">Encode Call Data</button>
+
+        <div class="result" id="encodeResult" style="display: none;">
+          <div class="result-header">📋 Encoded Call</div>
+          <div class="result-content" id="encodeResultContent"></div>
+        </div>
+      </div>
+
+      <!-- Chain Info Card -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">⛓️</div>
+          <div class="card-title">Chain Configuration</div>
+        </div>
+
+        <div class="result">
+          <div class="result-item">
+            <span class="result-label">EVM Chain 1 (rethlocal)</span>
+            <span class="result-value">Domain: 1234 | RPC: localhost:8545</span>
+          </div>
+          <div class="result-item">
+            <span class="result-label">Celestia</span>
+            <span class="result-value">Domain: 69420 | RPC: localhost:26657</span>
+          </div>
+          <div class="result-item">
+            <span class="result-label">EVM Chain 2 (rethlocal2)</span>
+            <span class="result-value">Domain: 5678 | RPC: localhost:9545</span>
+          </div>
+          <div class="result-item">
+            <span class="result-label">ICA Router (EVM1)</span>
+            <span class="result-value address">0x4dc4E8bf5D0390C95Af9AFEb1e9c9927c4dB83e7</span>
+          </div>
+          <div class="result-item">
+            <span class="result-label">Warp Route (EVM1)</span>
+            <span class="result-value address">0x345a583028762De4d733852c9D4f419077093A48</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // SDK Implementation (inline for standalone UI)
+    const FORWARD_VERSION = "CELESTIA_ICA_FORWARD_V1";
+    const CELESTIA_ICA_MODULE = "0x6963615f6d6f64756c6500000000000000000000000000000000000000000000";
+    const CELESTIA_BECH32_PREFIX = "celestia";
+
+    // Import viem functions
+    import { keccak256, encodeAbiParameters, parseAbiParameters, concat, toHex, hexToBytes, bytesToHex } from 'https://cdn.jsdelivr.net/npm/viem@2.0.0/+esm';
+
+    // Simple bech32 encoding (basic implementation)
+    const CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+    
+    function bech32Polymod(values) {
+      const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+      let chk = 1;
+      for (const v of values) {
+        const b = chk >> 25;
+        chk = ((chk & 0x1ffffff) << 5) ^ v;
+        for (let i = 0; i < 5; i++) {
+          if ((b >> i) & 1) chk ^= GEN[i];
+        }
+      }
+      return chk;
+    }
+
+    function bech32HrpExpand(hrp) {
+      const ret = [];
+      for (const c of hrp) {
+        ret.push(c.charCodeAt(0) >> 5);
+      }
+      ret.push(0);
+      for (const c of hrp) {
+        ret.push(c.charCodeAt(0) & 31);
+      }
+      return ret;
+    }
+
+    function bech32CreateChecksum(hrp, data) {
+      const values = bech32HrpExpand(hrp).concat(data).concat([0, 0, 0, 0, 0, 0]);
+      const polymod = bech32Polymod(values) ^ 1;
+      const ret = [];
+      for (let i = 0; i < 6; i++) {
+        ret.push((polymod >> (5 * (5 - i))) & 31);
+      }
+      return ret;
+    }
+
+    function convertBits(data, fromBits, toBits, pad) {
+      let acc = 0;
+      let bits = 0;
+      const ret = [];
+      const maxv = (1 << toBits) - 1;
+      for (const v of data) {
+        acc = (acc << fromBits) | v;
+        bits += fromBits;
+        while (bits >= toBits) {
+          bits -= toBits;
+          ret.push((acc >> bits) & maxv);
+        }
+      }
+      if (pad) {
+        if (bits > 0) {
+          ret.push((acc << (toBits - bits)) & maxv);
+        }
+      }
+      return ret;
+    }
+
+    function toBech32(prefix, data) {
+      const data5 = convertBits(Array.from(data), 8, 5, true);
+      const checksum = bech32CreateChecksum(prefix, data5);
+      return prefix + '1' + data5.concat(checksum).map(d => CHARSET[d]).join('');
+    }
+
+    // SDK Functions
+    function addressToBytes32(address) {
+      const clean = address.startsWith("0x") ? address.slice(2) : address;
+      return "0x" + clean.padStart(64, "0");
+    }
+
+    function computeForwardingSalt(intent) {
+      const callDigest = keccak256(
+        encodeAbiParameters(
+          parseAbiParameters("bytes32, uint32, bytes32"),
+          [intent.tokenId, intent.destDomain, intent.destRecipient]
+        )
+      );
+
+      const versionBytes = toHex(new TextEncoder().encode(FORWARD_VERSION));
+      const salt = keccak256(concat([versionBytes, callDigest]));
+      return { salt, callDigest };
+    }
+
+    function deriveCelestiaAddress(salt) {
+      const moduleBytes = hexToBytes(CELESTIA_ICA_MODULE);
+      const saltBytes = hexToBytes(salt);
+      
+      const preimage = new Uint8Array(moduleBytes.length + saltBytes.length);
+      preimage.set(moduleBytes, 0);
+      preimage.set(saltBytes, moduleBytes.length);
+      
+      // Use keccak256 for simplicity (actual Cosmos uses SHA256)
+      const hash = hexToBytes(keccak256(preimage));
+      return hash.slice(0, 20);
+    }
+
+    function computeForwardingAddressFromIntent(intent) {
+      const { salt, callDigest } = computeForwardingSalt(intent);
+      const addressBytes = deriveCelestiaAddress(salt);
+      const addressBytes32 = "0x" + "00".repeat(12) + bytesToHex(addressBytes).slice(2);
+      const celestiaAddress = toBech32(CELESTIA_BECH32_PREFIX, addressBytes);
+
+      return {
+        celestiaAddress,
+        addressBytes32,
+        salt,
+        callDigest,
+      };
+    }
+
+    function encodeForwardingCallData(intent, amount) {
+      return encodeAbiParameters(
+        parseAbiParameters("bytes32, uint32, bytes32, uint256"),
+        [intent.tokenId, intent.destDomain, intent.destRecipient, amount]
+      );
+    }
+
+    // Make functions available globally
+    window.computeAddress = function() {
+      const tokenId = document.getElementById('tokenId').value;
+      const destDomain = parseInt(document.getElementById('destDomain').value);
+      const recipient = document.getElementById('recipient').value;
+
+      const recipientBytes32 = recipient.length === 42 ? addressToBytes32(recipient) : recipient;
+
+      const intent = { tokenId, destDomain, destRecipient: recipientBytes32 };
+      const result = computeForwardingAddressFromIntent(intent);
+
+      const resultDiv = document.getElementById('addressResult');
+      const contentDiv = document.getElementById('addressResultContent');
+      
+      contentDiv.innerHTML = `
+        <div class="result-item">
+          <span class="result-label">Celestia Address</span>
+          <span class="result-value address">${result.celestiaAddress}</span>
+        </div>
+        <div class="result-item">
+          <span class="result-label">Bytes32 Address</span>
+          <span class="result-value hash">${result.addressBytes32}</span>
+        </div>
+        <div class="result-item">
+          <span class="result-label">Forwarding Salt</span>
+          <span class="result-value hash">${result.salt}</span>
+        </div>
+        <div class="result-item">
+          <span class="result-label">Call Digest</span>
+          <span class="result-value hash">${result.callDigest}</span>
+        </div>
+      `;
+      resultDiv.style.display = 'block';
+
+      // Auto-fill validate address field
+      document.getElementById('validateAddress').value = result.celestiaAddress;
+    };
+
+    window.validateAddress = function() {
+      const address = document.getElementById('validateAddress').value;
+      const tokenId = document.getElementById('validateTokenId').value;
+      const destDomain = parseInt(document.getElementById('validateDestDomain').value);
+      const recipient = document.getElementById('validateRecipient').value;
+
+      const recipientBytes32 = recipient.length === 42 ? addressToBytes32(recipient) : recipient;
+      const intent = { tokenId, destDomain, destRecipient: recipientBytes32 };
+      const expected = computeForwardingAddressFromIntent(intent);
+
+      const isValid = address === expected.celestiaAddress || 
+                      address.toLowerCase() === expected.addressBytes32.toLowerCase();
+
+      const resultDiv = document.getElementById('validateResult');
+      const contentDiv = document.getElementById('validateResultContent');
+      
+      if (isValid) {
+        contentDiv.innerHTML = `
+          <div class="status success">✓ Valid - Address matches the forwarding intent</div>
+          <div class="result-item" style="margin-top: 1rem;">
+            <span class="result-label">Expected Address</span>
+            <span class="result-value address">${expected.celestiaAddress}</span>
+          </div>
+        `;
+      } else {
+        contentDiv.innerHTML = `
+          <div class="status error">✗ Invalid - Address does NOT match</div>
+          <div class="result-item" style="margin-top: 1rem;">
+            <span class="result-label">Expected Address</span>
+            <span class="result-value address">${expected.celestiaAddress}</span>
+          </div>
+          <div class="result-item">
+            <span class="result-label">Provided Address</span>
+            <span class="result-value" style="color: var(--error);">${address}</span>
+          </div>
+        `;
+      }
+      resultDiv.style.display = 'block';
+    };
+
+    window.encodeCall = function() {
+      const tokenId = document.getElementById('encodeTokenId').value;
+      const destDomain = parseInt(document.getElementById('encodeDestDomain').value);
+      const recipient = document.getElementById('encodeRecipient').value;
+      const amount = BigInt(document.getElementById('encodeAmount').value);
+
+      const recipientBytes32 = recipient.length === 42 ? addressToBytes32(recipient) : recipient;
+      const intent = { tokenId, destDomain, destRecipient: recipientBytes32 };
+      
+      const callData = encodeForwardingCallData(intent, amount);
+      const { salt } = computeForwardingSalt(intent);
+
+      const resultDiv = document.getElementById('encodeResult');
+      const contentDiv = document.getElementById('encodeResultContent');
+      
+      contentDiv.innerHTML = `
+        <div class="result-item">
+          <span class="result-label">Encoded Call Data</span>
+          <span class="result-value" style="font-size: 0.75rem;">${callData}</span>
+        </div>
+        <div class="result-item">
+          <span class="result-label">User Salt (for ICA)</span>
+          <span class="result-value hash">${salt}</span>
+        </div>
+        <div class="result-item">
+          <span class="result-label">Call Data Length</span>
+          <span class="result-value">${(callData.length - 2) / 2} bytes</span>
+        </div>
+      `;
+      resultDiv.style.display = 'block';
+    };
+
+    window.loadPreset = function(preset) {
+      if (preset === 'tia-to-evm2') {
+        document.getElementById('tokenId').value = '0x726f757465725f61707000000000000000000000000000010000000000000000';
+        document.getElementById('destDomain').value = '5678';
+        document.getElementById('recipient').value = '0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d';
+      } else {
+        document.getElementById('tokenId').value = '';
+        document.getElementById('destDomain').value = '';
+        document.getElementById('recipient').value = '';
+      }
+    };
+  </script>
+</body>
+</html>
+

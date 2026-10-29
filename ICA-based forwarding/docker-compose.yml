@@ -1,0 +1,238 @@
+services:
+  celestia-init:
+    image: ghcr.io/celestiaorg/celestia-app-standalone:feature-zk-execution-ism
+    container_name: celestia-init
+    entrypoint: ["/bin/sh", "/scripts/init.sh"]
+    volumes:
+      - ./testnet/celestia-app/init.sh:/scripts/init.sh:ro
+      - celestia-app:/home/celestia/.celestia-app
+    restart: "no"
+
+  celestia-validator:
+    image: ghcr.io/celestiaorg/celestia-app-standalone:feature-zk-execution-ism
+    container_name: celestia-validator
+    ports:
+      - "26656:26656"
+      - "26657:26657"
+      - "9090:9090"
+    healthcheck:
+      test: [
+        "CMD-SHELL",
+        "bh=$(curl -sf http://localhost:26657/status | jq -r '.result.sync_info.latest_block_height'); if [ \"$$bh\" -gt 1 ]; then exit 0; else exit 1; fi"
+      ]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+    volumes:
+      - celestia-app:/home/celestia/.celestia-app
+    command: >
+      start --force-no-bbr
+    depends_on:
+      celestia-init:
+        condition: service_completed_successfully
+    networks:
+      - celestia-zkevm-net
+
+  celestia-bridge:
+    image: ghcr.io/celestiaorg/celestia-node:v0.23.0-rc0
+    container_name: celestia-bridge
+    volumes:
+      - ./testnet/celestia-node/init.sh:/scripts/init.sh:ro
+      - celestia-bridge:/home/celestia
+    entrypoint: ["/bin/sh", "/scripts/init.sh"]
+    command: celestia bridge start --log.level.module share/discovery:fatal --keyring.keyname node --rpc.skip-auth
+    ports:
+      - "26658:26658"
+      - "2121:2121"
+    healthcheck:
+      test: >
+        curl -sf -X POST http://localhost:26658
+        -H "Content-Type: application/json"
+        -d '{"id":1,"jsonrpc":"2.0","method":"node.Ready","params":[]}' | grep true
+      interval: 10s
+      start_period: 10s
+    depends_on:
+      celestia-validator:
+        condition: service_healthy
+    networks:
+      - celestia-zkevm-net
+
+  ev-node-evm-single:
+    image: ghcr.io/evstack/ev-node-evm-single:main
+    container_name: ev-node-evm-single
+    entrypoint: ["/bin/sh", "/scripts/entrypoint.sh"]
+    ports:
+      - "7331:7331"
+    volumes:
+      - ./testnet/ev-node/entrypoint.sh:/scripts/entrypoint.sh:ro
+      - evm-single-data:/data
+    environment:
+      - EVM_ENGINE_URL=http://reth:8551
+      - EVM_ETH_URL=http://reth:8545
+      - EVM_JWT_SECRET=f747494bb0fb338a0d71f5f9fe5b5034c17cc988c229b59fd71e005ee692e9bf
+      - EVM_GENESIS_HASH=0x72fe82115f994fbc350021230af421d67c39c9d2ff19ba494f5651af7363ff03
+      - EVM_BLOCK_TIME=1s
+      - EVM_SIGNER_PASSPHRASE=secret
+      - DA_ADDRESS=http://celestia-bridge:26658
+      - DA_AUTH_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiLCJhZG1pbiJdfQ.qxoN_a-k7aZZE77VSpfgyvI_0eNvJ_OgBsT35zxUQnQ
+      - DA_NAMESPACE=00000000000000000000000000000000000000b7b24d9321578eb83626
+    depends_on:
+      celestia-bridge:
+        condition: service_healthy
+      reth:
+        condition: service_started
+    networks:
+      - celestia-zkevm-net
+
+  reth:
+    container_name: reth
+    image: ghcr.io/evstack/ev-reth:latest
+    ports:
+      - "9001:9001" # metrics
+      - "30303:30303" # eth/66 peering
+      - "8545:8545" # rpc
+      - "8551:8551" # engine
+      - "8546:8546" # ws
+    volumes:
+      - ./testnet/reth:/home/reth
+      - reth:/home/reth/eth-home
+    entrypoint: /bin/sh -c
+    command:
+      - |
+          ev-reth node \
+            --chain /home/reth/eth-genesis.json \
+            --datadir /home/reth/eth-home \
+            --metrics 0.0.0.0:9001 \
+            --authrpc.addr 0.0.0.0 \
+            --authrpc.port 8551 \
+            --authrpc.jwtsecret /home/reth/jwt.hex \
+            --http --http.addr 0.0.0.0 --http.port 8545 \
+            --http.api eth,net,web3,txpool \
+            --ws --ws.addr 0.0.0.0 --ws.port 8546 \
+            --ws.api eth,net,web3 \
+            --engine.persistence-threshold 0 \
+            --engine.memory-block-buffer-target 0 \
+            --disable-discovery \
+            --txpool.pending-max-count 200000 \
+            --txpool.pending-max-size 200 \
+            --txpool.queued-max-count 200000 \
+            --txpool.queued-max-size 200 \
+            --txpool.max-account-slots 2048 \
+            --txpool.max-new-txns 2048 \
+            --txpool.additional-validation-tasks 16 \
+            --rpc.eth-proof-window 120000
+    networks:
+      - celestia-zkevm-net
+
+  reth-2:
+    container_name: reth-2
+    image: ghcr.io/evstack/ev-reth:latest
+    ports:
+      - "9101:9001" # metrics
+      - "31303:30303" # eth/66 peering
+      - "9545:8545" # rpc
+      - "9551:8551" # engine
+      - "9546:8546" # ws
+    volumes:
+      - ./testnet/reth-2:/home/reth
+      - reth-2:/home/reth/eth-home
+    entrypoint: /bin/sh -c
+    command:
+      - |
+          ev-reth node \
+            --chain /home/reth/eth-genesis.json \
+            --datadir /home/reth/eth-home \
+            --metrics 0.0.0.0:9001 \
+            --authrpc.addr 0.0.0.0 \
+            --authrpc.port 8551 \
+            --authrpc.jwtsecret /home/reth/jwt.hex \
+            --http --http.addr 0.0.0.0 --http.port 8545 \
+            --http.api eth,net,web3,txpool \
+            --ws --ws.addr 0.0.0.0 --ws.port 8546 \
+            --ws.api eth,net,web3 \
+            --engine.persistence-threshold 0 \
+            --engine.memory-block-buffer-target 0 \
+            --disable-discovery \
+            --txpool.pending-max-count 200000 \
+            --txpool.pending-max-size 200 \
+            --txpool.queued-max-count 200000 \
+            --txpool.queued-max-size 200 \
+            --txpool.max-account-slots 2048 \
+            --txpool.max-new-txns 2048 \
+            --txpool.additional-validation-tasks 16 \
+            --rpc.eth-proof-window 120000
+    networks:
+      - celestia-zkevm-net
+
+  ev-node-evm-2:
+    image: ghcr.io/evstack/ev-node-evm-single:main
+    container_name: ev-node-evm-2
+    entrypoint: ["/bin/sh", "/scripts/entrypoint.sh"]
+    ports:
+      - "7332:7331"
+    volumes:
+      - ./testnet/ev-node/entrypoint.sh:/scripts/entrypoint.sh:ro
+      - evm-single-data-2:/data
+    environment:
+      - EVM_ENGINE_URL=http://reth-2:8551
+      - EVM_ETH_URL=http://reth-2:8545
+      - EVM_JWT_SECRET=f747494bb0fb338a0d71f5f9fe5b5034c17cc988c229b59fd71e005ee692e9bf
+      - EVM_GENESIS_HASH=0x72fe82115f994fbc350021230af421d67c39c9d2ff19ba494f5651af7363ff03
+      - EVM_BLOCK_TIME=1s
+      - EVM_SIGNER_PASSPHRASE=secret
+      - DA_ADDRESS=http://celestia-bridge:26658
+      - DA_AUTH_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiLCJhZG1pbiJdfQ.qxoN_a-k7aZZE77VSpfgyvI_0eNvJ_OgBsT35zxUQnQ
+      - DA_NAMESPACE=00000000000000000000000000000000000000b7b24d9321578eb83627
+    depends_on:
+      celestia-bridge:
+        condition: service_healthy
+      reth-2:
+        condition: service_started
+    networks:
+      - celestia-zkevm-net
+
+  hyperlane-init:
+    image: ghcr.io/celestiaorg/hyperlane-init:latest
+    container_name: hyperlane-init
+    volumes:
+      - hyperlane:/home/hyperlane/
+    entrypoint: "scripts/docker-entrypoint.sh"
+    depends_on:
+      celestia-validator:
+        condition: service_healthy
+      reth:
+        condition: service_started
+      reth-2:
+        condition: service_started
+    restart: "no"
+    networks:
+      - celestia-zkevm-net
+
+  relayer:
+    image: gcr.io/abacus-labs-dev/hyperlane-agent:main
+    platform: linux/amd64
+    container_name: relayer
+    environment:
+      - CONFIG_FILES=/app/config/config.json
+    volumes:
+      - ./hyperlane/relayer-config.json:/app/config/config.json
+    command: "/app/relayer"
+    depends_on:
+      hyperlane-init:
+        condition: service_completed_successfully
+    networks:
+      - celestia-zkevm-net
+
+volumes:
+  celestia-app:
+  celestia-bridge:
+  hyperlane:
+  reth:
+  reth-2:
+  evm-single-data:
+  evm-single-data-2:
+
+networks:
+  celestia-zkevm-net:
+    driver: bridge
+

@@ -1,0 +1,38 @@
+{
+  "name": "@celestia-ica/forwarding-sdk",
+  "version": "0.1.0",
+  "description": "SDK for ICA-based token forwarding through Celestia",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts",
+    "forward:compute": "ts-node src/cli/compute-address.ts",
+    "forward:execute": "ts-node src/cli/execute-forward.ts"
+  },
+  "bin": {
+    "ica-forward": "./dist/cli/index.js"
+  },
+  "dependencies": {
+    "@cosmjs/amino": "^0.32.0",
+    "@cosmjs/crypto": "^0.32.0",
+    "@cosmjs/encoding": "^0.32.0",
+    "@cosmjs/proto-signing": "^0.32.0",
+    "@cosmjs/stargate": "^0.32.0",
+    "commander": "^11.1.0",
+    "ethers": "^6.9.0",
+    "viem": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+

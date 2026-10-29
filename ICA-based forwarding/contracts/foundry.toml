@@ -1,0 +1,19 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc = "0.8.19"
+
+# Remappings for hyperlane contracts
+remappings = [
+    "@openzeppelin/=lib/openzeppelin-contracts/",
+    "hyperlane/=lib/hyperlane-monorepo/solidity/contracts/"
+]
+
+[rpc_endpoints]
+rethlocal = "http://localhost:8545"
+rethlocal2 = "http://localhost:9545"
+
+[etherscan]
+# No etherscan for local chains
+

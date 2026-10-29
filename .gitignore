@@ -14,3 +14,9 @@ pgo-data.profdata
 proof_storage/
 
 hyperlane/hyp
+
+# Node.js
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
