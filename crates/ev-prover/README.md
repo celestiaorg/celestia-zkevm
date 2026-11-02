@@ -22,7 +22,7 @@ Run the following commands from the root of the repository.
 
 1. Install the binary to Cargo binary directory ~/.cargo/bin
     ```shell
-    cargo install --path ./crates/ev-prover
+    cargo install --locked --path ./crates/ev-prover
     ```
 
 2. Initialize a new `ev-prover` home directory and configuration file from the environment (delete `~/.ev-prover/config/config.yaml` to regenerate it after a new testnet run):
