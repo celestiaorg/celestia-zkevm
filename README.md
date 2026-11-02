@@ -56,6 +56,14 @@ NETWORK_PRIVATE_KEY="PRIVATE_KEY" to the SP1 prover network private key from Cel
     docker logs -f hyperlane-init
     ```
 
+    `hyperlane-init` builds the Hyperlane CLI from the [celestiaorg/hyperlane-monorepo](https://github.com/celestiaorg/hyperlane-monorepo) fork's latest `main` and deploys fresh contracts on every run. Contract addresses depend on the CLI's deploy sequence, so none are committed; the deployed ones land in `testnet/hyperlane/generated/` (the registry, the rendered relayer config and `deployed.env`). Source `deployed.env` before running the make targets below or `ev-prover init`:
+
+    ```shell
+    set -a
+    source testnet/hyperlane/generated/deployed.env
+    set +a
+    ```
+
 5. Run a Hyperlane warp transfer, bridging `utia` from celestia to the reth service.
 
     ```shell

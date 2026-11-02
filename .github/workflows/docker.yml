@@ -13,6 +13,11 @@ on:
       - '**/Dockerfile'
       - '.github/workflows/docker.yml'
       - 'testnet/hyperlane/**'
+  # The image builds the Hyperlane CLI from the celestiaorg/hyperlane-monorepo
+  # fork's main, so rebuild daily and on demand to track it.
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
 
 jobs:
   build-and-push:
@@ -53,6 +58,7 @@ jobs:
           context: .
           file: ./testnet/hyperlane/Dockerfile
           platforms: linux/amd64
+          pull: true
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

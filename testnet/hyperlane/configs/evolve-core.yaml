@@ -1,35 +1,13 @@
 defaultHook:
-  address: "0x1D957dA7A6988f5a9d2D2454637B4B7fea0Aeea5"
   beneficiary: "0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d"
   maxProtocolFee: "0"
   owner: "0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d"
   protocolFee: "0"
   type: protocolFee
 defaultIsm:
-  address: "0xFCb1d485ef46344029D9E8A7925925e146B3430E"
   type: testIsm
-interchainAccountRouter:
-  address: "0x67cff9B0F9F25c00C71bd8300c3f38553088e234"
-  commitmentIsm:
-    address: "0x7A0786AEc411DbCa7c127C233Bc7E56bc073E821"
-    owner: "0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d"
-    type: offchainLookupIsm
-    urls:
-      - https://commitment-read-ism.hyperlane.xyz
-  hook: "0x0000000000000000000000000000000000000000"
-  interchainSecurityModule:
-    address: "0x67cff9B0F9F25c00C71bd8300c3f38553088e234"
-    isms: {}
-    owner: "0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d"
-    type: interchainAccountRouting
-  mailbox: "0xa05915fD6E32A1AA7E67d800164CaCB12487142d"
-  owner: "0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d"
-  remoteRouters: {}
-  routerType: regular
 owner: "0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d"
 proxyAdmin:
-  address: "0x48fd1226D797400779bBfAf1706F5Fb8da04Ae91"
   owner: "0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d"
 requiredHook:
-  address: "0x6007cE81D2FD7b9b7f22e71cE9896e00d6017ba8"
   type: merkleTreeHook

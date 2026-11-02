@@ -1,5 +1,4 @@
 defaultHook:
-  address: "0x726f757465725f706f73745f6469737061746368000000040000000000000000"
   beneficiary: celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q
   oracleConfig:
     evolve:
@@ -11,14 +10,11 @@ defaultHook:
   owner: celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q
   type: interchainGasPaymaster
 defaultIsm:
-  address: "0x726f757465725f69736d00000000000000000000000000010000000000000001"
   domains:
     evolve:
-      address: "0x726f757465725f69736d00000000000000000000000000000000000000000000"
       type: testIsm
   owner: celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q
   type: domainRoutingIsm
 owner: celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q
 requiredHook:
-  address: "0x726f757465725f706f73745f6469737061746368000000030000000000000001"
   type: merkleTreeHook

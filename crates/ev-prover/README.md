@@ -6,19 +6,16 @@ It encapsulates the SP1 programs maintained under `sp1`, and uses the `sp1_sdk::
 The default mode (batch) aggregates a range of blocks and proves them in one go, using a single GPU instance.
 
 ### Setup
-1. Start the docker network locally
+1. Start the docker network locally and wait for `hyperlane-init` to finish (`docker logs -f hyperlane-init`)
     ```shell
     make start
     ```
 
-2. Deploy the ZKISM
+2. Export the addresses `hyperlane-init` generated; `ev-prover init` and the make targets read them from the environment
     ```shell
-    make deploy-ism
-    ```
-
-3. Update the ISM used by Hyperlane to the new ZKISM
-    ```shell
-    make update-ism
+    set -a
+    source testnet/hyperlane/generated/deployed.env
+    set +a
     ```
 
 Run the following commands from the root of the repository.
@@ -28,12 +25,22 @@ Run the following commands from the root of the repository.
     cargo install --path ./crates/ev-prover
     ```
 
-2. Initialize a new `ev-prover` home directory and configuration file with defaults:
+2. Initialize a new `ev-prover` home directory and configuration file from the environment (delete `~/.ev-prover/config/config.yaml` to regenerate it after a new testnet run):
     ```shell
     ev-prover init
     ```
 
-3. (Optional) If you have authentication enabled on your Celestia node, you need to set the auth token in the config file.
+3. Deploy the ZKISM
+    ```shell
+    make deploy-ism
+    ```
+
+4. Update the ISM used by Hyperlane to the new ZKISM
+    ```shell
+    make update-ism
+    ```
+
+5. (Optional) If you have authentication enabled on your Celestia node, you need to set the auth token in the config file.
 
    First, retrieve your auth token:
     ```shell
@@ -51,7 +58,7 @@ Run the following commands from the root of the repository.
       evreth_rpc: "http://localhost:8545"
     ```
 
-4. Start the `ev-prover` application binary using:
+6. Start the `ev-prover` application binary using:
 
     ```shell
     RUST_LOG="ev_prover=debug" ev-prover start

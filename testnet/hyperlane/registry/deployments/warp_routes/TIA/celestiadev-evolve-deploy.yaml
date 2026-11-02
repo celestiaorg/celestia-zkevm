@@ -1,6 +1,5 @@
 celestiadev:
   decimals: 6
-  mailbox: "0x68797065726c616e650000000000000000000000000000000000000000000000"
   name: TIA
   owner: celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q
   symbol: TIA
@@ -8,7 +7,6 @@ celestiadev:
   type: collateral
 evolve:
   decimals: 6
-  mailbox: "0xa05915fD6E32A1AA7E67d800164CaCB12487142d"
   name: TIA
   owner: "0xaF9053bB6c4346381C77C2FeD279B17ABAfCDf4d"
   symbol: TIA

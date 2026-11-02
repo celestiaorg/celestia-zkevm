@@ -6,7 +6,7 @@ use anyhow::{anyhow, Context, Result};
 use celestia_types::nmt::Namespace;
 use rsp_primitives::genesis::Genesis;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::{info, warn};
 
 pub const DEFAULT_NAMESPACE: &str = "a8045f161bf468bf4d44";
 pub const DEFAULT_PUB_KEY_HEX: &str = "3964a68700cf76e215626e076e76d23bd1f4c3b31184b5822fd7b4df15d5ce9a";
@@ -43,6 +43,29 @@ impl Default for Config {
 }
 
 impl Config {
+    /// Builds a config from the environment, falling back to the defaults for anything unset.
+    ///
+    /// The Hyperlane EVM addresses have no meaningful default: the docker testnet generates
+    /// them on every run (testnet/hyperlane/generated/deployed.env), so they must come from
+    /// MAILBOX_CONTRACT_ADDRESS and MERKLE_TREE_CONTRACT_ADDRESS.
+    pub fn from_env() -> Result<Self> {
+        let evm = match EvmHyperlaneConfig::from_env() {
+            Ok(evm) => evm,
+            Err(err) => {
+                warn!("{err:#}; writing placeholder EVM addresses. Source testnet/hyperlane/generated/deployed.env and re-run init.");
+                EvmHyperlaneConfig::default()
+            }
+        };
+        Ok(Self {
+            rpc: RpcConfig::from_env()?,
+            hyperlane: HyperlaneConfig {
+                evm,
+                celestia: CelestiaHyperlaneConfig::from_env()?,
+            },
+            ..Self::default()
+        })
+    }
+
     /// The default service home directory.
     pub const APP_HOME: &str = ".ev-prover";
     /// The default configuration directory.
@@ -70,11 +93,11 @@ impl Config {
 
         let config_path = config_dir.join(Self::CONFIG_FILE);
         if !config_path.exists() {
-            info!("Creating default config at {config_path:?}");
-            let yaml = serde_yaml::to_string(&Config::default())?;
+            info!("Creating config from the environment at {config_path:?}");
+            let yaml = serde_yaml::to_string(&Config::from_env()?)?;
             fs::write(&config_path, yaml)?;
         } else {
-            info!("Config file already exists at {config_path:?}");
+            info!("Config file already exists at {config_path:?}; delete it to regenerate from the environment");
         }
 
         let genesis_path = config_dir.join(Self::GENESIS_FILE);
@@ -217,9 +240,9 @@ pub struct EvmHyperlaneConfig {
 
 impl EvmHyperlaneConfig {
     pub fn from_env() -> Result<Self> {
-        let mailbox_address = env::var("MAILBOX_CONTRACT_ADDRESS").expect("MAILBOX_CONTRACT_ADDRESS must be set");
+        let mailbox_address = env::var("MAILBOX_CONTRACT_ADDRESS").context("MAILBOX_CONTRACT_ADDRESS must be set")?;
         let merkle_tree_address =
-            env::var("MERKLE_TREE_CONTRACT_ADDRESS").expect("MERKLE_TREE_CONTRACT_ADDRESS must be set");
+            env::var("MERKLE_TREE_CONTRACT_ADDRESS").context("MERKLE_TREE_CONTRACT_ADDRESS must be set")?;
         Ok(Self {
             mailbox_address,
             merkle_tree_address,
@@ -228,6 +251,7 @@ impl EvmHyperlaneConfig {
 }
 
 impl Default for EvmHyperlaneConfig {
+    /// Placeholders: the testnet generates these addresses on every run, see [`Config::from_env`].
     fn default() -> Self {
         Self {
             mailbox_address: "0xa05915fd6e32a1aa7e67d800164cacb12487142d".into(),

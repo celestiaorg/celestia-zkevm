@@ -140,8 +140,13 @@ services:
       - celestia-zkevm-net
 
   hyperlane-init:
-    image: ghcr.io/celestiaorg/hyperlane-init:main
-    platform: linux/amd64
+    # Hyperlane CLI built from the celestiaorg/hyperlane-monorepo fork's main by
+    # .github/workflows/docker.yml (see testnet/hyperlane/Dockerfile). It deploys
+    # Hyperlane on both chains and writes the resulting addresses to
+    # ./testnet/hyperlane/generated, which the relayer, the Makefile and
+    # ev-prover read. Override with HYPERLANE_INIT_IMAGE to run a locally built
+    # image (`make docker-build-hyperlane` tags it ghcr.io/celestiaorg/hyperlane-init:local).
+    image: ${HYPERLANE_INIT_IMAGE:-ghcr.io/celestiaorg/hyperlane-init:main}
     container_name: hyperlane-init
     volumes:
       - ./testnet/hyperlane:/home/hyperlane/
@@ -160,9 +165,10 @@ services:
     platform: linux/amd64
     container_name: relayer
     environment:
-      - CONFIG_FILES=/app/config/config.json
+      - CONFIG_FILES=/app/config/relayer-config.json
     volumes:
-      - ./testnet/hyperlane/relayer-config.json:/app/config/config.json
+      # Rendered by hyperlane-init from testnet/hyperlane/relayer-config.template.json.
+      - ./testnet/hyperlane/generated:/app/config
     command: "/app/relayer"
     depends_on:
       hyperlane-init:
