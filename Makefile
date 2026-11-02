@@ -115,6 +115,7 @@ spamoor:
 docker-build-hyperlane:
 	@echo "--> Building hyperlane-init image"
 	@docker build -t ghcr.io/celestiaorg/hyperlane-init:local -f testnet/hyperlane/Dockerfile .
+	@echo "Run it with HYPERLANE_INIT_IMAGE=ghcr.io/celestiaorg/hyperlane-init:local HYPERLANE_INIT_PLATFORM=linux/$$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') make start"
 .PHONY: docker-build-hyperlane
 
 deploy-ism:

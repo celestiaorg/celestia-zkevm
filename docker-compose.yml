@@ -144,9 +144,12 @@ services:
     # .github/workflows/docker.yml (see testnet/hyperlane/Dockerfile). It deploys
     # Hyperlane on both chains and writes the resulting addresses to
     # ./testnet/hyperlane/generated, which the relayer, the Makefile and
-    # ev-prover read. Override with HYPERLANE_INIT_IMAGE to run a locally built
-    # image (`make docker-build-hyperlane` tags it ghcr.io/celestiaorg/hyperlane-init:local).
+    # ev-prover read. The published image is linux/amd64 only and runs under
+    # emulation elsewhere. Override HYPERLANE_INIT_IMAGE (and HYPERLANE_INIT_PLATFORM)
+    # to run a locally built image: `make docker-build-hyperlane` tags one for the
+    # host platform as ghcr.io/celestiaorg/hyperlane-init:local.
     image: ${HYPERLANE_INIT_IMAGE:-ghcr.io/celestiaorg/hyperlane-init:main}
+    platform: ${HYPERLANE_INIT_PLATFORM:-linux/amd64}
     container_name: hyperlane-init
     volumes:
       - ./testnet/hyperlane:/home/hyperlane/
